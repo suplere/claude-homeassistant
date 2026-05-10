@@ -1,51 +1,693 @@
-# Example Home Assistant Automations
-# These are example automations showcasing common patterns
-
-- id: 'example_motion_lights'
-  alias: 'Example: Motion Activated Lights'
-  description: 'Turn on lights when motion is detected'
+- id: '1717674886307'
+  alias: 'FVE: solcast updates'
+  description: New API call Solcast
   trigger:
-    - platform: state
-      entity_id: binary_sensor.living_room_motion
-      to: 'on'
-  condition:
-    - condition: state
-      entity_id: sun.sun
-      state: 'below_horizon'
+  - platform: time
+    at:
+    - 06:30
+    - 08:00
+    - 09:00
+    - '10:00'
+    - '11:00'
+    - '12:00'
+    - '13:00'
+    - '14:00'
+    - '15:30'
+    - '18:30'
+  condition: []
   action:
-    - service: light.turn_on
-      target:
-        entity_id: light.living_room_main
+  - service: solcast_solar.update_forecasts
+    data: {}
+  mode: single
+- id: '1717828775243'
+  alias: Přetoky nastavit
+  description: Nastavení přetoků do sítě
+  triggers:
+  - entity_id:
+    - sensor.current_spot_electricity_hour_order
+    trigger: state
+  conditions: []
+  actions:
+  - if:
+    - condition: numeric_state
+      entity_id: sensor.current_spot_electricity_price
+      below: 0
+    then:
+    - data: {}
+      action: script.1717590841020
+    - data:
+        device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+        parameter: grid_export_limit
+        value: 200
+      action: goodwe.set_parameter
+    - action: notify.mobile_app_evzen_iphone
+      metadata: {}
       data:
-        brightness_pct: 75
-
-- id: 'example_schedule_lights'
-  alias: 'Example: Evening Light Schedule'
-  description: 'Turn on evening lights at sunset'
-  trigger:
-    - platform: sun
-      event: sunset
-      offset: "-00:30:00"
-  action:
-    - service: light.turn_on
-      target:
-        area_id: living_room
-      data:
-        brightness_pct: 50
-
-- id: 'example_device_notification'
-  alias: 'Example: Low Battery Notification'
-  description: 'Notify when device battery is low'
-  trigger:
-    - platform: numeric_state
-      entity_id: sensor.phone_battery_level
-      below: 20
-  condition:
+        title: Omezený výkon FVE
+        message: Jsou záporné ceny, nastaven omezený výkon elektrárny.
+    else:
+    - data: {}
+      action: script.1717590811347
+    - data:
+        device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+        parameter: grid_export_limit
+        value: 10000
+      action: goodwe.set_parameter
+  mode: single
+- id: '1718351641005'
+  alias: Ovládání filtrace - přetoky
+  description: Ovládání filtrace na základě přetoků na fázi L2
+  triggers:
+  - minutes: /5
+    trigger: time_pattern
+  conditions:
+  - condition: or
+    conditions:
     - condition: time
-      after: '09:00:00'
-      before: '22:00:00'
-  action:
-    - service: notify.mobile_app
+      after: 09:00:00
+      before: '18:00:00'
+    - condition: state
+      entity_id: switch.filtrace_switch
+      state:
+      - 'on'
+  actions:
+  - if:
+    - condition: or
+      conditions:
+      - condition: numeric_state
+        entity_id: sensor.active_power_l2
+        above: 400
+      - condition: state
+        entity_id: input_boolean.time_to_use_overflows
+        state: 'on'
+    then:
+    - metadata: {}
+      data: {}
+      action: switch.turn_on
+      target:
+        entity_id: switch.filtrace_switch
+    else:
+    - metadata: {}
+      data: {}
+      action: switch.turn_off
+      target:
+        entity_id: switch.filtrace_switch
+  mode: single
+- id: '1745924882313'
+  alias: Get data from DIP
+  description: ''
+  triggers:
+  - trigger: time
+    at: 00:45:00
+  conditions: []
+  actions:
+  - event: run_pnd
+    event_data: {}
+  mode: single
+- id: '1772571943115'
+  alias: Time to Use Overflow
+  description: ''
+  use_blueprint:
+    path: jan-trnka/time_to_use_overflow.yaml
+    input:
+      target_switch:
+        entity_id: input_boolean.time_to_use_overflows
+      average_20_consumption: sensor.base_average_consumption_in_last_20_minutes
+      average_20_production: sensor.average_pv_production_in_last_20_minutes
+      max_price: 0.7
+      spot_price: sensor.current_spot_electricity_price
+      goodwe_actual_soc: sensor.battery_state_of_charge
+- id: '1772629832725'
+  alias: Auto Set DoD
+  description: ''
+  use_blueprint:
+    path: jan-trnka/auto_set_dod.yaml
+    input:
+      production_forecast: sensor.solcast_pv_forecast_forecast_today
+      capacity: input_number.battery_capacity
+      winter_dod: input_number.winter_dod
+      goodwe_actual_soc: sensor.battery_state_of_charge
+      average_consumption: sensor.base_average_daily_consumption
+      threshold_for_changing_dod: 3
+      goodwe_dod_target:
+        entity_id: number.goodwe_maximum_vybiti_v_siti
+- id: '1772632237910'
+  alias: Fully Charge Battery Once a Week
+  description: ''
+  use_blueprint:
+    path: jan-trnka/battery_fully_charge.yaml
+    input:
+      count_charges: sensor.count_of_100_battery_state_in_a_week
+      time: 02:00:00
+      production_forecast: sensor.solcast_pv_forecast_forecast_today
+      goodwe_power:
+        entity_id: number.goodwe_vykon_v_ekonomickem_rezimu
+      goodwe_mode:
+        entity_id: select.goodwe_provozni_rezim_stridace
+      goodwe_actual_soc: sensor.battery_state_of_charge
+      goodwe_final_soc:
+        entity_id: number.goodwe_stav_nabiti_baterie_ekonomickem_rezimu
+- id: '1772656770792'
+  alias: Discharge Battery to the Grid
+  description: ''
+  use_blueprint:
+    path: jan-trnka/discharge_battery_to_grid.yaml
+    input:
+      spot_price: sensor.current_spot_electricity_price
+      max_spot_price: sensor.spot_most_expensive_electricity_today
+      min_price: 3
+      production_forecast: sensor.solcast_pv_forecast_forecast_tomorrow
+      goodwe_actual_soc: sensor.battery_state_of_charge
+      capacity: input_number.battery_capacity
+      avg_night_consumption: sensor.base_average_night_consumption_in_last_3_days
+      consumption: sensor.base_house_consumption
+      goodwe_power:
+        entity_id: number.goodwe_vykon_v_ekonomickem_rezimu
+      goodwe_mode:
+        entity_id: select.goodwe_provozni_rezim_stridace
+      prediction_threshold: 20
+      goodwe_dod: number.goodwe_maximum_vybiti_v_siti
+- id: '1772657599353'
+  alias: Eco Discharge When Low Price at Noon
+  description: ''
+  use_blueprint:
+    path: jan-trnka/eco_discharge_when_low_price.yaml
+    input:
+      average_consumption: sensor.base_average_daily_consumption
+      production_forecast: sensor.solcast_pv_forecast_forecast_today
+      average_20_production: sensor.average_pv_production_in_last_20_minutes
+      average_20_consumption: sensor.base_average_consumption_in_last_20_minutes
+      spot_price: sensor.current_spot_electricity_price
+      spot_price_dict: sensor.current_spot_electricity_hour_order
+      is_cheapest_3_hours_block: binary_sensor.spot_electricity_is_cheapest_3_hours_block
+      capacity: input_number.battery_capacity
+      goodwe_actual_soc: sensor.battery_state_of_charge
+      goodwe_power:
+        entity_id: number.goodwe_vykon_v_ekonomickem_rezimu
+      goodwe_mode:
+        entity_id: select.goodwe_provozni_rezim_stridace
+      time: 02:00:00
+- id: '1772657930649'
+  alias: Turn Off Eco Discharge Mode When Peak
+  description: ''
+  use_blueprint:
+    path: jan-trnka/turn_off_eco_discharge_when_peak.yaml
+    input:
+      consumption: sensor.base_house_consumption
+      pv_power: sensor.pv_power
+      goodwe_power: number.goodwe_vykon_v_ekonomickem_rezimu
+      capacity: input_number.battery_capacity
+      goodwe_mode: select.goodwe_provozni_rezim_stridace
+- id: '1772991037309'
+  alias: Disable Overflow
+  description: ''
+  use_blueprint:
+    path: jan-trnka/disable_overflow.yaml
+    input:
+      spot_price: sensor.current_spot_electricity_price
+      goodwe_entity:
+        entity_id: number.goodwe_limit_dodavky_do_site
+      limit_value_W: 10000
+      limit_value_percentage: 100
+- id: predictive_overflow_negative_price
+  alias: Prediktivni pretoky pri zaporne cene
+  description: Pri zapornych cenach prebirame rizeni pretoku od blueprintu Time to
+    Use Overflow. Pouziva Solcast predpoved a stav baterie pro prediktivni rozhodovani.
+  mode: queued
+  max: 5
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.current_spot_electricity_price
+    below: 0
+    id: price_negative
+  - trigger: numeric_state
+    entity_id: sensor.current_spot_electricity_price
+    above: 0
+    id: price_positive
+  - trigger: numeric_state
+    entity_id: sensor.battery_state_of_charge
+    above: 80
+    id: battery_rising
+  - trigger: time_pattern
+    minutes: /15
+    id: periodic
+  conditions: []
+  actions:
+  - variables:
+      battery_soc: '{{ states(''sensor.battery_state_of_charge'') | float(0) }}'
+      battery_capacity: '{{ states(''input_number.battery_capacity'') | float(10)
+        }}'
+      forecast_remaining: '{{ states(''sensor.solcast_pv_forecast_forecast_remaining_today'')
+        | float(0) }}'
+      avg_daily_consumption: '{{ states(''sensor.base_average_daily_consumption'') | float(0)
+        }}'
+      hours_until_evening: '{{ [((today_at(''20:00'') - now()).total_seconds() / 3600),
+        0] | max }}'
+      remaining_battery_capacity: '{{ (100 - battery_soc) / 100 * battery_capacity
+        }}'
+      remaining_consumption: '{{ avg_daily_consumption * hours_until_evening / 24
+        }}'
+      predicted_overflow: '{{ forecast_remaining - remaining_battery_capacity - remaining_consumption
+        }}'
+      current_month: '{{ now().month }}'
+      is_summer_season: '{{ current_month in [4, 5, 6, 7, 8, 9] }}'
+      is_daytime: '{{ hours_until_evening > 0 }}'
+      should_enable_overflow: '{{ is_summer_season and is_daytime and (battery_soc
+        >= 80 or predicted_overflow > 1) }}'
+      spot_price: '{{ states(''sensor.current_spot_electricity_price'') | float(0)
+        }}'
+      is_negative_price: '{{ spot_price < 0 }}'
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: price_negative
+      sequence:
+      - action: automation.turn_off
+        target:
+          entity_id: automation.time_to_use_overflow
+        data:
+          stop_actions: true
+      - if:
+        - condition: template
+          value_template: '{{ should_enable_overflow }}'
+        then:
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.time_to_use_overflows
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: Prediktivni pretoky
+            message: 'Zaporna cena ({{ spot_price }} CZK). Blueprint deaktivovan,
+              pretoky zapnuty. SoC: {{ battery_soc }}%, predpovedeny prebytek: {{
+              predicted_overflow | round(1) }} kWh.'
+        else:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.time_to_use_overflows
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: Prediktivni pretoky
+            message: 'Zaporna cena ({{ spot_price }} CZK). Blueprint deaktivovan,
+              pretoky zatim vypnuty. SoC: {{ battery_soc }}%, predpovedeny prebytek:
+              {{ predicted_overflow | round(1) }} kWh.'
+    - conditions:
+      - condition: trigger
+        id:
+        - battery_rising
+        - periodic
+      - condition: template
+        value_template: '{{ is_negative_price }}'
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ should_enable_overflow }}'
+        then:
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.time_to_use_overflows
+        else:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.time_to_use_overflows
+    - conditions:
+      - condition: trigger
+        id: price_positive
+      sequence:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.time_to_use_overflows
+      - action: automation.turn_on
+        target:
+          entity_id: automation.time_to_use_overflow
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: Prediktivni pretoky
+          message: Cena zpet kladna ({{ spot_price }} CZK). Blueprint reaktivovan,
+            rizeni vraceno.
+- id: 'kia_ev6_force_update_on_charge'
+  alias: 'KIA EV6: force update při začátku nabíjení'
+  description: Při reálném startu nabíjení (actual_power > 0.3 kW) vyžádá aktuální
+    data z auta pro čerstvý SoC.
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.ecovolter_revcr01c00002056_actual_power
+    above: 0.3
+    for: '0:01:00'
+  conditions:
+  - condition: template
+    value_template: >-
+      {{ this.attributes.last_triggered == none
+      or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}
+  actions:
+  - action: kia_uvo.force_update
+    target:
+      device_id: 2758b89b148f1176f740b6d11130c2d9
+  mode: single
+- id: ev_nabijeni_zaporne_ceny_pretoky
+  alias: EV nabíjení - záporné ceny nebo přetoky
+  description: Nabíjí EV 6A při záporné ceně OTE (jen se solárním přebytkem) nebo
+    přetocích >4.1kW. Spravuje GoodWe export limit při záporných cenách.
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.current_spot_electricity_price
+    below: 0
+    id: cena_zaporna
+  - trigger: numeric_state
+    entity_id: sensor.current_spot_electricity_price
+    above: 0
+    id: cena_kladna
+  - trigger: numeric_state
+    entity_id: sensor.energy_sell
+    above: 4100
+    for: '0:02:00'
+    id: pretoky_start
+  - trigger: state
+    entity_id: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
+    to: 'on'
+    id: auto_pripojeno
+  conditions: []
+  actions:
+  - variables:
+      ma_nabijeni: '{{ is_state(''switch.ecovolter_revcr01c00002056_is_charging_enable'',
+        ''on'') }}'
+      je_cena_zaporna: '{{ states(''sensor.current_spot_electricity_price'') | float(0)
+        < 0 }}'
+      je_pretoky_velke: '{{ states(''sensor.energy_sell'') | float(0) > 4100 }}'
+      je_vozidlo_pripojeno: '{{ is_state(''binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected'',
+        ''on'') }}'
+      ev6_soc: '{{ states(''sensor.ev6_ev_battery_level'') | int(0) }}'
+      ev6_limit: '{{ states(''number.ev6_ac_charging_limit'') | int(80) }}'
+      ev6_soc_ok: '{{ states(''sensor.ev6_ev_battery_level'') not in [''unavailable'',
+        ''unknown''] }}'
+      je_povoleno: '{{ is_state(''input_boolean.ev_nabijeni_povoleno'', ''on'') }}'
+      je_solar_dost: '{{ states(''sensor.solcast_pv_forecast_power_now'') | float(0)
+        > 1000 }}'
+  - condition: template
+    value_template: '{{ je_povoleno }}'
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: pretoky_start
+      - condition: template
+        value_template: '{{ not ma_nabijeni and je_vozidlo_pripojeno and (not ev6_soc_ok
+          or ev6_soc < ev6_limit) }}'
+      sequence:
+      - action: number.set_value
+        target:
+          entity_id: number.ecovolter_revcr01c00002056_target_current
+        data:
+          value: 6
+      - action: switch.turn_on
+        target:
+          entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+      - wait_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
+          | float(0) > 0.3 }}'
+        timeout: '0:01:30'
+        continue_on_timeout: true
+      - if:
+        - condition: template
+          value_template: '{{ wait.timed_out }}'
+        then:
+        - action: switch.turn_off
+          target:
+            entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: EV nabíjení - chyba
+            message: Auto nepřijímá nabíjení (přetoky). Nabíjení zastaveno.
+        else:
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: EV nabíjení spuštěno
+            message: Přetoky >4.1 kW. Nabíjení EV 6A aktivní.
+    - conditions:
+      - condition: trigger
+        id: cena_zaporna
+      - condition: template
+        value_template: '{{ not ma_nabijeni and je_vozidlo_pripojeno and je_solar_dost
+          and (not ev6_soc_ok or ev6_soc < ev6_limit) }}'
+      sequence:
+      - action: number.set_value
+        target:
+          entity_id: number.goodwe_limit_dodavky_do_site
+        data:
+          value: 10000
+      - action: number.set_value
+        target:
+          entity_id: number.ecovolter_revcr01c00002056_target_current
+        data:
+          value: 6
+      - action: switch.turn_on
+        target:
+          entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+      - wait_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
+          | float(0) > 0.3 }}'
+        timeout: '0:01:30'
+        continue_on_timeout: true
+      - if:
+        - condition: template
+          value_template: '{{ wait.timed_out }}'
+        then:
+        - action: switch.turn_off
+          target:
+            entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+        - action: number.set_value
+          target:
+            entity_id: number.goodwe_limit_dodavky_do_site
+          data:
+            value: 0
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: EV nabíjení - chyba
+            message: Auto nepřijímá nabíjení (záporná cena). Nabíjení zastaveno.
+        else:
+        - delay: '0:00:45'
+        - if:
+          - condition: or
+            conditions:
+            - condition: numeric_state
+              entity_id: sensor.energy_buy
+              above: 1500
+            - condition: numeric_state
+              entity_id: sensor.fve_battery_discharge_w
+              above: 3000
+          then:
+          - action: switch.turn_off
+            target:
+              entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+          - action: number.set_value
+            target:
+              entity_id: number.goodwe_limit_dodavky_do_site
+            data:
+              value: 0
+          - action: notify.mobile_app_evzen_iphone
+            data:
+              title: EV nabíjení zastaveno
+              message: Nedostatek solárů (import > 1.5 kW). Nabíjení EV zastaveno.
+          else:
+          - action: notify.mobile_app_evzen_iphone
+            data:
+              title: EV nabíjení spuštěno
+              message: Záporná cena + solár. Nabíjení EV 6A aktivní.
+    - conditions:
+      - condition: trigger
+        id: auto_pripojeno
+      - condition: template
+        value_template: '{{ not ev6_soc_ok or ev6_soc < ev6_limit }}'
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ je_pretoky_velke }}'
+        - condition: template
+          value_template: '{{ je_cena_zaporna and je_solar_dost }}'
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ je_cena_zaporna }}'
+        then:
+        - action: number.set_value
+          target:
+            entity_id: number.goodwe_limit_dodavky_do_site
+          data:
+            value: 10000
+      - action: number.set_value
+        target:
+          entity_id: number.ecovolter_revcr01c00002056_target_current
+        data:
+          value: 6
+      - action: switch.turn_on
+        target:
+          entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+      - wait_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
+          | float(0) > 0.3 }}'
+        timeout: '0:01:30'
+        continue_on_timeout: true
+      - if:
+        - condition: template
+          value_template: '{{ wait.timed_out }}'
+        then:
+        - action: switch.turn_off
+          target:
+            entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+        - if:
+          - condition: template
+            value_template: '{{ je_cena_zaporna }}'
+          then:
+          - action: number.set_value
+            target:
+              entity_id: number.goodwe_limit_dodavky_do_site
+            data:
+              value: 0
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: EV nabíjení - chyba
+            message: Auto nepřijímá nabíjení (připojení vozu). Nabíjení zastaveno.
+        else:
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: EV nabíjení spuštěno
+            message: Auto připojeno, podmínky splněny. Nabíjení EV 6A aktivní.
+    - conditions:
+      - condition: trigger
+        id: cena_kladna
+      - condition: template
+        value_template: '{{ ma_nabijeni and not je_pretoky_velke }}'
+      sequence:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: EV nabíjení zastaveno
+          message: Cena kladná a přetoky <4.1 kW. Nabíjení EV zastaveno.
+  mode: queued
+  max: 5
+- id: ev_zastavit_velky_import
+  alias: EV zastavit - příliš velký import
+  description: Zastaví nabíjení EV pokud import ze sítě překročí 1.5 kW po dobu 2
+    minut.
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.energy_buy
+    above: 1500
+    for: '0:02:00'
+  conditions:
+  - condition: state
+    entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.ev_nabijeni_povoleno
+    state: 'on'
+  actions:
+  - action: switch.turn_off
+    target:
+      entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+  - if:
+    - condition: numeric_state
+      entity_id: sensor.current_spot_electricity_price
+      below: 0
+    then:
+    - action: number.set_value
+      target:
+        entity_id: number.goodwe_limit_dodavky_do_site
       data:
-        title: "Low Battery Alert"
-        message: "Your phone battery is at {{ states('sensor.phone_battery_level') }}%"
+        value: 0
+  - action: notify.mobile_app_evzen_iphone
+    data:
+      title: EV nabíjení zastaveno
+      message: Import > 1.5 kW po dobu 2 min — málo solárů. Nabíjení EV zastaveno.
+  mode: single
+- id: ev_zastavit_plna_baterie
+  alias: EV zastavit - auto přestalo nabíjet
+  description: Detekuje že auto přestalo přijímat proud (actual_power < 0.3 kW po
+    dobu 5 min) a uklidí goodwe_limit při záporné ceně.
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.ecovolter_revcr01c00002056_actual_power
+    below: 0.3
+    for: '0:05:00'
+  conditions:
+  - condition: state
+    entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.ev_nabijeni_povoleno
+    state: 'on'
+  actions:
+  - action: switch.turn_off
+    target:
+      entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+  - if:
+    - condition: numeric_state
+      entity_id: sensor.current_spot_electricity_price
+      below: 0
+    then:
+    - action: number.set_value
+      target:
+        entity_id: number.goodwe_limit_dodavky_do_site
+      data:
+        value: 0
+  - action: notify.mobile_app_evzen_iphone
+    data:
+      title: EV nabíjení zastaveno
+      message: Auto přestalo přijímat proud. Nabíjení ukončeno.
+  mode: single
+- id: ev_regulace_proudu
+  alias: EV regulace proudu při záporné ceně
+  description: Každé 2 min upravuje nabíjecí proud 6–10A aby EV pohltilo solární
+    přebytek a nešlo nic do sítě za záporné ceny.
+  triggers:
+  - trigger: time_pattern
+    minutes: /2
+  conditions:
+  - condition: state
+    entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.ev_nabijeni_povoleno
+    state: 'on'
+  - condition: numeric_state
+    entity_id: sensor.current_spot_electricity_price
+    below: 0
+  actions:
+  - variables:
+      aktualni_proud: '{{ states(''number.ecovolter_revcr01c00002056_target_current'')
+        | float(6) }}'
+      energy_sell: '{{ states(''sensor.energy_sell'') | float(0) }}'
+      battery_discharge: '{{ states(''sensor.fve_battery_discharge_w'') | float(0) }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ energy_sell > 500 and aktualni_proud < 10 }}'
+      sequence:
+      - action: number.set_value
+        target:
+          entity_id: number.ecovolter_revcr01c00002056_target_current
+        data:
+          value: '{{ [aktualni_proud + 1, 10] | min }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ battery_discharge > 2000 and aktualni_proud > 6 }}'
+      sequence:
+      - action: number.set_value
+        target:
+          entity_id: number.ecovolter_revcr01c00002056_target_current
+        data:
+          value: '{{ [aktualni_proud - 1, 6] | max }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ battery_discharge > 2000 and aktualni_proud <= 6 }}'
+      sequence:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+      - action: number.set_value
+        target:
+          entity_id: number.goodwe_limit_dodavky_do_site
+        data:
+          value: 0
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: EV nabíjení zastaveno
+          message: Baterie kryje EV i při minimu 6A. Nabíjení zastaveno.
+  mode: single

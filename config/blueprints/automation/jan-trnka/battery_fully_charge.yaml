@@ -1,0 +1,113 @@
+blueprint:
+  name: Fully Charge Battery Once a Week
+  description: Charges battery to 100 % if wasn't charged during last week
+  domain: automation
+  input:
+    time:
+      name: Time
+      description: Time of start battery charging
+      selector:
+        time: {}
+    count_charges:
+      name: Count of 100% Battery State in a Week
+      description: Sensor which holds count of 100% battery charges in last 7 days
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+          multiple: false
+    production_forecast:
+      name: PV Production Forecast
+      description: Forecast of today's PV production
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+          multiple: false
+    goodwe_power:
+      name: GoodWe Charging Power
+      description: Target entity describing power of charging in eco charge mode
+      selector:
+        target:
+          entity:
+          - domain:
+            - number
+            integration: goodwe
+    goodwe_final_soc:
+      name: GoodWe Final SoC Entity
+      description: Target entity describing final value of battery charging
+      selector:
+        target:
+          entity:
+          - domain:
+            - number
+            integration: goodwe
+    goodwe_mode:
+      name: GoodWe Inverter Mode
+      description: Target entity describing mode of the inverter
+      selector:
+        target:
+          entity:
+          - domain:
+            - select
+            integration: goodwe
+    goodwe_actual_soc:
+      name: GoodWe SoC Sensor
+      description: GoodWe actual state of charge sensor
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+            integration: goodwe
+          multiple: false
+  source_url: https://github.com/jan-trnka/home-assistant-pv-system/blob/main/battery_fully_charge.yaml
+triggers:
+- trigger: time
+  at: !input time
+conditions:
+- condition: numeric_state
+  entity_id: !input count_charges
+  below: 1
+- condition: numeric_state
+  entity_id: !input production_forecast
+  below: input_number.threshold_for_changing_dod
+- condition: state
+  entity_id: input_select.season
+  state: Winter
+variables:
+  soc: !input goodwe_actual_soc
+actions:
+- action: number.set_value
+  target: !input goodwe_power
+  data:
+    value: 20
+- delay: 00:00:05
+- action: number.set_value
+  target: !input goodwe_final_soc
+  data:
+    value: 100
+- delay: 00:00:05
+- action: select.select_option
+  target: !input goodwe_mode
+  data:
+    option: eco_charge
+- sequence:
+  - wait_template: '{{ states(soc) | float(default=0) > 99 }}'
+  - action: select.select_option
+    target: !input goodwe_mode
+    data:
+      option: general
+  - delay: 00:00:05
+  - action: number.set_value
+    target: !input goodwe_power
+    data:
+      value: 0
+  - delay: 00:00:05
+  - action: number.set_value
+    target: !input goodwe_final_soc
+    data:
+      value: 0
+mode: single

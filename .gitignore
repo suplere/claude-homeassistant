@@ -2,6 +2,9 @@
 
 # Secrets and sensitive data
 config/secrets.yaml
+config/appdaemon/apps/apps.yaml
+config/solcast_solar/
+config/.ha_run.lock
 config/.storage/
 config/home-assistant.log*
 config/OZW_Log.txt

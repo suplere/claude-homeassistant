@@ -1,0 +1,72 @@
+### HISTORY sensors
+- platform: history_stats
+  type: time
+  name: Filtrace spuštěna
+  unique_id: filtrace_spustena_daily_hours
+  entity_id: switch.filtrace_switch
+  state: "on"
+  start: "{{ today_at() }}"
+  end: "{{ now() }}"
+- platform: history_stats
+  name: Count of 100% Battery State in a Week
+  entity_id: sensor.battery_state_of_charge
+  state: 100
+  type: count
+  start: "{{ now().replace(hour=0, minute=0, second=0) - timedelta(days=7) }}"
+  end: "{{ now() }}"
+- platform: statistics
+  unique_id: sensor.avg_daily_consumption
+  name: Average Daily Consumption
+  entity_id: sensor.final_daily_house_consumption
+  state_characteristic: mean
+  sampling_size: 7
+  max_age:
+    days: 7
+- platform: statistics
+  unique_id: sensor.avg_night_consumption
+  name: Average Night Consumption In Last 3 Days
+  entity_id: sensor.nighttime_consumption
+  state_characteristic: mean
+  sampling_size: 28080
+  max_age:
+    hours: 85
+- platform: statistics
+  unique_id: sensor.avg_power
+  name: "Average PV Production In Last 20 Minutes"
+  entity_id: sensor.pv_power
+  state_characteristic: mean
+  sampling_size: 240
+  max_age:
+    minutes: 20
+- platform: statistics
+  unique_id: sensor.avg_consumption
+  name: "Average Consumption In Last 20 Minutes"
+  entity_id: sensor.house_consumption
+  state_characteristic: mean
+  sampling_size: 240
+  max_age:
+    minutes: 20
+- platform: statistics
+  unique_id: sensor.base_avg_consumption
+  name: "Base Average Consumption In Last 20 Minutes"
+  entity_id: sensor.base_house_consumption
+  state_characteristic: mean
+  sampling_size: 240
+  max_age:
+    minutes: 20
+- platform: statistics
+  unique_id: sensor.base_avg_daily_consumption
+  name: "Base Average Daily Consumption"
+  entity_id: sensor.base_final_daily_house_consumption
+  state_characteristic: mean
+  sampling_size: 7
+  max_age:
+    days: 7
+- platform: statistics
+  unique_id: sensor.base_avg_night_consumption
+  name: "Base Average Night Consumption In Last 3 Days"
+  entity_id: sensor.base_nighttime_consumption
+  state_characteristic: mean
+  sampling_size: 28080
+  max_age:
+    hours: 85

@@ -1,62 +1,171 @@
-# Example Home Assistant Configuration File
-# This is a minimal example configuration for demonstration purposes
+# Loads default set of integrations. Do not remove.
+default_config:
 
-# Basic Home Assistant configuration
-homeassistant:
-  name: Home
-  latitude: 37.7749
-  longitude: -122.4194
-  elevation: 0
-  unit_system: metric
-  currency: USD
-  country: US
-  time_zone: America/Los_Angeles
-
-# Load frontend
+# Load frontend themes from the themes folder
 frontend:
+  themes: !include_dir_merge_named themes
 
-# Enable configuration panel
-config:
-
-# Enable the map panel
-map:
-
-# Enable mobile app integration
-mobile_app:
-
-# Enable history and logbook
-history:
-logbook:
-
-# Enable system health
-system_health:
-
-# Include automations and scripts
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
+sensor: !include sensor.yaml
 
-# Example integrations
-weather:
-  - platform: met
-    name: Local Weather
+template:
+  - sensor:
+      - name: "Bazénová filtrace výkon"
+        unique_id: bazen_filtrace_vykon
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% if is_state('switch.filtrace_switch', 'on') %}
+            {{ states('input_number.filtrace_vykon_w') | float(450) | round(0) }}
+          {% else %}
+            0
+          {% endif %}
+      - name: "ECO Volter výkon"
+        unique_id: eco_volter_vykon
+        default_entity_id: sensor.eco_volter_vykon
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {{ (states('sensor.ecovolter_revcr01c00002056_actual_power') | float(0) * 1000) | round(0) }}
+      - name: "PND Data"
+        icon: mdi:database-arrow-down
+        unique_id: 43d1efa0-c941-4d38-930a-5dc7ce4cfd3d
+        state: "{{ 'unknown' }}"
+      - name: "PND Production2Consumption"
+        unique_id: aeb9ef55-4db0-4ac6-93e8-d68f0ccd300d
+        unit_of_measurement: "%"
+        state: "{{ 'unknown' }}"
+        icon: mdi:home-battery-outline
+      - name: "PND Consumption"
+        unique_id: 14232aec-5dd1-4ee7-92ea-6412c156c7dc
+        unit_of_measurement: "kWh"
+        device_class: "energy"
+        icon: mdi:lightning-bolt
+        state: "{{ 'unknown' }}"
+      - name: "PND Production"
+        unique_id: 6dc5fec0-f3c3-426b-85d4-71d2945d8109
+        unit_of_measurement: "kWh"
+        device_class: "energy"
+        icon: mdi:lightning-bolt
+        state: "{{ 'unknown' }}"
+      - name: "PND Total Interval Consumption"
+        unique_id: dbd8815a-480d-4be5-9348-26e848fd8013
+        unit_of_measurement: "kWh"
+        device_class: "energy"
+        icon: mdi:lightning-bolt
+        state: "{{ 'unknown' }}"
+      - name: "PND Total Interval Production"
+        unique_id: ba4361c6-fea7-420c-9750-65225a0a189e
+        unit_of_measurement: "kWh"
+        device_class: "energy"
+        icon: mdi:lightning-bolt
+        state: "{{ 'unknown' }}"
+      - name: "PND Script Duration"
+        unique_id: af923e96-effd-46b6-96d8-ef61276b3e4a
+        icon: mdi:timelapse
+        state: "{{ 'unknown' }}"
+      - name: "PND Script Status"
+        unique_id: 50f46b0d-15e5-44e4-b75e-fa66e19582c8
+        icon: mdi:list-status
+        state: "{{ 'unknown' }}"
+      - name: "PND App Version"
+        unique_id: 7884f630-c949-45b5-807b-c43417a9ade2
+        icon: mdi:check-decagram
+        state: "{{ 'unknown' }}"
+      - name: Nighttime Consumption
+        default_entity_id: sensor.nighttime_consumption
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        state: "{% set hour = now().hour %} {% if hour >= 20 or hour < 9 %}\n  {{ states('sensor.house_consumption') | float(default=0) }}\n{% else %}\n  0\n{% endif %}"
+      - name: "Base House Consumption"
+        unique_id: base_house_consumption
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set total = states('sensor.house_consumption') | float(default=0) %}
+          {% set filtration = states('sensor.bazenova_filtrace_vykon') | float(default=0) %}
+          {% set ev = states('sensor.eco_volter_vykon') | float(default=0) %}
+          {{ [total - filtration - ev, 0] | max }}
+      - name: "Base Nighttime Consumption"
+        unique_id: base_nighttime_consumption
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set hour = now().hour %}
+          {% if hour >= 20 or hour < 9 %}
+            {{ states('sensor.base_house_consumption') | float(default=0) }}
+          {% else %}
+            0
+          {% endif %}
+  - binary_sensor:
+      - name: "PND Running"
+        unique_id: 1f1c154f-c5ea-4eae-94c0-69425334b48b
+        state: "off"
+  - trigger:
+      - trigger: time
+        at: "23:59:55"
+    sensor:
+      - name: "Final Daily House Consumption"
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+        state: >
+          {% set value = states('sensor.house_consumption_daily') | float(default=0) %}
+          {{ value*1 | round(1, default=0) }}
+      - name: "Base Final Daily House Consumption"
+        unique_id: base_final_daily_house_consumption
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+        state: >
+          {% set total = states('sensor.house_consumption_daily') | float(default=0) %}
+          {% set filtration_h = states('sensor.filtrace_spustena') | float(default=0) %}
+          {% set filtrace_w = states('input_number.filtrace_vykon_w') | float(450) %}
+          {% set filtration_kwh = filtration_h * filtrace_w / 1000 %}
+          {% set ev_kwh = states('sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy') | float(default=0) %}
+          {{ [total - filtration_kwh - ev_kwh, 0] | max | round(1) }}
 
-# Example groups
-group:
-  living_room:
-    name: "Living Room"
-    entities:
-      - light.living_room_main
-      - switch.living_room_fan
+input_select:
+  season:
+    name: Season
+    options:
+      - Summer
+      - Spring/Autumn
+      - Winter
+    icon: mdi:calendar
 
-# Example sensors
-sensor:
-  - platform: time_date
-    display_options:
-      - 'time'
-      - 'date'
+input_number:
+  battery_capacity:
+    name: Battery Capacity
+    icon: mdi:battery
+    min: 0
+    max: 30
+    unit_of_measurement: kWh
+    step: 0.1
+  winter_dod:
+    name: Winter DoD Value
+    icon: mdi:battery
+    min: 0
+    max: 100
+    unit_of_measurement: "%"
+    step: 1
+  filtrace_vykon_w:
+    name: Výkon filtrace bazénu
+    icon: mdi:pump
+    min: 0
+    max: 2000
+    unit_of_measurement: W
+    step: 50
+    initial: 450
 
-# Example binary sensors
-binary_sensor:
-  - platform: workday
-    country: US
+input_boolean:
+  time_to_use_overflows:
+    name: Time to Use Overflows
+    icon: mdi:lightning-bolt-circle

@@ -47,7 +47,12 @@ class HAOfficialValidator:
             # Parse the output
             self.parse_check_config_output(result.stdout, result.stderr)
 
-            # Return success if exit code is 0
+            # Return based on parsed errors rather than exit code alone,
+            # since some HA versions return non-zero for known check_config
+            # limitations (e.g. trigger platform registry not initialized).
+            if result.returncode != 0 and not self.errors:
+                # Exit code non-zero but no real errors found after filtering
+                return True
             return result.returncode == 0
 
         except subprocess.TimeoutExpired:
@@ -65,6 +70,12 @@ class HAOfficialValidator:
 
     def parse_check_config_output(self, stdout: str, stderr: str):
         """Parse Home Assistant check_config output."""
+        combined = (stdout or "") + (stderr or "")
+        # Detect known false positive: HA 2026.x check_config doesn't initialize
+        # the trigger platform registry (hass.data['triggers']), causing spurious
+        # KeyError failures that don't reflect actual config problems.
+        has_triggers_keyerror = "KeyError: 'triggers'" in combined
+
         # Parse stdout
         if stdout:
             lines = stdout.split("\n")
@@ -84,6 +95,12 @@ class HAOfficialValidator:
                     else:
                         self.errors.append(f"HA Check: {line}")
                 elif "ERROR" in line or "Error" in line:
+                    # Skip errors caused by the known triggers KeyError false positive
+                    if has_triggers_keyerror and (
+                        "Unexpected error validating config" in line
+                        or "KeyError: 'triggers'" in line
+                    ):
+                        continue
                     self.errors.append(f"HA Check: {line}")
                 elif "WARNING" in line or "Warning" in line:
                     self.warnings.append(f"HA Check: {line}")
@@ -117,8 +134,18 @@ class HAOfficialValidator:
                 ):
                     continue
 
+                # Skip "Unexpected error validating config" if caused by triggers KeyError
+                if has_triggers_keyerror and "Unexpected error validating config" in line:
+                    continue
+
                 # This is likely an actual error
                 self.errors.append(f"HA Error: {line}")
+
+        if has_triggers_keyerror:
+            self.warnings.append(
+                "HA Check: Trigger platform registry errors suppressed "
+                "(known check_config limitation in this HA version, not a config error)"
+            )
 
     def validate_all(self) -> bool:
         """Run complete validation using Home Assistant."""

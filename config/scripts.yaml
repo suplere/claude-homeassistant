@@ -1,52 +1,52 @@
-# Example Home Assistant Scripts
-# These are reusable sequences that can be called from automations or manually
-
-good_morning:
-  alias: "Good Morning Routine"
-  description: "Morning startup sequence"
+fve_grid_export_status:
+  alias: 'FVE: grid export - STATUS'
   sequence:
-    - service: light.turn_on
-      target:
-        area_id: bedroom
-      data:
-        brightness_pct: 30
-    - delay: '00:00:30'
-    - service: media_player.volume_set
-      target:
-        entity_id: media_player.bedroom_speaker
-      data:
-        volume_level: 0.3
-    - service: media_player.play_media
-      target:
-        entity_id: media_player.bedroom_speaker
-      data:
-        media_content_id: "https://example.com/morning_playlist"
-        media_content_type: "music"
-
-good_night:
-  alias: "Good Night Routine"
-  description: "Evening shutdown sequence"
+  - service: goodwe.get_parameter
+    data:
+      parameter: grid_export
+      device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+      entity_id: input_text.goodwe_grid_export
+  mode: single
+  icon: mdi:transmission-tower
+'1717590811347':
+  alias: 'FVE: grid export - OFF'
   sequence:
-    - service: light.turn_off
-      target:
-        area_id: living_room
-    - service: climate.set_temperature
-      target:
-        entity_id: climate.main_thermostat
-      data:
-        temperature: 68
-    - service: lock.lock
-      target:
-        area_id: exterior
-
-security_check:
-  alias: "Security Check"
-  description: "Check all doors and windows"
+  - service: goodwe.set_parameter
+    data:
+      parameter: grid_export
+      value: 0
+      device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+  - service: script.fve_grid_export_status
+    data: {}
+  mode: single
+  icon: mdi:transmission-tower-off
+'1717590841020':
+  alias: 'FVE: grid export - ON'
   sequence:
-    - service: notify.mobile_app
-      data:
-        title: "Security Check"
-        message: >
-          Front Door: {{ states('lock.front_door') }}
-          Back Door: {{ states('lock.back_door') }}
-          Security System: {{ states('alarm_control_panel.home_security') }}
+  - service: goodwe.set_parameter
+    data:
+      parameter: grid_export
+      value: 1
+      device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+  - service: script.fve_grid_export_status
+    data: {}
+  mode: single
+  icon: mdi:transmission-tower-export
+filtrace_on:
+  alias: Filtrace ON
+  sequence:
+  - type: turn_on
+    device_id: 9b432627a59a5a8bbae912cb8f499f2d
+    entity_id: 7086253917cb89b0e2f59fa29fbef4a8
+    domain: switch
+  mode: single
+  icon: mdi:power-plug
+filtrace_off:
+  alias: Filtrace OFF
+  sequence:
+  - type: turn_off
+    device_id: 9b432627a59a5a8bbae912cb8f499f2d
+    entity_id: 7086253917cb89b0e2f59fa29fbef4a8
+    domain: switch
+  mode: single
+  icon: mdi:power-plug-off
