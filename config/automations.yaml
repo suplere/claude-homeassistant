@@ -552,12 +552,18 @@
   max: 5
 - id: ev_zastavit_velky_import
   alias: EV zastavit - příliš velký import
-  description: Zastaví nabíjení EV pokud import ze sítě překročí 1.5 kW po dobu 2
-    minut.
+  description: Zastaví nabíjení EV pokud import ze sítě překročí 1.5 kW nebo vybíjení
+    baterie překročí 2 kW po dobu 2 minut.
   triggers:
   - trigger: numeric_state
+    id: sit_import
     entity_id: sensor.energy_buy
     above: 1500
+    for: 0:02:00
+  - trigger: numeric_state
+    id: baterie_vybijeni
+    entity_id: sensor.fve_battery_discharge_w
+    above: 2000
     for: 0:02:00
   conditions:
   - condition: state
@@ -583,7 +589,12 @@
   - action: notify.mobile_app_evzen_iphone
     data:
       title: EV nabíjení zastaveno
-      message: Import > 1.5 kW po dobu 2 min — málo solárů. Nabíjení EV zastaveno.
+      message: >-
+        {% if trigger.id == 'baterie_vybijeni' %}
+        Vybíjení baterie > 2 kW po dobu 2 min. Nabíjení EV zastaveno.
+        {% else %}
+        Import ze sítě > 1.5 kW po dobu 2 min — málo solárů. Nabíjení EV zastaveno.
+        {% endif %}
   mode: single
 - id: ev_zastavit_plna_baterie
   alias: EV zastavit - auto přestalo nabíjet
