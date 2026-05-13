@@ -93,17 +93,6 @@
       target:
         entity_id: switch.filtrace_switch
   mode: single
-- id: '1745924882313'
-  alias: Get data from DIP
-  description: ''
-  triggers:
-  - trigger: time
-    at: 00:45:00
-  conditions: []
-  actions:
-  - event: run_pnd
-    event_data: {}
-  mode: single
 - id: '1772571943115'
   alias: Time to Use Overflow
   description: ''
@@ -239,8 +228,8 @@
         }}'
       forecast_remaining: '{{ states(''sensor.solcast_pv_forecast_forecast_remaining_today'')
         | float(0) }}'
-      avg_daily_consumption: '{{ states(''sensor.base_average_daily_consumption'') | float(0)
-        }}'
+      avg_daily_consumption: '{{ states(''sensor.base_average_daily_consumption'')
+        | float(0) }}'
       hours_until_evening: '{{ [((today_at(''20:00'') - now()).total_seconds() / 3600),
         0] | max }}'
       remaining_battery_capacity: '{{ (100 - battery_soc) / 100 * battery_capacity
@@ -324,7 +313,7 @@
           title: Prediktivni pretoky
           message: Cena zpet kladna ({{ spot_price }} CZK). Blueprint reaktivovan,
             rizeni vraceno.
-- id: 'kia_ev6_force_update_on_charge'
+- id: kia_ev6_force_update_on_charge
   alias: 'KIA EV6: force update při začátku nabíjení'
   description: Při reálném startu nabíjení (actual_power > 0.3 kW) vyžádá aktuální
     data z auta pro čerstvý SoC.
@@ -332,12 +321,11 @@
   - trigger: numeric_state
     entity_id: sensor.ecovolter_revcr01c00002056_actual_power
     above: 0.3
-    for: '0:01:00'
+    for: 0:01:00
   conditions:
   - condition: template
-    value_template: >-
-      {{ this.attributes.last_triggered == none
-      or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}
+    value_template: '{{ this.attributes.last_triggered == none or (now() - this.attributes.last_triggered).total_seconds()
+      > 3600 }}'
   actions:
   - action: kia_uvo.force_update
     target:
@@ -359,7 +347,7 @@
   - trigger: numeric_state
     entity_id: sensor.energy_sell
     above: 4100
-    for: '0:02:00'
+    for: 0:02:00
     id: pretoky_start
   - trigger: state
     entity_id: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
@@ -402,7 +390,7 @@
           entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
       - wait_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
           | float(0) > 0.3 }}'
-        timeout: '0:01:30'
+        timeout: 0:01:30
         continue_on_timeout: true
       - if:
         - condition: template
@@ -442,7 +430,7 @@
           entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
       - wait_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
           | float(0) > 0.3 }}'
-        timeout: '0:01:30'
+        timeout: 0:01:30
         continue_on_timeout: true
       - if:
         - condition: template
@@ -461,7 +449,7 @@
             title: EV nabíjení - chyba
             message: Auto nepřijímá nabíjení (záporná cena). Nabíjení zastaveno.
         else:
-        - delay: '0:00:45'
+        - delay: 0:00:45
         - if:
           - condition: or
             conditions:
@@ -520,7 +508,7 @@
           entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
       - wait_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
           | float(0) > 0.3 }}'
-        timeout: '0:01:30'
+        timeout: 0:01:30
         continue_on_timeout: true
       - if:
         - condition: template
@@ -570,7 +558,7 @@
   - trigger: numeric_state
     entity_id: sensor.energy_buy
     above: 1500
-    for: '0:02:00'
+    for: 0:02:00
   conditions:
   - condition: state
     entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
@@ -605,7 +593,7 @@
   - trigger: numeric_state
     entity_id: sensor.ecovolter_revcr01c00002056_actual_power
     below: 0.3
-    for: '0:05:00'
+    for: 0:05:00
   conditions:
   - condition: state
     entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
@@ -634,8 +622,8 @@
   mode: single
 - id: ev_regulace_proudu
   alias: EV regulace proudu při záporné ceně
-  description: Každé 2 min upravuje nabíjecí proud 6–10A aby EV pohltilo solární
-    přebytek a nešlo nic do sítě za záporné ceny.
+  description: Každé 2 min upravuje nabíjecí proud 6–10A aby EV pohltilo solární přebytek
+    a nešlo nic do sítě za záporné ceny.
   triggers:
   - trigger: time_pattern
     minutes: /2
@@ -654,7 +642,8 @@
       aktualni_proud: '{{ states(''number.ecovolter_revcr01c00002056_target_current'')
         | float(6) }}'
       energy_sell: '{{ states(''sensor.energy_sell'') | float(0) }}'
-      battery_discharge: '{{ states(''sensor.fve_battery_discharge_w'') | float(0) }}'
+      battery_discharge: '{{ states(''sensor.fve_battery_discharge_w'') | float(0)
+        }}'
   - choose:
     - conditions:
       - condition: template
@@ -690,4 +679,29 @@
         data:
           title: EV nabíjení zastaveno
           message: Baterie kryje EV i při minimu 6A. Nabíjení zastaveno.
+  mode: single
+- id: '1778526312883'
+  alias: Run PND
+  description: ''
+  triggers:
+  - at: 00:30:00
+    trigger: time
+  conditions: []
+  actions:
+  - event: run_pnd
+    event_data: {}
+  mode: single
+- id: '1778526595548'
+  alias: Run actions after AppDaemon starts
+  description: Spustí PND po startu AppDaemonu s prodlevou 15 sekund pro zajištění
+    závislostí
+  triggers:
+  - event_type: APPDAEMON_READY
+    trigger: event
+  conditions: []
+  actions:
+  - delay:
+      seconds: 15
+  - event: run_pnd
+    event_data: {}
   mode: single
