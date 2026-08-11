@@ -88,7 +88,9 @@ Soubor: `config/automations.yaml`
 | `ev_nabijeni_zaporne_ceny_pretoky` | EV nabíjení - záporné ceny nebo přetoky | Hlavní řídící automatizace (start/stop) |
 | `ev_zastavit_velky_import` | EV zastavit - příliš velký import | Záložní ochrana při importu ze sítě |
 | `ev_zastavit_plna_baterie` | EV zastavit - auto přestalo nabíjet | Úklid po skončení nabíjení |
-| `ev_regulace_proudu` | EV regulace proudu při záporné ceně | Dynamická regulace 6–10A podle přetoků a vybíjení baterie |
+| `ev_regulace_proudu` | EV regulace proudu při nabíjení | Dynamická regulace 6–11A podle přetoků, importu a vybíjení baterie (obě ceny) |
+| `ev_nabijeni_nt_manualni_start` | EV nabíjení NT - manuální start | Spustí manuální nabíjení za nízký tarif (HDO), zamkne domácí baterii |
+| `ev_nabijeni_nt_manualni_stop` | EV nabíjení NT - manuální stop | Ukončí manuální NT nabíjení, odemkne baterii, uklidí helper |
 
 ---
 
@@ -210,18 +212,28 @@ Hlavní automatizace. Reaguje na čtyři triggery, každý spustí jinou větev 
 
 ## Automatizace 3: `ev_zastavit_velky_import`
 
-**Účel:** Záložní ochrana při importu ze sítě (doplněk k regulátoru proudu).
+**Účel:** Záložní ochrana při importu ze sítě nebo vybíjení baterie (doplněk k regulátoru proudu). Filtrace bazénu má nižší prioritu než EV — pokud běží, zkusí se vypnout jako první, než se sáhne na nabíjení EV.
 
-**Trigger:** `energy_buy > 1500 W` po dobu 2 minut
+**Trigger:**
+- `sit_import`: `energy_buy > 1500 W` po dobu 2 minut
+- `baterie_vybijeni`: `fve_battery_discharge_w > 2000 W` po dobu 2 minut
 
 **Podmínky:** EcoVolter switch = on AND `ev_nabijeni_povoleno` = on
 
 **Akce:**
 ```
-1. Vypni nabíjení
-2. Pokud spot_price < 0 → goodwe_limit = 0
-3. notify "Import > 1.5 kW po dobu 2 min"
+1. Pokud switch.filtrace_switch = on:
+   - Vypni filtraci + notify "Filtrace vypnuta"
+   - Počkej 1 minutu
+   - Zkontroluj znovu energy_buy > 1500 W NEBO fve_battery_discharge_w > 2000 W
+     → NE (problém vyřešen vypnutím filtrace) → konec, nabíjení EV pokračuje
+     → ANO → pokračuj krokem 2
+2. Vypni nabíjení EV
+3. Pokud spot_price < 0 → goodwe_limit = 0
+4. notify "Import/vybíjení > limit po dobu 2 min. Nabíjení EV zastaveno"
 ```
+
+**Proč vypnout filtraci nejdřív:** Filtrace (~450 W) je nejsnazší zátěž k odlehčení bez přerušení nabíjecí session EV (restart nabíjení má vlastní 90s probe a notifikace navíc). Pokud vypnutí filtrace problém vyřeší, EV nabíjení se vůbec nezastaví.
 
 **Mode:** `single`
 
@@ -250,34 +262,118 @@ Hlavní automatizace. Reaguje na čtyři triggery, každý spustí jinou větev 
 
 ## Automatizace 5: `ev_regulace_proudu`
 
-**Účel:** Každé 2 minuty dynamicky upravuje nabíjecí proud 6–10A aby EV pohltilo
-solární přebytek a baterie se zbytečně nevybíjela.
-
-Maximální proud 10A odpovídá výkonu panelů (7 kW ÷ 230 V × 3 = 10.1 A).
+**Účel:** Každé 2 minuty dynamicky upravuje nabíjecí proud 6–11A, aby EV pohltilo
+solární přebytek a baterie/síť se zbytečně nevybíjela/nezatěžovala. Běží při
+nabíjení bez ohledu na znaménko spotové ceny (dřív jen při záporné ceně).
 
 **Trigger:** `time_pattern` každé 2 minuty
 
 **Podmínky:**
 - EcoVolter switch = on
 - `ev_nabijeni_povoleno` = on
-- `spot_price < 0`
 
 **Proměnné:**
 - `aktualni_proud` — aktuálně nastavený proud (A)
 - `energy_sell` — aktuální export do sítě (W)
+- `energy_buy` — aktuální import ze sítě (W)
 - `battery_discharge` — aktuální vybíjení baterie (W)
+- `filtrace_bezi` — `switch.filtrace_switch` = on
 
 **Logika (choose — první splněná větev):**
 
 | Podmínka | Akce |
 |---|---|
-| `energy_sell > 500 W` a proud < 10A | Zvýš proud o 1A (max 10A) |
-| `battery_discharge > 2000 W` a proud > 6A | Sniž proud o 1A (min 6A) |
-| `battery_discharge > 2000 W` a proud = 6A | Stop + goodwe_limit = 0 + notify |
+| `energy_sell > 500 W` a proud < 11A | Pokud filtrace neběží → zapni ji, počkej 45s, a jen pokud export stále > 500 W → zvýš proud o 1A (max 11A). Pokud filtrace už běžela → zvýš proud o 1A rovnou. |
+| (`energy_buy > 1500 W` nebo `battery_discharge > 2000 W`) a proud > 6A | Sniž proud o 1A (min 6A) |
+| (`energy_buy > 1500 W` nebo `battery_discharge > 2000 W`) a proud = 6A | Pokud filtrace běží → vypni ji + notify, počkej 1 min, znovu zkontroluj podmínku. Pokud stále platí (nebo filtrace neběžela) → Stop nabíjení EV + goodwe_limit = 0 (jen pokud cena < 0) + notify |
 
-*`energy_sell` je zde spolehlivý — goodwe_limit = 10000 je nastaveno, GoodWe exportuje.*
+**Proč filtrace jde první i při zvyšování proudu:** Filtrace se může vypnout kvůli
+nedostatku solárů (viz `ev_zastavit_velky_import` a stop-větev výše). Než se zvýší
+proud EV, automatizace nejdřív zajistí, že filtrace zase běží — a teprve pokud i
+po jejím zapnutí zbývá export do sítě, přidá se proud EV.
+
+*`energy_sell` je zde spolehlivý pouze pokud `goodwe_limit` umožňuje export (10000
+při záporné ceně, viz výše) — GoodWe jinak nevyrábí nad spotřebu domu.*
+
+*Stejná priorita jako v `ev_zastavit_velky_import` — nejdřív se zkusí odlehčit
+vypnutím filtrace, teprve pak se sníží/zastaví nabíjení EV.*
 
 **Mode:** `single`
+
+---
+
+## Automatizace 6 a 7: Manuální nabíjení za nízký tarif (NT / HDO)
+
+**Účel:** Umožnit ruční spuštění nabíjení EV v období, kdy solárů není dost (blížící
+se podzim/zima), ale je nízký tarif dle CEZ HDO integrace. Aby se přitom zbytečně
+nevybíjela domácí baterie do domu/EV, baterie se na dobu nabíjení "zamkne" přepnutím
+GoodWe do `eco_charge` módu s výkonem 0 % — baterie pak nekryje žádnou spotřebu domu,
+vše (dům i EV) jde ze sítě za NT cenu.
+
+**Entity CEZ HDO:**
+
+| Účel | Entita |
+|---|---|
+| Nízký tarif (NT) aktivní | `binary_sensor.cez_hdo_lowtariffactive_dum` |
+| Vysoký tarif (VT) aktivní | `binary_sensor.cez_hdo_hightariffactive_dum` |
+
+**Entity GoodWe pro zamčení baterie:**
+
+| Účel | Entita |
+|---|---|
+| Provozní mód střídače | `select.goodwe_provozni_rezim_stridace` (`general` / `eco_charge` / `eco_discharge` / …) |
+| Výkon v ekonomickém režimu | `number.goodwe_vykon_v_ekonomickem_rezimu` (%) |
+
+Stejné entity používají i blueprinty `jan-trnka/battery_fully_charge.yaml` a
+`jan-trnka/eco_discharge_when_low_price.yaml` — `eco_charge` s výkonem 0 % baterii
+jen "zamkne" (nenabíjí ani nevybíjí), na rozdíl od těchto blueprintů, které mód
+používají aktivně k nabití/vybití na cílové SoC.
+
+### Helper (nutno vytvořit v HA GUI, stejně jako `ev_nabijeni_povoleno`)
+
+`input_boolean.ev_nabijeni_manualni_nt` — Settings → Devices & Services → Helpers →
+Create Helper → Toggle. Zapnutím tohoto helperu (kdykoliv, i mimo NT) se nabíjení
+spustí, jakmile začne NT; pokud je NT už aktivní, spustí se hned.
+
+### `ev_nabijeni_nt_manualni_start`
+
+**Triggery:** helper → `on`, nebo `binary_sensor.cez_hdo_lowtariffactive_dum` → `on`
+
+**Podmínky:** `ev_nabijeni_povoleno` = on, helper = on, NT aktivní, EV nenabíjí,
+vozidlo připojeno, SoC EV pod limitem AC nabíjení
+
+**Akce:**
+```
+1. goodwe mód = eco_charge, výkon ekonom. režimu = 0 %  (zamkne baterii)
+2. Nastav proud 6A, zapni nabíjení
+3. Čekej max 90s na actual_power > 0.3 kW
+   → timeout → Vypni nabíjení, goodwe mód = general, notify chyba
+   → OK      → Zvyš proud na 11A, notify "NT nabíjení spuštěno, baterie zamčena"
+```
+
+### `ev_nabijeni_nt_manualni_stop`
+
+**Triggery:** helper → `off`, NT → `off`, EcoVolter switch → `off` (co nastane dřív)
+
+**Podmínka:** helper byl `on` NEBO goodwe mód byl `eco_charge` (jinak se nedělá nic —
+NT manuální režim nebyl aktivní)
+
+**Akce:**
+```
+1. Pokud důvod není "EV samo přestalo nabíjet" → vypni nabíjení EV
+2. Pokud goodwe mód = eco_charge → vrať na general, výkon ekonom. režimu = 0
+3. Pokud helper = on → vypni ho (jednorázové použití, příště zapnout znovu)
+4. notify "NT nabíjení ukončeno, baterie odemčena"
+```
+
+**Proč `ev_zastavit_velky_import` a `ev_regulace_proudu` mají výjimku pro helper:**
+Obě automatizace normálně sníží proud/zastaví nabíjení, pokud `energy_buy > 1500 W`
+— to je ale přesně stav, který manuální NT nabíjení očekává a chce (dům i EV ze
+sítě). Proto obě mají podmínku `not helper == on`, která je při NT manuálním
+nabíjení úplně vypne; proud po celou dobu NT nabíjení řídí jen start-automatika
+(pevně 11A).
+
+**Mode:** `single` (obě)
 
 ---
 
@@ -294,12 +390,16 @@ Maximální proud 10A odpovídá výkonu panelů (7 kW ÷ 230 V × 3 = 10.1 A).
 | Auto připojeno za přetoků | Větev C: zapne jako větev A |
 | Cena přejde do kladné, přetoky < 4.1 kW | Větev D: zastaví |
 | Cena přejde do kladné, přetoky > 4.1 kW | Větev D nespustí → nabíjení pokračuje |
-| Přebytek solárů při nabíjení | Regulátor zvýší proud (až 10A) |
-| Baterie začne krýt EV (discharge > 2 kW) | Regulátor sníží proud, nebo zastaví při 6A |
+| Přebytek solárů při nabíjení (kladná i záporná cena) | Regulátor zapne filtraci (pokud neběžela) a zvýší proud (až 11A) |
+| Import ze sítě > 1.5 kW nebo baterie kryje EV (discharge > 2 kW) | Regulátor sníží proud, nebo (na 6A) vypne filtraci a teprve pak zastaví nabíjení |
 | Auto samo přestalo nabíjet | `ev_zastavit_plna_baterie`: po 5 min → stop + goodwe=0 |
 | `ev_nabijeni_povoleno` = OFF | Žádná automatizace nic nespustí |
+| Zapnut helper `ev_nabijeni_manualni_nt`, NT aktivní | Zamkne baterii (eco_charge/0), zapne 11A, ignoruje import ze sítě |
+| Zapnut helper mimo NT | Nic (čeká na start NT), spustí se automaticky jakmile NT začne |
+| NT skončí / helper vypnut / EV přestane nabíjet | Odemkne baterii (general), vypne nabíjení, vypne helper |
 
 ## Helper
 
 `input_boolean.ev_nabijeni_povoleno` — vytvořen v HA GUI (2026-04-25).
+`input_boolean.ev_nabijeni_manualni_nt` — nutno vytvořit v HA GUI (manuální NT nabíjení, viz Automatizace 6 a 7).
 Nelze spravovat přes YAML (input helpers nejdou do entity_registry přes YAML).

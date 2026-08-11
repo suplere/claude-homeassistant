@@ -56,30 +56,49 @@
   mode: single
 - id: '1718351641005'
   alias: Ovládání filtrace - přetoky
-  description: Ovládání filtrace na základě přetoků na fázi L2
+  description: Filtrace běží jen pokud je baterie nabitá (SoC >= 95 %) a je reálný
+    solární přebytek (pv_power při kladné ceně, Solcast power_now při záporné, kdy
+    je pv_power kvůli exportnímu limitu nespolehlivý). Dobíjení baterie i nabíjení
+    EV mají před filtrací přednost.
   triggers:
   - minutes: /5
     trigger: time_pattern
-  conditions:
-  - condition: or
-    conditions:
-    - condition: time
-      after: 09:00:00
-      before: '18:00:00'
-    - condition: state
-      entity_id: switch.filtrace_switch
-      state:
-      - 'on'
+  - trigger: state
+    entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    to: 'off'
+  - trigger: state
+    entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    to: 'on'
+  conditions: []
   actions:
+  - variables:
+      filtrace_vykon: '{{ states(''input_number.filtrace_vykon_w'') | float(450) }}'
+      ev_nabiji: '{{ is_state(''switch.ecovolter_revcr01c00002056_is_charging_enable'',
+        ''on'') }}'
+      ev_vykon: '{{ states(''sensor.eco_volter_vykon'') | float(0) if ev_nabiji else
+        0 }}'
+      je_cena_zaporna: '{{ states(''sensor.current_spot_electricity_price'') | float(0)
+        < 0 }}'
+      solar_now: '{{ states(''sensor.solcast_pv_forecast_power_now'') | float(0) if
+        je_cena_zaporna else states(''sensor.pv_power'') | float(0) }}'
+      base_spotreba: '{{ states(''sensor.base_house_consumption'') | float(0) }}'
+      volny_vykon: '{{ solar_now - base_spotreba }}'
+      volny_vykon_pro_filtraci: '{{ volny_vykon - ev_vykon }}'
+      battery_soc: '{{ states(''sensor.battery_state_of_charge'') | float(0) }}'
+      baterie_plna: '{{ battery_soc >= 95 }}'
+      filtrace_bezi: '{{ is_state(''switch.filtrace_switch'', ''on'') }}'
+      dost_slunce_zapnout: '{{ volny_vykon_pro_filtraci > (filtrace_vykon + 150) }}'
+      dost_slunce_udrzet: '{{ volny_vykon_pro_filtraci > (filtrace_vykon - 150) }}'
+      energy_buy_now: '{{ states(''sensor.energy_buy'') | float(0) }}'
+      battery_discharge_now: '{{ states(''sensor.fve_battery_discharge_w'') | float(0)
+        }}'
+      system_v_preteceni: '{{ energy_buy_now > 1500 or battery_discharge_now > 2000 }}'
+      muze_bezet: '{{ baterie_plna and not system_v_preteceni }}'
   - if:
-    - condition: or
-      conditions:
-      - condition: numeric_state
-        entity_id: sensor.active_power_l2
-        above: 400
-      - condition: state
-        entity_id: input_boolean.time_to_use_overflows
-        state: 'on'
+    - condition: template
+      value_template: '{{ muze_bezet and ((not filtrace_bezi and dost_slunce_zapnout)
+        or (filtrace_bezi and dost_slunce_udrzet) or is_state(''input_boolean.time_to_use_overflows'',
+        ''on'')) }}'
     then:
     - metadata: {}
       data: {}
@@ -342,17 +361,20 @@
     id: cena_zaporna
   - trigger: numeric_state
     entity_id: sensor.current_spot_electricity_price
-    above: 0
+    above: -0.001
     id: cena_kladna
   - trigger: numeric_state
     entity_id: sensor.energy_sell
-    above: 4100
+    above: 3900
     for: 0:02:00
     id: pretoky_start
   - trigger: state
     entity_id: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
     to: 'on'
     id: auto_pripojeno
+  - trigger: time_pattern
+    minutes: /15
+    id: periodic_check
   conditions: []
   actions:
   - variables:
@@ -460,6 +482,28 @@
               entity_id: sensor.fve_battery_discharge_w
               above: 3000
           then:
+          - if:
+            - condition: state
+              entity_id: switch.filtrace_switch
+              state: 'on'
+            then:
+            - action: switch.turn_off
+              target:
+                entity_id: switch.filtrace_switch
+            - action: notify.mobile_app_evzen_iphone
+              data:
+                title: Filtrace vypnuta
+                message: Nedostatek solárů - filtrace vypnuta přednostně, aby nabíjení
+                  EV mohlo pokračovat.
+            - delay: 0:01:00
+            - condition: or
+              conditions:
+              - condition: numeric_state
+                entity_id: sensor.energy_buy
+                above: 1500
+              - condition: numeric_state
+                entity_id: sensor.fve_battery_discharge_w
+                above: 3000
           - action: switch.turn_off
             target:
               entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
@@ -478,10 +522,15 @@
               title: EV nabíjení spuštěno
               message: Záporná cena + solár. Nabíjení EV 6A aktivní.
     - conditions:
-      - condition: trigger
-        id: auto_pripojeno
+      - condition: or
+        conditions:
+        - condition: trigger
+          id: auto_pripojeno
+        - condition: trigger
+          id: periodic_check
       - condition: template
-        value_template: '{{ not ev6_soc_ok or ev6_soc < ev6_limit }}'
+        value_template: '{{ not ma_nabijeni and je_vozidlo_pripojeno and (not ev6_soc_ok
+          or ev6_soc < ev6_limit) }}'
       - condition: or
         conditions:
         - condition: template
@@ -553,7 +602,8 @@
 - id: ev_zastavit_velky_import
   alias: EV zastavit - příliš velký import
   description: Zastaví nabíjení EV pokud import ze sítě překročí 1.5 kW nebo vybíjení
-    baterie překročí 2 kW po dobu 2 minut.
+    baterie překročí 2 kW po dobu 2 minut. Neplatí při manuálním NT nabíjení (import
+    ze sítě je tam žádaný stav).
   triggers:
   - trigger: numeric_state
     id: sit_import
@@ -572,6 +622,11 @@
   - condition: state
     entity_id: input_boolean.ev_nabijeni_povoleno
     state: 'on'
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: input_boolean.ev_nabijeni_manualni_nt
+      state: 'on'
   actions:
   - action: switch.turn_off
     target:
@@ -589,12 +644,9 @@
   - action: notify.mobile_app_evzen_iphone
     data:
       title: EV nabíjení zastaveno
-      message: >-
-        {% if trigger.id == 'baterie_vybijeni' %}
-        Vybíjení baterie > 2 kW po dobu 2 min. Nabíjení EV zastaveno.
-        {% else %}
-        Import ze sítě > 1.5 kW po dobu 2 min — málo solárů. Nabíjení EV zastaveno.
-        {% endif %}
+      message: '{% if trigger.id == ''baterie_vybijeni'' %} Vybíjení baterie > 2 kW
+        po dobu 2 min. Nabíjení EV zastaveno. {% else %} Import ze sítě > 1.5 kW po
+        dobu 2 min — málo solárů. Nabíjení EV zastaveno. {% endif %}'
   mode: single
 - id: ev_zastavit_plna_baterie
   alias: EV zastavit - auto přestalo nabíjet
@@ -632,9 +684,12 @@
       message: Auto přestalo přijímat proud. Nabíjení ukončeno.
   mode: single
 - id: ev_regulace_proudu
-  alias: EV regulace proudu při záporné ceně
-  description: Každé 2 min upravuje nabíjecí proud 6–10A aby EV pohltilo solární přebytek
-    a nešlo nic do sítě za záporné ceny.
+  alias: EV regulace proudu při nabíjení
+  description: Každé 2 min upravuje nabíjecí proud 6–11A podle přetoků, importu a
+    vybíjení baterie, bez ohledu na znaménko spotové ceny. Před zvýšením proudu nejdřív
+    zapne filtraci (aby využila přebytek dřív než EV), před vypnutím nabíjení nejdřív
+    sníží proud na 6A a zkusí vypnout filtraci. Neběží při manuálním NT nabíjení
+    (proud tam řídí start automatika, dům běží na grid).
   triggers:
   - trigger: time_pattern
     minutes: /2
@@ -645,29 +700,52 @@
   - condition: state
     entity_id: input_boolean.ev_nabijeni_povoleno
     state: 'on'
-  - condition: numeric_state
-    entity_id: sensor.current_spot_electricity_price
-    below: 0
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: input_boolean.ev_nabijeni_manualni_nt
+      state: 'on'
   actions:
   - variables:
       aktualni_proud: '{{ states(''number.ecovolter_revcr01c00002056_target_current'')
         | float(6) }}'
       energy_sell: '{{ states(''sensor.energy_sell'') | float(0) }}'
+      energy_buy: '{{ states(''sensor.energy_buy'') | float(0) }}'
       battery_discharge: '{{ states(''sensor.fve_battery_discharge_w'') | float(0)
         }}'
+      filtrace_bezi: '{{ is_state(''switch.filtrace_switch'', ''on'') }}'
   - choose:
     - conditions:
       - condition: template
-        value_template: '{{ energy_sell > 500 and aktualni_proud < 10 }}'
+        value_template: '{{ energy_sell > 500 and aktualni_proud < 11 }}'
       sequence:
-      - action: number.set_value
-        target:
-          entity_id: number.ecovolter_revcr01c00002056_target_current
-        data:
-          value: '{{ [aktualni_proud + 1, 10] | min }}'
+      - if:
+        - condition: template
+          value_template: '{{ not filtrace_bezi }}'
+        then:
+        - action: switch.turn_on
+          target:
+            entity_id: switch.filtrace_switch
+        - delay: 0:00:45
+        - if:
+          - condition: template
+            value_template: '{{ states(''sensor.energy_sell'') | float(0) > 500 }}'
+          then:
+          - action: number.set_value
+            target:
+              entity_id: number.ecovolter_revcr01c00002056_target_current
+            data:
+              value: '{{ [aktualni_proud + 1, 11] | min }}'
+        else:
+        - action: number.set_value
+          target:
+            entity_id: number.ecovolter_revcr01c00002056_target_current
+          data:
+            value: '{{ [aktualni_proud + 1, 11] | min }}'
     - conditions:
       - condition: template
-        value_template: '{{ battery_discharge > 2000 and aktualni_proud > 6 }}'
+        value_template: '{{ (energy_buy > 1500 or battery_discharge > 2000) and aktualni_proud
+          > 6 }}'
       sequence:
       - action: number.set_value
         target:
@@ -676,21 +754,250 @@
           value: '{{ [aktualni_proud - 1, 6] | max }}'
     - conditions:
       - condition: template
-        value_template: '{{ battery_discharge > 2000 and aktualni_proud <= 6 }}'
+        value_template: '{{ (energy_buy > 1500 or battery_discharge > 2000) and aktualni_proud
+          <= 6 }}'
       sequence:
+      - if:
+        - condition: template
+          value_template: '{{ filtrace_bezi }}'
+        then:
+        - action: switch.turn_off
+          target:
+            entity_id: switch.filtrace_switch
+        - action: notify.mobile_app_evzen_iphone
+          data:
+            title: Filtrace vypnuta
+            message: Nedostatek solárů - filtrace vypnuta přednostně, aby nabíjení
+              EV mohlo pokračovat na 6A.
+        - delay: 0:01:00
+        - condition: template
+          value_template: '{{ (states(''sensor.energy_buy'') | float(0) > 1500) or
+            (states(''sensor.fve_battery_discharge_w'') | float(0) > 2000) }}'
       - action: switch.turn_off
         target:
           entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
-      - action: number.set_value
-        target:
-          entity_id: number.goodwe_limit_dodavky_do_site
-        data:
-          value: 0
+      - if:
+        - condition: numeric_state
+          entity_id: sensor.current_spot_electricity_price
+          below: 0
+        then:
+        - action: number.set_value
+          target:
+            entity_id: number.goodwe_limit_dodavky_do_site
+          data:
+            value: 0
       - action: notify.mobile_app_evzen_iphone
         data:
           title: EV nabíjení zastaveno
-          message: Baterie kryje EV i při minimu 6A. Nabíjení zastaveno.
+          message: Import ze sítě nebo vybíjení baterie kryje EV i při minimu 6A.
+            Nabíjení zastaveno.
   mode: single
+- id: ev_nabijeni_nt_manualni_start
+  alias: EV nabíjení NT - manuální start
+  description: Manuální nabíjení EV za nízký tarif (CEZ HDO). Spustí se zapnutím
+    input_boolean.ev_nabijeni_manualni_nt (nebo pokud je už zapnuté, začátkem NT)
+    a zamkne domácí baterii (GoodWe eco_charge, výkon 0 %), aby spotřeba domu i
+    EV šla ze sítě a baterie se zbytečně nevybíjela.
+  triggers:
+  - trigger: state
+    entity_id: input_boolean.ev_nabijeni_manualni_nt
+    to: 'on'
+  - trigger: state
+    entity_id: binary_sensor.cez_hdo_lowtariffactive_dum
+    to: 'on'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.ev_nabijeni_povoleno
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.ev_nabijeni_manualni_nt
+    state: 'on'
+  - condition: state
+    entity_id: binary_sensor.cez_hdo_lowtariffactive_dum
+    state: 'on'
+  - condition: state
+    entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    state: 'off'
+  - condition: state
+    entity_id: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
+    state: 'on'
+  - condition: template
+    value_template: '{{ states(''sensor.ev6_ev_battery_level'') in [''unavailable'',
+      ''unknown''] or states(''sensor.ev6_ev_battery_level'') | int(0) < (states(''number.ev6_ac_charging_limit'')
+      | int(80)) }}'
+  actions:
+  - action: select.select_option
+    target:
+      entity_id: select.goodwe_provozni_rezim_stridace
+    data:
+      option: eco_charge
+  - delay: 0:00:05
+  - action: number.set_value
+    target:
+      entity_id: number.goodwe_vykon_v_ekonomickem_rezimu
+    data:
+      value: 0
+  - delay: 0:00:05
+  - action: number.set_value
+    target:
+      entity_id: number.ecovolter_revcr01c00002056_target_current
+    data:
+      value: 6
+  - action: switch.turn_on
+    target:
+      entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+  - wait_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
+      | float(0) > 0.3 }}'
+    timeout: 0:01:30
+    continue_on_timeout: true
+  - if:
+    - condition: template
+      value_template: '{{ states(''sensor.ecovolter_revcr01c00002056_actual_power'')
+        | float(0) <= 0.3 }}'
+    then:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    - action: select.select_option
+      target:
+        entity_id: select.goodwe_provozni_rezim_stridace
+      data:
+        option: general
+    - action: notify.mobile_app_evzen_iphone
+      data:
+        title: EV nabíjení NT - chyba
+        message: Auto nepřijímá nabíjení. NT manuální nabíjení zrušeno, baterie odemčena.
+    else:
+    - action: number.set_value
+      target:
+        entity_id: number.ecovolter_revcr01c00002056_target_current
+      data:
+        value: 11
+    - action: notify.mobile_app_evzen_iphone
+      data:
+        title: EV nabíjení NT spuštěno
+        message: Nízký tarif aktivní. Nabíjení EV 11A, domácí baterie zamčena (eco_charge,
+          0 %) — spotřeba domu i EV jde ze sítě.
+  mode: single
+- id: ev_nabijeni_nt_manualni_stop
+  alias: EV nabíjení NT - manuální stop
+  description: Ukončí NT manuální nabíjení a odemkne domácí baterii (GoodWe general
+    mode) při konci NT tarifu, vypnutí input_boolean nebo zastavení nabíjení EV —
+    podle toho, co nastane dřív. Nedělá nic, pokud NT manuální režim nebyl aktivní.
+  triggers:
+  - trigger: state
+    entity_id: input_boolean.ev_nabijeni_manualni_nt
+    to: 'off'
+    id: boolean_off
+  - trigger: state
+    entity_id: binary_sensor.cez_hdo_lowtariffactive_dum
+    to: 'off'
+    id: hdo_off
+  - trigger: state
+    entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+    to: 'off'
+    id: charging_off
+  conditions:
+  - condition: template
+    value_template: '{{ is_state(''input_boolean.ev_nabijeni_manualni_nt'', ''on'')
+      or is_state(''select.goodwe_provozni_rezim_stridace'', ''eco_charge'') }}'
+  actions:
+  - if:
+    - condition: not
+      conditions:
+      - condition: template
+        value_template: '{{ trigger.id == ''charging_off'' }}'
+    then:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+  - if:
+    - condition: state
+      entity_id: select.goodwe_provozni_rezim_stridace
+      state: eco_charge
+    then:
+    - action: select.select_option
+      target:
+        entity_id: select.goodwe_provozni_rezim_stridace
+      data:
+        option: general
+    - delay: 0:00:05
+    - action: number.set_value
+      target:
+        entity_id: number.goodwe_vykon_v_ekonomickem_rezimu
+      data:
+        value: 0
+  - if:
+    - condition: state
+      entity_id: input_boolean.ev_nabijeni_manualni_nt
+      state: 'on'
+    then:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.ev_nabijeni_manualni_nt
+  - action: notify.mobile_app_evzen_iphone
+    data:
+      title: EV nabíjení NT ukončeno
+      message: '{% if trigger.id == ''hdo_off'' %} Nízký tarif skončil. {% elif trigger.id
+        == ''charging_off'' %} Nabíjení EV se zastavilo. {% else %} Manuální NT nabíjení
+        vypnuto. {% endif %} Domácí baterie odemčena (general mode).'
+  mode: single
+- id: ev_blokovat_vybijeni_baterie
+  alias: EV - blokovat vybíjení baterie při plánovaném nabíjení
+  description: Pokud je plánováno nabíjení EV (ev_nabijeni_povoleno = on) a baterie
+    EV je pod nabíjecím limitem, zakazuje automatizace vybíjení domácí baterie do
+    sítě. Po dosažení limitu nebo zakázání nabíjení vybíjení obnoví.
+  triggers:
+  - trigger: state
+    entity_id: input_boolean.ev_nabijeni_povoleno
+  - trigger: state
+    entity_id: sensor.ev6_ev_battery_level
+  - trigger: state
+    entity_id: number.ev6_ac_charging_limit
+  conditions: []
+  actions:
+  - variables:
+      je_povoleno: '{{ is_state(''input_boolean.ev_nabijeni_povoleno'', ''on'') }}'
+      ev6_soc: '{{ states(''sensor.ev6_ev_battery_level'') | int(-1) }}'
+      ev6_limit: '{{ states(''number.ev6_ac_charging_limit'') | int(80) }}'
+      ev6_soc_ok: '{{ states(''sensor.ev6_ev_battery_level'') not in [''unavailable'',
+        ''unknown''] }}'
+      treba_blokovat: '{{ je_povoleno and ev6_soc_ok and ev6_soc < ev6_limit }}'
+      uz_blokovano: '{{ is_state(''automation.discharge_battery_to_the_grid'', ''off'')
+        }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ treba_blokovat and not uz_blokovano }}'
+      sequence:
+      - action: automation.turn_off
+        target:
+          entity_id:
+          - automation.discharge_battery_to_the_grid
+          - automation.eco_discharge_when_low_price_at_noon
+          - automation.turn_off_eco_discharge_mode_when_peak
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: EV nabíjení - priorita baterie
+          message: EV {{ ev6_soc }}% < limit {{ ev6_limit }}%. Vybíjení domácí baterie
+            do sítě blokováno.
+    - conditions:
+      - condition: template
+        value_template: '{{ not treba_blokovat and uz_blokovano }}'
+      sequence:
+      - action: automation.turn_on
+        target:
+          entity_id:
+          - automation.discharge_battery_to_the_grid
+          - automation.eco_discharge_when_low_price_at_noon
+          - automation.turn_off_eco_discharge_mode_when_peak
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: EV nabíjení - vybíjení obnoveno
+          message: EV dosáhlo limitu nebo nabíjení zakázáno. Vybíjení domácí baterie
+            do sítě opět povoleno.
+  mode: queued
+  max: 3
 - id: '1778526312883'
   alias: Run PND
   description: ''
@@ -712,7 +1019,10 @@
   conditions: []
   actions:
   - delay:
-      seconds: 15
+      hours: 0
+      minutes: 10
+      seconds: 0
+      milliseconds: 0
   - event: run_pnd
     event_data: {}
   mode: single
