@@ -67,6 +67,20 @@ template:
           {% set kwh = states('sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy') | float(0) %}
           {% set price = states('sensor.current_spot_electricity_price') | float(3) %}
           {{ (kwh * price) | round(1) }}
+      - name: "EV NT energie celkem"
+        unique_id: ev_nt_energie_celkem
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+        state: >
+          {{ states('input_number.ev_nt_energie_celkem_kwh') | float(0) }}
+      - name: "EV NT náklady celkem"
+        unique_id: ev_nt_naklady_celkem
+        unit_of_measurement: "Kč"
+        device_class: monetary
+        state_class: total
+        state: >
+          {{ states('input_number.ev_nt_naklady_celkem_kc') | float(0) }}
   - binary_sensor:
       - name: "EV nabíjí ze solárů"
         unique_id: ev_nabiji_ze_solaru

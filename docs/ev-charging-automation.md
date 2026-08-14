@@ -344,9 +344,11 @@ vozidlo připojeno, SoC EV pod limitem AC nabíjení
 
 **Akce:**
 ```
-1. goodwe mód = eco_charge, výkon ekonom. režimu = 0 %  (zamkne baterii)
-2. Nastav proud 6A, zapni nabíjení
-3. Čekej max 90s na actual_power > 0.3 kW
+1. Ulož snapshot: total_charged_energy → input_number.ev_nt_start_energie_kwh
+                  cez_hdo_currentprice → input_number.ev_nt_start_cena_kc_kwh
+2. goodwe mód = eco_charge, výkon ekonom. režimu = 0 %  (zamkne baterii)
+3. Nastav proud 6A, zapni nabíjení
+4. Čekej max 90s na actual_power > 0.3 kW
    → timeout → Vypni nabíjení, goodwe mód = general, notify chyba
    → OK      → Zvyš proud na 11A, notify "NT nabíjení spuštěno, baterie zamčena"
 ```
@@ -360,10 +362,14 @@ NT manuální režim nebyl aktivní)
 
 **Akce:**
 ```
-1. Pokud důvod není "EV samo přestalo nabíjet" → vypni nabíjení EV
-2. Pokud goodwe mód = eco_charge → vrať na general, výkon ekonom. režimu = 0
-3. Pokud helper = on → vypni ho (jednorázové použití, příště zapnout znovu)
-4. notify "NT nabíjení ukončeno, baterie odemčena"
+1. Spočítej session_kwh = max(0, total_charged_energy_teď − snapshot_při_startu)
+           session_kc  = session_kwh × cena_při_startu
+2. Přičti session_kwh/session_kc do input_number.ev_nt_energie_celkem_kwh
+   a input_number.ev_nt_naklady_celkem_kc (lifetime akumulátory)
+3. Pokud důvod není "EV samo přestalo nabíjet" → vypni nabíjení EV
+4. Pokud goodwe mód = eco_charge → vrať na general, výkon ekonom. režimu = 0
+5. Pokud helper = on → vypni ho (jednorázové použití, příště zapnout znovu)
+6. notify "NT nabíjení ukončeno, baterie odemčena, tato session: X kWh, Y Kč"
 ```
 
 **Proč `ev_zastavit_velky_import` a `ev_regulace_proudu` mají výjimku pro helper:**
@@ -374,6 +380,44 @@ nabíjení úplně vypne; proud po celou dobu NT nabíjení řídí jen start-au
 (pevně 11A).
 
 **Mode:** `single` (obě)
+
+---
+
+## Sledování náklady NT nabíjení (pro vyúčtování druhé rodině)
+
+**Účel:** Dva společné byty, jeden elektroměr. NT nabíjení EV táhne ze sítě (baterie
+je zamčená, viz výše), takže je to reálný náklad, který má smysl každý měsíc odečíst
+ze spotřeby pro vyúčtování druhé rodině.
+
+**Princip:** Session kWh se počítá jako rozdíl `sensor.ecovolter_..._total_charged_energy`
+(lifetime čítač energie EcoVolteru — roste při každém nabíjení, NT i solárním) mezi
+okamžikem startu a stopu NT session. Session Kč = session kWh × NT cena zachycená
+při startu (`sensor.cez_hdo_currentprice_dum`). Tento delta přístup nezávisí na tom,
+jak/kdy se `total_charged_energy` uvnitř EcoVolteru resetuje.
+
+**Entity (přehled):**
+
+| Účel | Entita | Vytvořeno |
+|---|---|---|
+| Snapshot energie při startu (scratch) | `input_number.ev_nt_start_energie_kwh` | GUI helper |
+| Snapshot NT ceny při startu (scratch) | `input_number.ev_nt_start_cena_kc_kwh` | GUI helper |
+| Lifetime akumulátor energie | `input_number.ev_nt_energie_celkem_kwh` | GUI helper |
+| Lifetime akumulátor nákladů | `input_number.ev_nt_naklady_celkem_kc` | GUI helper |
+| Template mirror (energie, pro utility_meter) | `sensor.ev_nt_energie_celkem` | `configuration.yaml` (`template:`) |
+| Template mirror (náklady, pro utility_meter) | `sensor.ev_nt_naklady_celkem` | `configuration.yaml` (`template:`) |
+| Měsíční energie (resetuje se každý měsíc) | `sensor.ev_nt_energie_mesic` | GUI utility_meter |
+| Měsíční náklady (resetuje se každý měsíc) | `sensor.ev_nt_naklady_mesic` | GUI utility_meter |
+
+**Proč template mirror mezi input_number a utility_meter:** utility_meter helper v HA
+GUI nabízí jako zdroj jen entity v doméně `sensor`, ne `input_number` — proto lifetime
+akumulátory (input_number) zrcadlíme do `sensor.*` template entit s `device_class:
+energy`/`monetary` a `state_class: total_increasing`/`total`, a až ty se dají vybrat
+jako zdroj utility_meter helperu.
+
+**Proč 4 GUI helpery a ne YAML:** Tyto konkrétní 4 `input_number` vznikly původně
+přes GUI (dřív, než jsme zjistili, že `input_number` jde i přes YAML jako
+`battery_capacity`/`winter_dod`/`filtrace_vykon_w`). Nezkoušejte je znovu definovat
+v `configuration.yaml` — už jednou to vytvořilo duplicitní entity se suffixem `_2`.
 
 ---
 
@@ -401,5 +445,14 @@ nabíjení úplně vypne; proud po celou dobu NT nabíjení řídí jen start-au
 ## Helper
 
 `input_boolean.ev_nabijeni_povoleno` — vytvořen v HA GUI (2026-04-25).
-`input_boolean.ev_nabijeni_manualni_nt` — nutno vytvořit v HA GUI (manuální NT nabíjení, viz Automatizace 6 a 7).
-Nelze spravovat přes YAML (input helpers nejdou do entity_registry přes YAML).
+`input_boolean.ev_nabijeni_manualni_nt` — vytvořen v HA GUI (manuální NT nabíjení, viz Automatizace 6 a 7).
+
+`input_number.ev_nt_start_energie_kwh`, `ev_nt_start_cena_kc_kwh`,
+`ev_nt_energie_celkem_kwh`, `ev_nt_naklady_celkem_kc` — vytvořeny v HA GUI (sledování
+nákladů NT nabíjení, viz sekce výše). Pozn.: `input_number`/`input_boolean` *jde*
+definovat i přes YAML (`configuration.yaml`, viz `battery_capacity`, `winter_dod`,
+`filtrace_vykon_w`, `time_to_use_overflows`) — tyto konkrétní 4 ale už existují
+z GUI, takže je znovu nedefinujte v YAML (vznikne duplicita se suffixem `_2`).
+
+`utility_meter` helpery (`sensor.ev_nt_energie_mesic`, `sensor.ev_nt_naklady_mesic`)
+musí vždy vzniknout přes GUI — YAML `utility_meter:` nejde spolehlivě do entity_registry.

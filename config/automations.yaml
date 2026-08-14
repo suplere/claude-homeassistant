@@ -797,7 +797,8 @@
   description: Manuální nabíjení EV za nízký tarif (CEZ HDO). Spustí se zapnutím
     input_boolean.ev_nabijeni_manualni_nt (nebo pokud je už zapnuté, začátkem NT)
     a zamkne domácí baterii (GoodWe eco_charge, výkon 0 %), aby spotřeba domu i
-    EV šla ze sítě a baterie se zbytečně nevybíjela.
+    EV šla ze sítě a baterie se zbytečně nevybíjela. Zaznamená stav energie a
+    aktuální NT cenu pro pozdější dopočet nákladů session (viz stop automatika).
   triggers:
   - trigger: state
     entity_id: input_boolean.ev_nabijeni_manualni_nt
@@ -826,6 +827,17 @@
       ''unknown''] or states(''sensor.ev6_ev_battery_level'') | int(0) < (states(''number.ev6_ac_charging_limit'')
       | int(80)) }}'
   actions:
+  - action: input_number.set_value
+    target:
+      entity_id: input_number.ev_nt_start_energie_kwh
+    data:
+      value: '{{ states(''sensor.ecovolter_revcr01c00002056_total_charged_energy'')
+        | float(0) }}'
+  - action: input_number.set_value
+    target:
+      entity_id: input_number.ev_nt_start_cena_kc_kwh
+    data:
+      value: '{{ states(''sensor.cez_hdo_currentprice_dum'') | float(0) }}'
   - action: select.select_option
     target:
       entity_id: select.goodwe_provozni_rezim_stridace
@@ -884,6 +896,9 @@
   description: Ukončí NT manuální nabíjení a odemkne domácí baterii (GoodWe general
     mode) při konci NT tarifu, vypnutí input_boolean nebo zastavení nabíjení EV —
     podle toho, co nastane dřív. Nedělá nic, pokud NT manuální režim nebyl aktivní.
+    Spočítá spotřebu a náklady session (energie teď minus snapshot při startu ×
+    NT cena při startu) a přičte je do celoživotních akumulátorů pro měsíční
+    utility_meter (sensor.ev_nt_energie_mesic, sensor.ev_nt_naklady_mesic).
   triggers:
   - trigger: state
     entity_id: input_boolean.ev_nabijeni_manualni_nt
@@ -902,6 +917,27 @@
     value_template: '{{ is_state(''input_boolean.ev_nabijeni_manualni_nt'', ''on'')
       or is_state(''select.goodwe_provozni_rezim_stridace'', ''eco_charge'') }}'
   actions:
+  - variables:
+      energie_pri_startu: '{{ states(''input_number.ev_nt_start_energie_kwh'') |
+        float(0) }}'
+      cena_pri_startu: '{{ states(''input_number.ev_nt_start_cena_kc_kwh'') | float(0)
+        }}'
+      energie_ted: '{{ states(''sensor.ecovolter_revcr01c00002056_total_charged_energy'')
+        | float(0) }}'
+      session_kwh: '{{ [energie_ted - energie_pri_startu, 0] | max }}'
+      session_kc: '{{ session_kwh * cena_pri_startu }}'
+  - action: input_number.set_value
+    target:
+      entity_id: input_number.ev_nt_energie_celkem_kwh
+    data:
+      value: '{{ (states(''input_number.ev_nt_energie_celkem_kwh'') | float(0)) +
+        session_kwh }}'
+  - action: input_number.set_value
+    target:
+      entity_id: input_number.ev_nt_naklady_celkem_kc
+    data:
+      value: '{{ (states(''input_number.ev_nt_naklady_celkem_kc'') | float(0)) +
+        session_kc }}'
   - if:
     - condition: not
       conditions:
@@ -940,7 +976,8 @@
       title: EV nabíjení NT ukončeno
       message: '{% if trigger.id == ''hdo_off'' %} Nízký tarif skončil. {% elif trigger.id
         == ''charging_off'' %} Nabíjení EV se zastavilo. {% else %} Manuální NT nabíjení
-        vypnuto. {% endif %} Domácí baterie odemčena (general mode).'
+        vypnuto. {% endif %} Domácí baterie odemčena (general mode). Tato session:
+        {{ session_kwh | round(2) }} kWh, {{ session_kc | round(1) }} Kč.'
   mode: single
 - id: ev_blokovat_vybijeni_baterie
   alias: EV - blokovat vybíjení baterie při plánovaném nabíjení
