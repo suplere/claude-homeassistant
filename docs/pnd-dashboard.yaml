@@ -1,0 +1,353 @@
+type: sections
+max_columns: 4
+title: PND
+path: pnd
+sections:
+  - type: grid
+    cards:
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 7d
+        span:
+          end: day
+        header:
+          show: true
+          title: PND Včerejší stav
+          show_states: true
+          colorize_states: true
+        series:
+          - entity: sensor.pnd_data
+            name: Spotřeba
+            attribute: consumption
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.consumption[index])])
+                .filter(([time]) => time < today.getTime());
+            color: var(--error-color)
+            opacity: 0.8
+            invert: true
+            type: column
+          - entity: sensor.pnd_data
+            name: Výroba
+            attribute: production
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.production[index])])
+                .filter(([time]) => time < today.getTime());
+            color: var(--success-color)
+            opacity: 0.8
+            type: column
+        apex_config:
+          legend:
+            formatter: |
+              EVAL: (seriesName) => seriesName
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 10d
+        span:
+          end: day
+        header:
+          show: true
+          title: PND Posledních 10 dní
+        series:
+          - entity: sensor.pnd_data
+            name: Výroba
+            attribute: production
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.production[index])])
+                .filter(([time]) => time < today.getTime());
+            color: var(--success-color)
+            opacity: 0.8
+            invert: false
+            type: column
+          - entity: sensor.pnd_data
+            name: Spotřeba
+            attribute: consumption
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.consumption[index])])
+                .filter(([time]) => time < today.getTime());
+            color: var(--error-color)
+            opacity: 0.8
+            invert: true
+            type: column
+        apex_config:
+          legend:
+            formatter: |
+              EVAL: (seriesName) => seriesName
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 1y
+        span:
+          end: isoWeek
+        header:
+          show: true
+          title: PND Historická Data (Týdenní agregace)
+        series:
+          - entity: sensor.pnd_data
+            name: Výroba
+            attribute: production
+            data_generator: |
+              return entity.attributes.pnddate.map((pnd, index) => {
+                return [new Date(pnd).getTime(), parseFloat(entity.attributes.production[index])];
+              });
+            color: var(--success-color)
+            opacity: 0.8
+            invert: false
+            type: column
+            group_by:
+              func: sum
+              duration: 7d
+          - entity: sensor.pnd_data
+            name: Spotřeba
+            attribute: consumption
+            data_generator: |
+              return entity.attributes.pnddate.map((pnd, index) => {
+                return [new Date(pnd).getTime(), parseFloat(entity.attributes.consumption[index])];
+              });
+            color: var(--error-color)
+            opacity: 0.8
+            invert: true
+            type: column
+            group_by:
+              func: sum
+              duration: 7d
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 1y
+        span:
+          end: month
+        header:
+          show: true
+          title: PND Historická Data (Měsíční agregace)
+        series:
+          - entity: sensor.pnd_data
+            name: Výroba
+            attribute: production
+            data_generator: |
+              const sums = {};
+              entity.attributes.pnddate.forEach((pnd, index) => {
+                const d = new Date(pnd);
+                const key = d.getFullYear() + '-' + d.getMonth();
+                if (!sums[key]) {
+                  sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };
+                }
+                sums[key].value += parseFloat(entity.attributes.production[index]);
+              });
+              return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);
+            color: var(--success-color)
+            opacity: 0.8
+            invert: false
+            type: column
+          - entity: sensor.pnd_data
+            name: Spotřeba
+            attribute: consumption
+            data_generator: |
+              const sums = {};
+              entity.attributes.pnddate.forEach((pnd, index) => {
+                const d = new Date(pnd);
+                const key = d.getFullYear() + '-' + d.getMonth();
+                if (!sums[key]) {
+                  sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };
+                }
+                sums[key].value += parseFloat(entity.attributes.consumption[index]);
+              });
+              return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);
+            color: var(--error-color)
+            opacity: 0.8
+            invert: true
+            type: column
+        apex_config:
+          tooltip:
+            x:
+              formatter: |
+                EVAL: (value) => {
+                  const date = new Date(value);
+                  date.setDate(date.getDate() + 5);
+                  const formatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'long' });
+                  return formatter.format(date);
+                }
+  - type: grid
+    cards:
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 7d
+        span:
+          end: day
+        header:
+          show: true
+          title: PND NT/VT Včerejší stav
+          show_states: true
+          colorize_states: true
+        series:
+          - entity: sensor.pnd_tariff_data
+            name: NT
+            attribute: low_tariff
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.low_tariff[index])])
+                .filter(([time]) => time < today.getTime());
+            color: '#2196F3'
+            opacity: 0.8
+            type: column
+          - entity: sensor.pnd_tariff_data
+            name: VT
+            attribute: high_tariff
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.high_tariff[index])])
+                .filter(([time]) => time < today.getTime());
+            color: '#FF9800'
+            opacity: 0.8
+            type: column
+        apex_config:
+          legend:
+            formatter: |
+              EVAL: (seriesName) => seriesName
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 10d
+        span:
+          end: day
+        header:
+          show: true
+          title: PND NT/VT Posledních 10 dní
+        series:
+          - entity: sensor.pnd_tariff_data
+            name: NT
+            attribute: low_tariff
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.low_tariff[index])])
+                .filter(([time]) => time < today.getTime());
+            color: '#2196F3'
+            opacity: 0.8
+            type: column
+          - entity: sensor.pnd_tariff_data
+            name: VT
+            attribute: high_tariff
+            data_generator: |
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return entity.attributes.pnddate
+                .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.high_tariff[index])])
+                .filter(([time]) => time < today.getTime());
+            color: '#FF9800'
+            opacity: 0.8
+            type: column
+        apex_config:
+          legend:
+            formatter: |
+              EVAL: (seriesName) => seriesName
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 1y
+        span:
+          end: isoWeek
+        header:
+          show: true
+          title: PND NT/VT Historická Data (Týdenní agregace)
+        series:
+          - entity: sensor.pnd_tariff_data
+            name: NT
+            attribute: low_tariff
+            data_generator: |
+              return entity.attributes.pnddate.map((pnd, index) => {
+                return [new Date(pnd).getTime(), parseFloat(entity.attributes.low_tariff[index])];
+              });
+            color: '#2196F3'
+            opacity: 0.8
+            type: column
+            group_by:
+              func: sum
+              duration: 7d
+          - entity: sensor.pnd_tariff_data
+            name: VT
+            attribute: high_tariff
+            data_generator: |
+              return entity.attributes.pnddate.map((pnd, index) => {
+                return [new Date(pnd).getTime(), parseFloat(entity.attributes.high_tariff[index])];
+              });
+            color: '#FF9800'
+            opacity: 0.8
+            type: column
+            group_by:
+              func: sum
+              duration: 7d
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 1y
+        span:
+          end: month
+        header:
+          show: true
+          title: PND NT/VT Historická Data (Měsíční agregace)
+        series:
+          - entity: sensor.pnd_tariff_data
+            name: NT
+            attribute: low_tariff
+            data_generator: |
+              const sums = {};
+              entity.attributes.pnddate.forEach((pnd, index) => {
+                const d = new Date(pnd);
+                const key = d.getFullYear() + '-' + d.getMonth();
+                if (!sums[key]) {
+                  sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };
+                }
+                sums[key].value += parseFloat(entity.attributes.low_tariff[index]);
+              });
+              return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);
+            color: '#2196F3'
+            opacity: 0.8
+            type: column
+          - entity: sensor.pnd_tariff_data
+            name: VT
+            attribute: high_tariff
+            data_generator: |
+              const sums = {};
+              entity.attributes.pnddate.forEach((pnd, index) => {
+                const d = new Date(pnd);
+                const key = d.getFullYear() + '-' + d.getMonth();
+                if (!sums[key]) {
+                  sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };
+                }
+                sums[key].value += parseFloat(entity.attributes.high_tariff[index]);
+              });
+              return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);
+            color: '#FF9800'
+            opacity: 0.8
+            type: column
+        apex_config:
+          tooltip:
+            x:
+              formatter: |
+                EVAL: (value) => {
+                  const date = new Date(value);
+                  date.setDate(date.getDate() + 5);
+                  const formatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'long' });
+                  return formatter.format(date);
+                }
+header:
+  layout: responsive
+  badges_position: bottom
+  card:
+    type: markdown
+    text_only: true
+    content: |-
+      # Dobrý den, {{ user }}
+      Zde jsou data z distribučního portálu ✨

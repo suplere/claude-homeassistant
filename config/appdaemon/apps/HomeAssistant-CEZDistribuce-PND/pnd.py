@@ -19,7 +19,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, ElementClickInterceptedException
 from selenium.webdriver.common.action_chains import ActionChains
 from bs4 import BeautifulSoup
 import platform
@@ -129,6 +129,43 @@ def conv_date(s):
     s = s.replace("24:00:00", "23:59:00")
     return datetime.datetime.strptime(s, "%d.%m.%Y %H:%M:%S")
 
+def _normalize_decimal_str(s):
+    # PND renders numbers using whatever locale the headless Chrome instance
+    # picks up - observed both "6 733,39" (space thousands, comma decimal)
+    # and "8,228.968" (comma thousands, dot decimal) from different runs.
+    # "-" is a placeholder for not-yet-settled days.
+    if s is None:
+        return None
+    s = str(s).strip().replace("\xa0", "").replace(" ", "")
+    if s in ("", "-", "nan", "NaN"):
+        return None
+    if "," in s and "." in s:
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")  # comma is decimal, dot is thousands
+        else:
+            s = s.replace(",", "")  # dot is decimal, comma is thousands
+    elif "," in s:
+        s = s.replace(",", ".")
+    return s
+
+def parse_flexible_decimal(series):
+    # Plain .astype(float)/.sum() on the raw strings would silently do
+    # string concatenation instead of a numeric sum for unparsed values.
+    return pd.to_numeric(series.map(_normalize_decimal_str), errors="coerce")
+
+def clamp_data_interval(raw_interval):
+    fmt = "%d.%m.%Y %H:%M"
+    try:
+        start_str, end_str = [p.strip() for p in raw_interval.split(" - ")]
+        start_dt = dt.strptime(start_str, fmt)
+        end_dt = dt.strptime(end_str, fmt)
+        today = dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if end_dt > today:
+            end_dt = today
+        return f"{start_dt.strftime(fmt)} - {end_dt.strftime(fmt)}"
+    except Exception:
+        return raw_interval
+
 def _normalize_ha_state(value):
     if value is None:
         return "unknown"
@@ -151,7 +188,7 @@ class pnd(hass.Hass):
     self.username = self.args["PNDUserName"]
     self.password = self.args["PNDUserPassword"]
     self.download_folder = self.args["DownloadFolder"]
-    self.datainterval = self.args["DataInterval"]
+    self.datainterval = clamp_data_interval(self.args["DataInterval"])
     self.ELM = self.args["ELM"]
     self.id = self.args.get("id", "")
     self.suffix = f"_{self.id}" if self.id else ""
@@ -164,6 +201,64 @@ class pnd(hass.Hass):
 
   def set_state_safe(self, entity_id, state, attributes=None):
       return self.set_state(entity_id, state=_normalize_ha_state(state), attributes=attributes or {})
+
+  def click_report_link(self, driver, first_pnd_window, body, link_text, screenshot_tag,
+                         max_attempts=5, retry_delay=2, wait_seconds=10):
+      # Native Selenium .click() on these Vue/vue-multiselect report tabs is
+      # unreliable on the PND portal - it can silently no-op and leave the
+      # previously active report tab selected, exporting the wrong CSV.
+      # A JS-dispatched click reliably switches the active tab.
+      last_exc = None
+      for attempt in range(max_attempts):
+          try:
+              link = WebDriverWait(first_pnd_window, wait_seconds).until(
+                  EC.element_to_be_clickable((By.XPATH, f".//a[contains(text(), '{link_text}')]"))
+              )
+              ActionChains(driver).move_to_element(link).perform()
+              time.sleep(1)
+              body.screenshot(self.download_folder + f"/{screenshot_tag}-a.png")
+              driver.execute_script("arguments[0].click();", link)
+              body.screenshot(self.download_folder + f"/{screenshot_tag}-b.png")
+              time.sleep(1)
+              body.click()
+              return True
+          except (TimeoutException, StaleElementReferenceException, ElementClickInterceptedException) as e:
+              last_exc = e
+              print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.YELLOW}Attempt {attempt+1}/{max_attempts} failed for '{link_text}': {e}{Colors.RESET}")
+              time.sleep(retry_delay)
+      print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: Failed to click link '{link_text}' after {max_attempts} attempts: {last_exc}{Colors.RESET}")
+      return False
+
+  def export_csv_and_rename(self, driver, wait_seconds, dest_filename):
+      # Same story as click_report_link: the "Exportovat data" toggle's
+      # aria-expanded can stay stuck on native .click() (dropdown never
+      # opens), so we JS-click it and verify aria-expanded before proceeding.
+      wait = WebDriverWait(driver, wait_seconds)
+      try:
+          toggle_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exportovat data')]")))
+          driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", toggle_button)
+          time.sleep(1)
+          for _ in range(4):
+              if toggle_button.get_attribute("aria-expanded") == "true":
+                  break
+              driver.execute_script("arguments[0].click();", toggle_button)
+              time.sleep(1)
+          csv_link = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[normalize-space()='CSV']")))
+          driver.execute_script("arguments[0].click();", csv_link)
+      except Exception as e:
+          print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: Failed to trigger CSV export for {dest_filename}: {e}{Colors.RESET}")
+          return False
+
+      time.sleep(5)
+      downloaded_file = os.path.join(self.download_folder, "pnd_export.csv")
+      if os.path.exists(downloaded_file):
+          dest = os.path.join(self.download_folder, dest_filename)
+          os.remove(dest) if os.path.exists(dest) else None
+          os.rename(downloaded_file, dest)
+          print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.GREEN}File downloaded and saved as: {dest} {round(os.path.getsize(dest)/1024,2)} KB{Colors.RESET}")
+          return True
+      print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: No file was downloaded for {dest_filename}.{Colors.RESET}")
+      return False
 
   def run_pnd(self, event_name, data, kwargs):
     script_start_time = dt.now()
@@ -717,148 +812,39 @@ class pnd(hass.Hass):
     # Wait for the page and elements to fully load
     wait = WebDriverWait(driver, 10)  # Adjust timeout as necessary
 
-    # Find and click the link by its exact text
-    try:
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + "Selecting 07 Profil spotřeby za den (+A)")
-        link_text = "07 Profil spotřeby za den (+A)"
-        link = WebDriverWait(first_pnd_window, 10).until(
-            EC.element_to_be_clickable((By.XPATH, ".//a[contains(text(), '" + link_text + "')]"))
-        )
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " +  link.text)
+    def select_and_export_interval_report(link_text, screenshot_tag, dest_filename):
+        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"Selecting {link_text}")
+        if not self.click_report_link(driver, first_pnd_window, body, link_text, screenshot_tag):
+            self.set_state(f"binary_sensor.pnd_running{self.suffix}", state="off")
+            self.set_state(f"sensor.pnd_script_status{self.suffix}", state="Error", attributes={
+                "status": f"ERROR: Nepodařilo se najít odkaz pro interval export {link_text}",
+                "friendly_name": "PND Script Status"
+            })
+            return False
+        body.screenshot(self.download_folder + f"/{screenshot_tag}-c.png")
 
-        # Navigate to the parent element using XPath
-        parent_element = driver.execute_script("return arguments[0].parentNode;", link)
-        # Get the HTML of the parent element
-        parent_html = parent_element.get_attribute('outerHTML')
-        # Use ActionChains to move to the element
-        actions = ActionChains(driver)
-        actions.move_to_element(link).perform()
-        time.sleep(1)
-        body.screenshot(self.download_folder+"/interval-body-07a.png")
-        link.click()
-        body.screenshot(self.download_folder+"/interval-body-07b.png")
-        time.sleep(1)
-        body.click()
-    except:
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: Failed to find link {link_text}{Colors.RESET}")
-        self.set_state(f"binary_sensor.pnd_running{self.suffix}", state="off")
-        self.set_state(f"sensor.pnd_script_status{self.suffix}", state="Error", attributes={
-            "status": f"ERROR: Nepodařilo se najít odkaz pro interval export {link_text}",
-            "friendly_name": "PND Script Status"
-        })
+        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + "Exporting data")
+        if not self.export_csv_and_rename(driver, 10, dest_filename):
+            self.set_state(f"binary_sensor.pnd_running{self.suffix}", state="off")
+            self.set_state(f"sensor.pnd_script_status{self.suffix}", state="Error", attributes={
+                "status": f"ERROR: Nepodařilo se stáhnout CSV soubor pro interval export {link_text}",
+                "friendly_name": "PND Script Status"
+            })
+            return False
+        return True
 
-    body.screenshot(self.download_folder+"/interval-body-07c.png")
+    select_and_export_interval_report("07 Profil spotřeby za den (+A)", "interval-body-07", "range-consumption.csv")
+    select_and_export_interval_report("08 Profil výroby za den (-A)", "interval-body-08", "range-production.csv")
+    select_and_export_interval_report("17 Registry za den (+E, -E)", "interval-body-17", "range-tariff.csv")
 
-    # Wait for the dropdown toggle and click it using the button text
-    print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + "Exporting data")
-    wait = WebDriverWait(driver, 10)
-    try:
-        toggle_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exportovat data')]")))
-        time.sleep(1)
-        toggle_button.click()
-
-        # Wait for the CSV link and click it
-        csv_link = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[normalize-space()='CSV']")))
-        csv_link.click()
-    except:
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: Failed to download CSV file for {link_text}{Colors.RESET}")
-        self.set_state(f"binary_sensor.pnd_running{self.suffix}", state="off")
-        self.set_state(f"sensor.pnd_script_status{self.suffix}", state="Error", attributes={
-            "status": f"ERROR: Nepodařilo se stáhnout CSV soubor pro interval export {link_text}",
-            "friendly_name": "PND Script Status"
-        })
-    # Wait for the download to complete
-    time.sleep(5)
-    try:
-        del downloaded_file
-    except:
-        pass
-    #downloaded_file = wait_for_download(self.download_folder)
-    downloaded_file = os.path.join(self.download_folder, "pnd_export.csv")
-    # Rename the file if it was downloaded
-    if downloaded_file:
-        new_filename = os.path.join(self.download_folder, "range-consumption.csv")
-        os.remove(new_filename) if os.path.exists(new_filename) else None
-        os.rename(downloaded_file, new_filename)
-        downloaded_file = self.download_folder+"/range-consumption.csv"
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.GREEN}File downloaded and saved as: {new_filename} {round(os.path.getsize(downloaded_file)/1024,2)} KB{Colors.RESET}")
-    else:
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: No file was downloaded.{Colors.RESET}")
-    #----------------------------------------------
-    # Wait for the page and elements to fully load
-    wait = WebDriverWait(driver, 10)  # Adjust timeout as necessary
-
-    # Find and click the link by its exact text
-    print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + "Selecting 08 Profil výroby za den (-A)")
-    link_text = "08 Profil výroby za den (-A)"
-    try:
-        link = WebDriverWait(first_pnd_window, 10).until(
-            EC.element_to_be_clickable((By.XPATH, ".//a[contains(text(), '" + link_text + "')]"))
-        )
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " +  link.text)
-
-        # Navigate to the parent element using XPath
-        parent_element = driver.execute_script("return arguments[0].parentNode;", link)
-        # Get the HTML of the parent element
-        parent_html = parent_element.get_attribute('outerHTML')
-        # Use ActionChains to move to the element
-        actions = ActionChains(driver)
-        actions.move_to_element(link).perform()
-
-        body.screenshot(self.download_folder+"/interval-body-08a.png")
-        time.sleep(1)
-        link.click()
-        body.screenshot(self.download_folder+"/interval-body-08b.png")
-        time.sleep(1)
-        body.click()
-        body.screenshot(self.download_folder+"/interval-body-08c.png")
-    except:
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: Failed to find link {link_text}{Colors.RESET}")
-        self.set_state(f"binary_sensor.pnd_running{self.suffix}", state="off")
-        self.set_state(f"sensor.pnd_script_status{self.suffix}", state="Error", attributes={
-            "status": f"ERROR: Nepodařilo se najít odkaz pro interval export {link_text}",
-            "friendly_name": "PND Script Status"
-        })
-    # Wait for the dropdown toggle and click it using the button text
-    print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + "Exporting data")
-    wait = WebDriverWait(driver, 10)
-    try:
-        toggle_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Exportovat data')]")))
-        #driver.execute_script("arguments[0].scrollIntoView();", toggle_button)
-
-        toggle_button.click()
-
-        # Wait for the CSV link and click it
-        csv_link = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[normalize-space()='CSV']")))
-        csv_link.click()
-    except:
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: Failed to download CSV file for {link_text}{Colors.RESET}")
-        self.set_state(f"binary_sensor.pnd_running{self.suffix}", state="off")
-        self.set_state(f"sensor.pnd_script_status{self.suffix}", state="Error", attributes={
-            "status": f"ERROR: Nepodařilo se stáhnout CSV soubor pro interval export {link_text}",
-            "friendly_name": "PND Script Status"
-        })
-    # Wait for the download to complete
-    time.sleep(5)
-    try:
-        del downloaded_file
-    except:
-        pass
-    #downloaded_file = wait_for_download(self.download_folder)
-    downloaded_file = os.path.join(self.download_folder, "pnd_export.csv")
-
-    # Rename the file if it was downloaded
-    if downloaded_file:
-        new_filename = os.path.join(self.download_folder, "range-production.csv")
-        os.remove(new_filename) if os.path.exists(new_filename) else None
-        os.rename(downloaded_file, new_filename)
-        downloaded_file = self.download_folder+"/range-production.csv"
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.GREEN}File downloaded and saved as: {new_filename} {round(os.path.getsize(downloaded_file)/1024,2)} KB{Colors.RESET}")
-    else:
-        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}No file was downloaded.{Colors.RESET}")
     print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + "All Done - INTERVAL DATA DOWNLOADED")
     data_consumption = pd.read_csv(self.download_folder + '/range-consumption.csv', delimiter=';', encoding='latin1', converters={0: lambda s: dt.strptime(s.replace("24:00:00","23:59:00"), "%d.%m.%Y %H:%M:%S")})
     data_production = pd.read_csv(self.download_folder + '/range-production.csv', delimiter=';', encoding='latin1', converters={0: lambda s: dt.strptime(s.replace("24:00:00","23:59:00"), "%d.%m.%Y %H:%M:%S")})
+    # PND now serves these value columns as Czech-formatted decimal strings
+    # (e.g. "27,7635") - .sum() on the raw strings would concatenate them
+    # instead of adding, so they're normalized to numbers here.
+    data_consumption.iloc[:, 1] = parse_flexible_decimal(data_consumption.iloc[:, 1])
+    data_production.iloc[:, 1] = parse_flexible_decimal(data_production.iloc[:, 1])
 
     date_str = [dt.date().isoformat() for dt in data_consumption.iloc[:, 0]]
 
@@ -914,7 +900,60 @@ class pnd(hass.Hass):
       "friendly_name": "PND Interval Production to Consumption Floor",
       "state_class": "measurement",
       "unit_of_measurement": "%"
-    }) 
+    })
+    #----------------------------------------------
+    try:
+        data_tariff = pd.read_csv(self.download_folder + '/range-tariff.csv', delimiter=';', encoding='latin1',
+                                   converters={0: lambda s: dt.strptime(s.replace("24:00:00", "23:59:00"), "%d.%m.%Y %H:%M:%S")})
+        date_col = data_tariff.columns[0]
+        nt_col = next(c for c in data_tariff.columns if c.startswith("+E_NT"))
+        vt_col = next(c for c in data_tariff.columns if c.startswith("+E_VT"))
+
+        # +E_NT/+E_VT are cumulative meter register readings, not daily deltas,
+        # and recent days often show "-" (not yet settled by the distributor).
+        # Diff consecutive days to get per-day NT/VT consumption; the first
+        # row has no prior baseline so it's dropped.
+        tariff_dates = [d.date().isoformat() for d in data_tariff[date_col]][1:]
+        nt_daily = parse_flexible_decimal(data_tariff[nt_col]).diff().iloc[1:].reset_index(drop=True)
+        vt_daily = parse_flexible_decimal(data_tariff[vt_col]).diff().iloc[1:].reset_index(drop=True)
+
+        self.set_state(f"sensor.pnd_tariff_data{self.suffix}", state=now.strftime("%Y-%m-%d %H:%M:%S"), attributes={
+            "pnddate": tariff_dates,
+            "low_tariff": [str(x) for x in nt_daily.to_list()],
+            "high_tariff": [str(x) for x in vt_daily.to_list()],
+        })
+
+        self.set_state_safe(f"sensor.pnd_total_interval_consumption_low_tariff{self.suffix}", state="{:.2f}".format(nt_daily.sum()), attributes={
+            "friendly_name": "PND Total Interval Consumption Low Tariff (NT)",
+            "device_class": "energy",
+            "unit_of_measurement": "kWh"
+        })
+        self.set_state_safe(f"sensor.pnd_total_interval_consumption_high_tariff{self.suffix}", state="{:.2f}".format(vt_daily.sum()), attributes={
+            "friendly_name": "PND Total Interval Consumption High Tariff (VT)",
+            "device_class": "energy",
+            "unit_of_measurement": "kWh"
+        })
+
+        # Pick the most recent SETTLED day (skip trailing "-" placeholders)
+        # rather than blindly using the last row, which is often still empty.
+        settled_nt = nt_daily.dropna()
+        settled_vt = vt_daily.dropna()
+        if len(settled_nt) > 0 and len(settled_vt) > 0:
+            last_settled_date = tariff_dates[settled_nt.index[-1]]
+            self.set_state_safe(f"sensor.pnd_tariff_low{self.suffix}", state=str(settled_nt.iloc[-1]), attributes={
+                "friendly_name": "PND Low Tariff Consumption (Last Settled Day)",
+                "device_class": "energy",
+                "unit_of_measurement": "kWh",
+                "date": last_settled_date
+            })
+            self.set_state_safe(f"sensor.pnd_tariff_high{self.suffix}", state=str(settled_vt.iloc[-1]), attributes={
+                "friendly_name": "PND High Tariff Consumption (Last Settled Day)",
+                "device_class": "energy",
+                "unit_of_measurement": "kWh",
+                "date": last_settled_date
+            })
+    except Exception as e:
+        print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + f"{Colors.RED}ERROR: Failed to process range-tariff.csv: {e}{Colors.RESET}")
     #----------------------------------------------
     print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + "All Done - INTERVAL DATA PROCESSED")
 
