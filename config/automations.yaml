@@ -898,7 +898,8 @@
     podle toho, co nastane dřív. Nedělá nic, pokud NT manuální režim nebyl aktivní.
     Spočítá spotřebu a náklady session (energie teď minus snapshot při startu ×
     NT cena při startu) a přičte je do celoživotních akumulátorů pro měsíční
-    utility_meter (sensor.ev_nt_energie_mesic, sensor.ev_nt_naklady_mesic).
+    utility_meter (sensor.ev_nt_energie_mesic, sensor.ev_nt_naklady_mesic). Vrátí
+    proud na 6A (na hodnotu se dá přes start automatiky, jinak by zůstal na 11A).
   triggers:
   - trigger: state
     entity_id: input_boolean.ev_nabijeni_manualni_nt
@@ -947,6 +948,11 @@
     - action: switch.turn_off
       target:
         entity_id: switch.ecovolter_revcr01c00002056_is_charging_enable
+  - action: number.set_value
+    target:
+      entity_id: number.ecovolter_revcr01c00002056_target_current
+    data:
+      value: 6
   - if:
     - condition: state
       entity_id: select.goodwe_provozni_rezim_stridace
