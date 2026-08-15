@@ -419,6 +419,41 @@ přes GUI (dřív, než jsme zjistili, že `input_number` jde i přes YAML jako
 `battery_capacity`/`winter_dod`/`filtrace_vykon_w`). Nezkoušejte je znovu definovat
 v `configuration.yaml` — už jednou to vytvořilo duplicitní entity se suffixem `_2`.
 
+### Dashboard "NT nabíjení EV" – graf po měsících ukazoval 0 Kč (zjištěno 15.8.2026)
+
+Karta `statistics-graph` (`period: month`, `chart_type: bar`) pro `sensor.ev_nt_naklady_mesic`
+a `sensor.ev_nt_energie_mesic` ukazovala pro aktuální (první) měsíc nulu, i když dlaždice
+nad grafem správně ukazovala reálnou hodnotu (61 Kč). Ověřeno přímo v SQLite databázi
+recorderu i přes stejné WebSocket API, které karta používá (`recorder/statistics_during_period`)
+– podkladová data byla v obou případech správná (`sum` i `change` = 61,39 Kč pro srpen).
+
+**Skutečná příčina** (dohledáno ve zdrojovém kódu HA frontendu,
+`src/components/chart/statistics-chart-data.ts`): `stat_types: sum` má speciální logiku
+navrženou pro **nikdy neresetující** senzory (`total_increasing`, typicky celoživotní čítač) –
+chce ukázat "o kolik to narostlo od začátku zobrazeného rozsahu", takže **první bod v
+zobrazeném rozsahu se vždy natvrdo vykreslí jako 0** (použije se jako základ pro odečet
+od dalších bodů):
+
+```js
+case SUM_KIND:
+    if (firstSum === null || firstSum === undefined) {
+      val.push(0);              // první bod vždy 0, bez ohledu na reálnou hodnotu
+      firstSum = stat.sum;
+    } else {
+      val.push((stat.sum || 0) - firstSum);
+    }
+```
+
+`sensor.ev_nt_naklady_mesic`/`_energie_mesic` jsou ale **měsíčně se resetující**
+utility_meter helpery – srpen byl jediný (a tedy "první") bod v historii, takže se
+automaticky zobrazil jako 0.
+
+**Oprava:** v obou `statistics-graph` kartách změnit `stat_types: sum` na
+`stat_types: change` – `change` neprochází touhle "odečti od prvního bodu" větví
+(jde přímo přes `val.push(stat[type] ?? null)`), takže ukáže hodnotu za dané období
+přímo. Pro měsíčně resetující metr je to navíc významově správně (change = přírůstek
+za dané období = přesně to, co chceme zobrazit). Ověřeno funkční po nasazení.
+
 ---
 
 ## Přehled scénářů

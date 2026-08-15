@@ -92,7 +92,8 @@
       energy_buy_now: '{{ states(''sensor.energy_buy'') | float(0) }}'
       battery_discharge_now: '{{ states(''sensor.fve_battery_discharge_w'') | float(0)
         }}'
-      system_v_preteceni: '{{ energy_buy_now > 1500 or battery_discharge_now > 2000 }}'
+      system_v_preteceni: '{{ energy_buy_now > 1500 or battery_discharge_now > 2000
+        }}'
       muze_bezet: '{{ baterie_plna and not system_v_preteceni }}'
   - if:
     - condition: template
@@ -688,8 +689,8 @@
   description: Každé 2 min upravuje nabíjecí proud 6–11A podle přetoků, importu a
     vybíjení baterie, bez ohledu na znaménko spotové ceny. Před zvýšením proudu nejdřív
     zapne filtraci (aby využila přebytek dřív než EV), před vypnutím nabíjení nejdřív
-    sníží proud na 6A a zkusí vypnout filtraci. Neběží při manuálním NT nabíjení
-    (proud tam řídí start automatika, dům běží na grid).
+    sníží proud na 6A a zkusí vypnout filtraci. Neběží při manuálním NT nabíjení (proud
+    tam řídí start automatika, dům běží na grid).
   triggers:
   - trigger: time_pattern
     minutes: /2
@@ -794,11 +795,11 @@
   mode: single
 - id: ev_nabijeni_nt_manualni_start
   alias: EV nabíjení NT - manuální start
-  description: Manuální nabíjení EV za nízký tarif (CEZ HDO). Spustí se zapnutím
-    input_boolean.ev_nabijeni_manualni_nt (nebo pokud je už zapnuté, začátkem NT)
-    a zamkne domácí baterii (GoodWe eco_charge, výkon 0 %), aby spotřeba domu i
-    EV šla ze sítě a baterie se zbytečně nevybíjela. Zaznamená stav energie a
-    aktuální NT cenu pro pozdější dopočet nákladů session (viz stop automatika).
+  description: Manuální nabíjení EV za nízký tarif (CEZ HDO). Spustí se zapnutím input_boolean.ev_nabijeni_manualni_nt
+    (nebo pokud je už zapnuté, začátkem NT) a zamkne domácí baterii (GoodWe eco_charge,
+    výkon 0 %), aby spotřeba domu i EV šla ze sítě a baterie se zbytečně nevybíjela.
+    Zaznamená stav energie a aktuální NT cenu pro pozdější dopočet nákladů session
+    (viz stop automatika).
   triggers:
   - trigger: state
     entity_id: input_boolean.ev_nabijeni_manualni_nt
@@ -896,10 +897,10 @@
   description: Ukončí NT manuální nabíjení a odemkne domácí baterii (GoodWe general
     mode) při konci NT tarifu, vypnutí input_boolean nebo zastavení nabíjení EV —
     podle toho, co nastane dřív. Nedělá nic, pokud NT manuální režim nebyl aktivní.
-    Spočítá spotřebu a náklady session (energie teď minus snapshot při startu ×
-    NT cena při startu) a přičte je do celoživotních akumulátorů pro měsíční
-    utility_meter (sensor.ev_nt_energie_mesic, sensor.ev_nt_naklady_mesic). Vrátí
-    proud na 6A (na hodnotu se dá přes start automatiky, jinak by zůstal na 11A).
+    Spočítá spotřebu a náklady session (energie teď minus snapshot při startu × NT
+    cena při startu) a přičte je do celoživotních akumulátorů pro měsíční utility_meter
+    (sensor.ev_nt_energie_mesic, sensor.ev_nt_naklady_mesic). Vrátí proud na 6A (na
+    hodnotu se dá přes start automatiky, jinak by zůstal na 11A).
   triggers:
   - trigger: state
     entity_id: input_boolean.ev_nabijeni_manualni_nt
@@ -919,8 +920,8 @@
       or is_state(''select.goodwe_provozni_rezim_stridace'', ''eco_charge'') }}'
   actions:
   - variables:
-      energie_pri_startu: '{{ states(''input_number.ev_nt_start_energie_kwh'') |
-        float(0) }}'
+      energie_pri_startu: '{{ states(''input_number.ev_nt_start_energie_kwh'') | float(0)
+        }}'
       cena_pri_startu: '{{ states(''input_number.ev_nt_start_cena_kc_kwh'') | float(0)
         }}'
       energie_ted: '{{ states(''sensor.ecovolter_revcr01c00002056_total_charged_energy'')
@@ -937,8 +938,8 @@
     target:
       entity_id: input_number.ev_nt_naklady_celkem_kc
     data:
-      value: '{{ (states(''input_number.ev_nt_naklady_celkem_kc'') | float(0)) +
-        session_kc }}'
+      value: '{{ (states(''input_number.ev_nt_naklady_celkem_kc'') | float(0)) + session_kc
+        }}'
   - if:
     - condition: not
       conditions:
@@ -1045,7 +1046,7 @@
   alias: Run PND
   description: ''
   triggers:
-  - at: 00:30:00
+  - at: 06:00:00
     trigger: time
   conditions: []
   actions:

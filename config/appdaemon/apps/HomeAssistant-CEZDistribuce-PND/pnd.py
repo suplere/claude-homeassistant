@@ -153,13 +153,18 @@ def parse_flexible_decimal(series):
     # string concatenation instead of a numeric sum for unparsed values.
     return pd.to_numeric(series.map(_normalize_decimal_str), errors="coerce")
 
-def clamp_data_interval(raw_interval):
+def clamp_data_interval(raw_interval, now):
+    # `now` must come from AppDaemon's own clock (self.datetime()), not the
+    # container's raw OS clock (dt.now()) - the AppDaemon add-on's system
+    # clock has been observed to lag a full day behind, which silently
+    # freezes this clamp on a stale date forever (verified 15.8.2026: the
+    # container reported "today" as 14.8. even hours into 15.8.).
     fmt = "%d.%m.%Y %H:%M"
     try:
         start_str, end_str = [p.strip() for p in raw_interval.split(" - ")]
         start_dt = dt.strptime(start_str, fmt)
         end_dt = dt.strptime(end_str, fmt)
-        today = dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         if end_dt > today:
             end_dt = today
         return f"{start_dt.strftime(fmt)} - {end_dt.strftime(fmt)}"
@@ -188,7 +193,7 @@ class pnd(hass.Hass):
     self.username = self.args["PNDUserName"]
     self.password = self.args["PNDUserPassword"]
     self.download_folder = self.args["DownloadFolder"]
-    self.datainterval = clamp_data_interval(self.args["DataInterval"])
+    self.raw_data_interval = self.args["DataInterval"]
     self.ELM = self.args["ELM"]
     self.id = self.args.get("id", "")
     self.suffix = f"_{self.id}" if self.id else ""
@@ -262,6 +267,10 @@ class pnd(hass.Hass):
 
   def run_pnd(self, event_name, data, kwargs):
     script_start_time = dt.now()
+    # Recomputed fresh on every run (not cached from initialize(), which only
+    # runs once at app load/reload) using AppDaemon's own clock rather than
+    # the container's raw OS clock - see clamp_data_interval() docstring.
+    self.datainterval = clamp_data_interval(self.raw_data_interval, self.datetime())
     print(dt.now().strftime("%Y-%m-%d %H:%M:%S") + f": {Colors.CYAN}********************* Starting " +  ver + f" *********************{Colors.RESET}")
     self.set_state(f"binary_sensor.pnd_running{self.suffix}", state="on")
     self.set_state(f"sensor.pnd_script_status{self.suffix}", state="Running",attributes={

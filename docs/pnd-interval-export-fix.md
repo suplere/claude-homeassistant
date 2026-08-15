@@ -3,8 +3,9 @@
 ## Kontext
 
 **Aplikace:** `config/appdaemon/apps/HomeAssistant-CEZDistribuce-PND/pnd.py` – AppDaemon app
-nainstalovaná přes HACS (repo `HomeAssistant-CEZDistribuce-PND`). Denně (00:30, event `run_pnd`
-z automatizace `automation.run_pnd`) se přihlašuje na portál PND ČEZ Distribuce a stahuje:
+nainstalovaná přes HACS (repo `HomeAssistant-CEZDistribuce-PND`). Denně (06:00, event `run_pnd`
+z automatizace `automation.run_pnd`, id `1778526312883`) se přihlašuje na portál PND ČEZ
+Distribuce a stahuje:
 - **DAILY** sekci – report za "Včera" (07 Profil spotřeby, 08 Profil výroby)
 - **INTERVAL** sekci – reporty za celé nastavené období (`DataInterval` v `apps.yaml`)
 
@@ -42,14 +43,36 @@ hodnot (report 17, v tisících kWh) to dávalo nesmyslné výsledky / `NaN`.
 podle POZICE poslední čárky/tečky, která je desetinná a která tisícová, funguje pro oba formáty.
 `"-"` (placeholder pro ještě neuzavřené dny) se mapuje na `NaN` přes `errors="coerce"`.
 
+### 3. `clamp_data_interval()` se počítal jen jednou při startu aplikace, ne při každém běhu (zjištěno 15.8.2026)
+
+`self.datainterval = clamp_data_interval(...)` byl původně v `initialize()` – u AppDaemon apek se
+ale `initialize()` volá **jen při startu/reloadu aplikace**, ne při každém `run_pnd` eventu. Po
+posledním nasazení (14.8. večer) AppDaemon aplikaci reloadnul, spočítal "dnešek = 14.8." a tahle
+hodnota zůstala v `self.datainterval` navždy zmrzlá – i běh dnes ráno (06:00) i ruční testy pořád
+posílaly portálu konec intervalu `"14.08.2026 00:00"`, takže 14.8. (natož další dny) by se **nikdy**
+nestáhlo. Ověřeno v logu AppDaemonu (`ha addons logs a0d7b954_appdaemon`): `Data Interval Entered -
+'01.01.2026 00:00 - 14.08.2026 00:00'` i hodiny po půlnoci 15.8.
+
+**Oprava:** přepočet přesunut do `run_pnd()` (počítá se nově při každém běhu), a jako zdroj "dnešního
+data" se místo syrových OS hodin kontejneru (`dt.now()`) používá `self.datetime()` – AppDaemonův
+vlastní, na HA navázaný čas (doporučený postup pro AppDaemon apky obecně). Ověřeno: po opravě log
+ukazuje správně `'01.01.2026 00:00 - 15.08.2026 00:00'` a `sensor.pnd_data`/`sensor.pnd_tariff_data`
+okamžitě doplnily chybějící 14.8.
+
 ---
 
 ## Vedlejší vylepšení
 
 **`clamp_data_interval()`** – `DataInterval` z `apps.yaml` (natvrdo `"01.01.2026 00:00 - 31.12.2026 00:00"`,
-tj. rozsah do budoucna) se při každém běhu ořízne na dnešek. Nejde o hlavní příčinu pádu (ta byla
-v bodě 1 výše), ale nemá smysl žádat portál o dny, které ještě neexistují, a `apps.yaml` se tak
-nemusí ručně upravovat.
+tj. rozsah do budoucna) se při každém běhu ořízne na dnešek. Nejde o hlavní příčinu původního pádu
+(ta byla v bodě 1 výše), ale nemá smysl žádat portál o dny, které ještě neexistují, a `apps.yaml` se
+tak nemusí ručně upravovat. (Viz bug č. 3 výše – tohle zlepšení mělo vlastní skrytou chybu.)
+
+**Posun plánovaného běhu z 00:30 na 06:00** (automatizace "Run PND", `automations.yaml`, id
+`1778526312883`) – zjištěno 15.8.2026: portál ČEZ má u denních dat zpoždění zpracování, které
+může být **déle než 24 hodin**. Běh v 00:30 (i ruční re-run v 8:31 téhož dne) opakovaně nezachytil
+data za předchozí den, protože je ČEZ ještě neměl uzavřená (stejný jev jako `-` placeholdery u
+NT/VT). Posunutím na 06:00 má ČEZ víc času data zpracovat před stažením.
 
 ---
 
@@ -94,7 +117,7 @@ pokus o zálohu (`pnd.py.bak-*` přímo na HA) smazal následující `make push`
 
 1. `make push` (validace + nahrání na HA)
 2. Spustit automatizaci `automation.run_pnd` ručně (Settings → Automations → "Run PND" → Spustit,
-   nebo `automation.trigger` s `entity_id: automation.run_pnd`) – nečekat na plánovaný běh v 00:30
+   nebo `automation.trigger` s `entity_id: automation.run_pnd`) – nečekat na plánovaný běh v 06:00
 3. Sledovat log AppDaemonu (add-on log) nebo počkat na `binary_sensor.pnd_running` → `off`
 4. Zkontrolovat `sensor.pnd_script_status` (očekáváno `Stopped` / `Finished`) a nové senzory výše
 
@@ -114,7 +137,7 @@ včerejšek") s `apexcharts-card group_by: func: last, duration: 1d`. Toto řad�
 přes `/api/history` – konkrétní den se dokázal "přesunout" na jiný sloupec, když:
 - ČEZ portál později revidoval hodnotu (viz `-` placeholdery u NT/VT výše) a stav se v HA
   přepsal v jiný den, než ke kterému se váže
-- skript se spustil mimo pravidelných 00:30 (např. ruční test)
+- skript se spustil mimo pravidelného plánu (např. ruční test)
 
 Důkaz: reálná data (`sensor.pnd_data`) ukazovala spotřebu 11.8.=13,0 kWh a 12.8.=15,5 kWh, graf
 ale u obou dnů ukazoval téměř nulu.
