@@ -1,6 +1,7 @@
 # HAv2 – dashboard „Energie v2“ (docs/hav2-architektura.md §9)
 # Zdroj pravdy pro storage dashboard `energie-v2`. Do HA se nahrává přes Lovelace API
-# (lovelace/config/save), ne přes rsync. Úpravy dělat tady a znovu nahrát.
+# (lovelace/config/save), ne přes rsync. Úpravy dělat tady a znovu nahrát:
+#   python dashboards/push_dashboard.py energie-v2 dashboards/energie-v2.yaml
 # Časové řady plánu čte z atributů AppDaemon senzorů (slots_json = ISO čas).
 
 title: Energie v2

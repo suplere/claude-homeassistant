@@ -14,6 +14,7 @@ Vše, co HAv2 smaže nebo nahradí, je tady uložené v plné definici.
 | UI helpery input_* (storage) | `helpers/input_*.json` |
 | UI helpery template / integration / utility_meter / statistics / history_stats | `helpers/ui_helpers_config_entries.json` |
 | Aktuální stavy helperů, automatizací a energetických senzorů | `states_snapshot.json` |
+| Nastavení Energy dashboardu před HAv2 (ceny, zařízení) | `helpers/energy_prefs.json` (obnova: `ha_manage_energy_prefs` mode=set) |
 
 ## Plánované k odstranění (po oblastech, v okamžiku převzetí řízení v2)
 
