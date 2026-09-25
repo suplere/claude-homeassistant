@@ -296,9 +296,17 @@ template:
                else 'odhad z nabité energie' }}
 
   # -------------------------------------- bazén: teplota vody jen při běhu čerpadla
+  # spouští se změnou teploty, 10 min po zapnutí čerpadla a pak každých 10 min běhu
   - triggers:
       - trigger: state
         entity_id: sensor.davkovac_teplota
+      - trigger: state
+        entity_id: switch.filtrace_switch
+        to: "on"
+        for:
+          minutes: 10
+      - trigger: time_pattern
+        minutes: /10
     conditions:
       - condition: state
         entity_id: switch.filtrace_switch
@@ -306,7 +314,7 @@ template:
         for:
           minutes: 10
       - condition: template
-        value_template: "{{ trigger.to_state.state | is_number }}"
+        value_template: "{{ states('sensor.davkovac_teplota') | is_number }}"
     sensor:
       - name: Teplota vody v bazénu
         unique_id: hav2_pool_water_temperature
@@ -316,7 +324,7 @@ template:
         state_class: measurement
         icon: mdi:pool-thermometer
         # PoolDose měří v cele – platné jen po 10 min běhu filtrace
-        state: "{{ trigger.to_state.state | float }}"
+        state: "{{ states('sensor.davkovac_teplota') | float }}"
 
   - binary_sensor:
       - name: Bojler hřeje

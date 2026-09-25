@@ -134,7 +134,7 @@ class EvControl:
             "est_grid_cost": f"{ev_plan.est_cost:.2f}",
             "battery_reserve_w": f"{self.ev_reserve_w:.0f}",
             "horizon_end": ev_plan.horizon_end.isoformat() if ev_plan.horizon_end else "",
-            "grid_slots_json": json.dumps([[t.strftime("%d.%m %H:%M"), k] for t, k in ev_plan.grid_slots.items()],
+            "grid_slots_json": json.dumps([[t.isoformat(timespec="minutes"), k] for t, k in ev_plan.grid_slots.items()],
                                           ensure_ascii=False),
             "generated": now.isoformat(),
         })

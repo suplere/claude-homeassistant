@@ -330,6 +330,6 @@ def compact(plan: Plan, slots: Sequence[Slot], every: int = 2) -> List[list]:
     for i, (r, s) in enumerate(zip(plan.results, slots)):
         if i % every:
             continue
-        out.append([r.start.strftime("%d.%m %H:%M"), r.mode, round(r.power_kw, 2), r.soc_pct,
+        out.append([r.start.isoformat(timespec="minutes"), r.mode, round(r.power_kw, 2), r.soc_pct,
                     round(r.grid_import_kwh, 3), round(r.grid_export_kwh, 3)])
     return out
