@@ -1,0 +1,47 @@
+{#- HAv2 – sdílená makra datové vrstvy (docs/hav2-architektura.md §3)
+    Kalibrace Solcastu z 2 let dat (2026-09-25):
+    - denní faktor podle měsíce (skutečnost / Solcast p50)
+    - tvar dne: odpoledne stín (platí březen–říjen), v zimě plochý průběh -#}
+
+{#- Denní opravný faktor Solcast p50 podle měsíce -#}
+{%- macro pv_month_factor(month) -%}
+{{ {1: 0.50, 2: 0.68, 3: 0.75, 4: 0.80, 5: 0.80, 6: 0.80, 7: 0.80, 8: 0.80, 9: 0.80, 10: 0.75, 11: 0.50, 12: 0.50}[month | int] }}
+{%- endmacro -%}
+
+{#- Relativní tvar dne podle hodiny (před normalizací na denní faktor) -#}
+{%- macro pv_hour_shape(month, hour) -%}
+{%- set m = month | int -%}{%- set h = hour | int -%}
+{%- if m in [11, 12, 1] -%}1.0
+{%- elif h <= 12 -%}0.95
+{%- elif h == 13 -%}0.85
+{%- elif h <= 15 -%}0.80
+{%- elif h == 16 -%}0.70
+{%- elif h == 17 -%}0.55
+{%- else -%}0.40
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Konzervativní denní faktor (dolní ~10 % poměru skutečnost/p50) -#}
+{%- macro pv_conservative_factor(month) -%}
+{%- set m = month | int -%}
+{{ 0.55 if 4 <= m <= 9 else 0.45 if m in [3, 10] else 0.25 }}
+{%- endmacro -%}
+
+{#- Opravené 30min sloty jednoho dne ze Solcast detailedForecast.
+    Vrací JSON seznam [iso_start, kW]; součet dne = p50 × denní faktor,
+    rozložení podle tvaru dne. -#}
+{%- macro pv_corrected_slots(detailed) -%}
+{%- set ns = namespace(raw=0, shaped=0, out=[]) -%}
+{%- for s in detailed or [] -%}
+  {%- set ns.raw = ns.raw + s.pv_estimate -%}
+  {%- set ns.shaped = ns.shaped + s.pv_estimate * (pv_hour_shape(s.period_start.month, s.period_start.hour) | float) -%}
+{%- endfor -%}
+{%- if ns.shaped > 0 -%}
+  {%- set scale = ns.raw * (pv_month_factor((detailed | first).period_start.month) | float) / ns.shaped -%}
+  {%- for s in detailed -%}
+    {%- set kw = s.pv_estimate * (pv_hour_shape(s.period_start.month, s.period_start.hour) | float) * scale -%}
+    {%- set ns.out = ns.out + [[s.period_start.isoformat(), kw | round(3)]] -%}
+  {%- endfor -%}
+{%- endif -%}
+{{ ns.out | to_json }}
+{%- endmacro -%}

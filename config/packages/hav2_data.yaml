@@ -1,0 +1,346 @@
+# HAv2 – datová vrstva (Fáze 3, krok 1), docs/hav2-architektura.md §3
+# Jen čte a počítá – nic neřídí.
+# Konvence: meter_active_power_lX kladné = dodávka do sítě, záporné = odběr.
+
+sensor:
+  # vyhlazený přebytek pro regulaci EV a filtrace
+  - platform: statistics
+    name: energy_surplus_smoothed_w
+    unique_id: hav2_energy_surplus_smoothed_w
+    entity_id: sensor.energy_surplus_w
+    state_characteristic: mean
+    max_age:
+      seconds: 90
+    sampling_size: 60
+    precision: 0
+  # 5min průměr napěťového indexu bojleru (L3 mimo měření GoodWe)
+  - platform: statistics
+    name: energy_boiler_voltage_index_5min
+    unique_id: hav2_energy_boiler_voltage_index_5min
+    entity_id: sensor.energy_boiler_voltage_index
+    state_characteristic: mean
+    max_age:
+      minutes: 5
+    sampling_size: 200
+    precision: 2
+  # hodiny filtrace v bazénovém dni 06:00–06:00
+  - platform: history_stats
+    name: pool_hours_done_today
+    unique_id: hav2_pool_hours_done_today
+    entity_id: switch.filtrace_switch
+    state: "on"
+    type: time
+    start: >
+      {{ today_at('06:00') if now() >= today_at('06:00') else today_at('06:00') - timedelta(days=1) }}
+    end: "{{ now() }}"
+
+template:
+  - sensor:
+      # ----------------------------------------------------------- bojler (L3)
+      - name: Napěťový index bojleru
+        unique_id: hav2_energy_boiler_voltage_index
+        default_entity_id: sensor.energy_boiler_voltage_index
+        unit_of_measurement: V
+        device_class: voltage
+        state_class: measurement
+        icon: mdi:water-boiler
+        # (L1+L2)/2 − L3: bojler 2,25 kW na L3 (mimo GoodWe) prohne L3 o ~3 V
+        availability: >
+          {{ ['sensor.on_grid_l1_voltage', 'sensor.on_grid_l2_voltage', 'sensor.on_grid_l3_voltage']
+             | select('has_value') | list | count == 3 }}
+        state: >
+          {{ ((states('sensor.on_grid_l1_voltage') | float + states('sensor.on_grid_l2_voltage') | float) / 2
+              - states('sensor.on_grid_l3_voltage') | float) | round(2) }}
+
+      # ------------------------------------------------------- přebytek a fáze
+      - name: Přebytek pro řízené spotřebiče
+        unique_id: hav2_energy_surplus_w
+        default_entity_id: sensor.energy_surplus_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:solar-power-variant
+        # FVE − dům bez EV a filtrace − bojler (když hřeje); kladné = k dispozici
+        availability: "{{ has_value('sensor.pv_power') and has_value('sensor.base_house_consumption') }}"
+        state: >
+          {{ (states('sensor.pv_power') | float - states('sensor.base_house_consumption') | float
+              - (2250 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0)) | round(0) }}
+
+      - name: Rezerva fáze L1
+        unique_id: hav2_energy_phase_headroom_l1_w
+        default_entity_id: sensor.energy_phase_headroom_l1_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:sine-wave
+        # baterie umí dorovnávat → celkový přebytek; jinak přetok fáze
+        availability: "{{ has_value('sensor.energy_surplus_smoothed_w') and has_value('sensor.meter_active_power_l1') }}"
+        state: >
+          {% set soc = states('sensor.battery_state_of_charge') | float(0) %}
+          {% set minsoc = states('input_number.energy_battery_min_soc') | float(20) %}
+          {% if minsoc + 2 < soc < 97 %}{{ states('sensor.energy_surplus_smoothed_w') | float | round(0) }}
+          {% else %}{{ states('sensor.meter_active_power_l1') | float | round(0) }}{% endif %}
+      - name: Rezerva fáze L2
+        unique_id: hav2_energy_phase_headroom_l2_w
+        default_entity_id: sensor.energy_phase_headroom_l2_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:sine-wave
+        availability: "{{ has_value('sensor.energy_surplus_smoothed_w') and has_value('sensor.meter_active_power_l2') }}"
+        state: >
+          {% set soc = states('sensor.battery_state_of_charge') | float(0) %}
+          {% set minsoc = states('input_number.energy_battery_min_soc') | float(20) %}
+          {% if minsoc + 2 < soc < 97 %}{{ states('sensor.energy_surplus_smoothed_w') | float | round(0) }}
+          {% else %}{{ states('sensor.meter_active_power_l2') | float | round(0) }}{% endif %}
+      - name: Rezerva fáze L3
+        unique_id: hav2_energy_phase_headroom_l3_w
+        default_entity_id: sensor.energy_phase_headroom_l3_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:sine-wave
+        # na L3 navíc bojler mimo GoodWe
+        availability: "{{ has_value('sensor.energy_surplus_smoothed_w') and has_value('sensor.meter_active_power_l3') }}"
+        state: >
+          {% set soc = states('sensor.battery_state_of_charge') | float(0) %}
+          {% set minsoc = states('input_number.energy_battery_min_soc') | float(20) %}
+          {% set boiler = 2250 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0 %}
+          {% if minsoc + 2 < soc < 97 %}{{ states('sensor.energy_surplus_smoothed_w') | float | round(0) }}
+          {% else %}{{ (states('sensor.meter_active_power_l3') | float - boiler) | round(0) }}{% endif %}
+
+      - name: Rezerva hlavního jističe
+        unique_id: hav2_energy_breaker_headroom_a
+        default_entity_id: sensor.energy_breaker_headroom_a
+        unit_of_measurement: A
+        device_class: current
+        state_class: measurement
+        icon: mdi:electric-switch
+        # 25 A − nejvíc zatížená fáze ze sítě; L3 + bojler 9,8 A (mimo GoodWe)
+        availability: >
+          {{ ['sensor.meter_active_power_l1', 'sensor.meter_active_power_l2', 'sensor.meter_active_power_l3']
+             | select('has_value') | list | count == 3 }}
+        state: >
+          {% set boiler_a = 9.8 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0 %}
+          {% set i1 = [0 - states('sensor.meter_active_power_l1') | float, 0] | max / 230 %}
+          {% set i2 = [0 - states('sensor.meter_active_power_l2') | float, 0] | max / 230 %}
+          {% set i3 = [0 - states('sensor.meter_active_power_l3') | float, 0] | max / 230 + boiler_a %}
+          {{ (25 - [i1, i2, i3] | max) | round(1) }}
+        attributes:
+          worst_phase: >
+            {% set boiler_a = 9.8 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0 %}
+            {% set i = [[0 - states('sensor.meter_active_power_l1') | float(0), 0] | max / 230,
+                        [0 - states('sensor.meter_active_power_l2') | float(0), 0] | max / 230,
+                        [0 - states('sensor.meter_active_power_l3') | float(0), 0] | max / 230 + boiler_a] %}
+            L{{ i.index(i | max) + 1 }}
+
+      # ---------------------------------------------------------- hodnota kWh
+      - name: Hodnota kWh z FVE teď
+        unique_id: hav2_energy_value_pv_now
+        default_entity_id: sensor.energy_value_pv_now
+        unit_of_measurement: Kč/kWh
+        icon: mdi:solar-power
+        # ušlý prodej = max(spot × koeficient, 0)
+        availability: "{{ has_value('sensor.energy_price_sell_now') }}"
+        state: "{{ [states('sensor.energy_price_sell_now') | float, 0] | max | round(3) }}"
+
+      # ------------------------------------------------ opravená předpověď FVE
+      - name: Předpověď FVE opravená
+        unique_id: hav2_energy_pv_forecast_corrected
+        default_entity_id: sensor.energy_pv_forecast_corrected
+        unit_of_measurement: kWh
+        device_class: energy
+        icon: mdi:solar-power-variant-outline
+        # stav = opravený zbytek dnešního dne; sloty po 30 min (kW) dnes + zítra
+        availability: "{{ state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedForecast') is not none }}"
+        state: >
+          {% from 'hav2.jinja' import pv_corrected_slots %}
+          {% set slots = pv_corrected_slots(state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedForecast')) | from_json %}
+          {% set ns = namespace(e=0) %}
+          {% for s in slots %}
+            {% set start = s[0] | as_datetime %}
+            {% if start + timedelta(minutes=30) > now() %}
+              {% set frac = 1 if start >= now() else (start + timedelta(minutes=30) - now()).total_seconds() / 1800 %}
+              {% set ns.e = ns.e + s[1] * 0.5 * frac %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.e | round(2) }}
+        attributes:
+          today_kwh: >
+            {% from 'hav2.jinja' import pv_corrected_slots %}
+            {{ ((pv_corrected_slots(state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedForecast')) | from_json)
+                | map(attribute=1) | sum * 0.5) | round(2) }}
+          tomorrow_kwh: >
+            {% from 'hav2.jinja' import pv_corrected_slots %}
+            {{ ((pv_corrected_slots(state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedForecast')) | from_json)
+                | map(attribute=1) | sum * 0.5) | round(2) }}
+          tomorrow_conservative_kwh: >
+            {% from 'hav2.jinja' import pv_conservative_factor %}
+            {% set t = now() + timedelta(days=1) %}
+            {{ (states('sensor.solcast_pv_forecast_forecast_tomorrow') | float(0)
+                * pv_conservative_factor(t.month) | float) | round(2) }}
+          solcast_raw_today_kwh: "{{ states('sensor.solcast_pv_forecast_forecast_today') | float(0) }}"
+          solcast_raw_tomorrow_kwh: "{{ states('sensor.solcast_pv_forecast_forecast_tomorrow') | float(0) }}"
+          slots: >
+            {% from 'hav2.jinja' import pv_corrected_slots %}
+            {{ (pv_corrected_slots(state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedForecast')) | from_json)
+               + (pv_corrected_slots(state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedForecast')) | from_json) }}
+
+      # ---------------------------------------------------------------- EV
+      - name: EV potřebná energie
+        unique_id: hav2_ev_energy_needed_kwh
+        default_entity_id: sensor.ev_energy_needed_kwh
+        unit_of_measurement: kWh
+        device_class: energy
+        icon: mdi:ev-plug-type2
+        # (cíl − odhad SOC) × kapacita / účinnost nabíjení
+        availability: "{{ has_value('sensor.ev_soc_estimate') }}"
+        state: >
+          {% set diff = states('input_number.ev_target_soc') | float(80) - states('sensor.ev_soc_estimate') | float %}
+          {{ ([diff, 0] | max / 100 * states('input_number.ev_battery_capacity_kwh') | float(77.4)
+              / (states('input_number.ev_charge_efficiency') | float(90) / 100)) | round(2) }}
+
+      - name: EV rezerva do termínu
+        unique_id: hav2_ev_deadline_slack_h
+        default_entity_id: sensor.ev_deadline_slack_h
+        unit_of_measurement: h
+        device_class: duration
+        icon: mdi:calendar-clock
+        # hodiny do termínu − hodiny nabíjení na max. výkon (3f 11 A ≈ 7 kW)
+        # bez termínu (nebo s termínem v minulosti) je senzor nedostupný
+        availability: >
+          {% set d = states('input_datetime.ev_deadline') | as_datetime(none) %}
+          {{ d is not none and (d | as_local) > now() and has_value('sensor.ev_energy_needed_kwh') }}
+        state: >
+          {% set d = (states('input_datetime.ev_deadline') | as_datetime) | as_local %}
+          {% set hours_left = (d - now()).total_seconds() / 3600 %}
+          {{ (hours_left - states('sensor.ev_energy_needed_kwh') | float / 7.0) | round(2) }}
+
+      # -------------------------------------------------------------- bazén
+      - name: Filtrace doporučené hodiny
+        unique_id: hav2_pool_hours_recommended
+        default_entity_id: sensor.pool_hours_recommended
+        unit_of_measurement: h
+        device_class: duration
+        icon: mdi:pool-thermometer
+        # teplota vody / 2, +1 h při ORP < 650 mV, omezeno min/max
+        availability: "{{ has_value('sensor.pool_water_temperature') }}"
+        state: >
+          {% set h = states('sensor.pool_water_temperature') | float / 2
+                     + (1 if states('sensor.davkovac_orp') | float(700) < 650 else 0) %}
+          {% set h = [[h, states('input_number.pool_hours_min') | float(2)] | max,
+                      states('input_number.pool_hours_max') | float(12)] | min %}
+          {{ (h * 2) | round(0) / 2 }}
+
+  # -------------------------------------------------- EV: odhad SOC
+  - triggers:
+      - trigger: state
+        entity_id: sensor.ev6_ev_battery_level
+        id: kia
+      - trigger: state
+        entity_id: sensor.ecovolter_revcr01c00002056_total_charged_energy
+        id: energy
+      - trigger: homeassistant
+        event: start
+        id: start
+      - trigger: event
+        event_type: event_template_reloaded
+        id: reload
+    # `this` není ve `variables` trigger šablony dostupné → logika je přímo v šablonách
+    # (všechny vidí stejný předchozí stav entity, takže jsou konzistentní)
+    sensor:
+      - name: EV odhad SOC
+        unique_id: hav2_ev_soc_estimate
+        default_entity_id: sensor.ev_soc_estimate
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+        icon: mdi:car-electric
+        # Kia SOC (staré i hodiny) + energie nabitá od té doby × účinnost / kapacita.
+        # Na Kia SOC se přebázuje jen tehdy, když jsou data z auta novější než báze.
+        state: >
+          {% set total_now = states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) %}
+          {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
+          {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
+          {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
+          {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+          {% set base_soc = kia_soc | float if rebase else this.attributes.get('base_soc', kia_soc) | float(50) %}
+          {% set base_energy = total_now if rebase else this.attributes.get('base_energy', total_now) | float %}
+          {% set added = (total_now - base_energy) * states('input_number.ev_charge_efficiency') | float(90) / 100 %}
+          {{ [[base_soc + added / states('input_number.ev_battery_capacity_kwh') | float(77.4) * 100, 0] | max, 100] | min | round(1) }}
+        attributes:
+          base_soc: >
+            {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
+            {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
+            {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
+            {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+            {{ kia_soc | float if rebase else this.attributes.get('base_soc', kia_soc) | float(50) }}
+          base_energy: >
+            {% set total_now = states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) %}
+            {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
+            {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
+            {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
+            {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+            {{ total_now if rebase else this.attributes.get('base_energy', total_now) | float }}
+          base_time: >
+            {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
+            {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
+            {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
+            {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+            {{ (kia_time.isoformat() if kia_time is not none else now().isoformat()) if rebase else this.attributes.get('base_time') }}
+          source: >
+            {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
+            {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
+            {{ 'kia' if states('sensor.ev6_ev_battery_level') | is_number
+                        and (base_time is none or (kia_time is not none and kia_time > base_time))
+               else 'odhad z nabité energie' }}
+
+  # -------------------------------------- bazén: teplota vody jen při běhu čerpadla
+  - triggers:
+      - trigger: state
+        entity_id: sensor.davkovac_teplota
+    conditions:
+      - condition: state
+        entity_id: switch.filtrace_switch
+        state: "on"
+        for:
+          minutes: 10
+      - condition: template
+        value_template: "{{ trigger.to_state.state | is_number }}"
+    sensor:
+      - name: Teplota vody v bazénu
+        unique_id: hav2_pool_water_temperature
+        default_entity_id: sensor.pool_water_temperature
+        unit_of_measurement: °C
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:pool-thermometer
+        # PoolDose měří v cele – platné jen po 10 min běhu filtrace
+        state: "{{ trigger.to_state.state | float }}"
+
+  - binary_sensor:
+      - name: Bojler hřeje
+        unique_id: hav2_energy_boiler_heating
+        default_entity_id: binary_sensor.energy_boiler_heating
+        device_class: heat
+        icon: mdi:water-boiler
+        # kalibrace 16.–24.9.: index > 1,5 V v okně 12–20 h zachytí 94 % ohřevu, 0,5 % falešně
+        # hystereze: vypne pod 0,8 V
+        delay_off:
+          minutes: 3
+        availability: "{{ has_value('sensor.energy_boiler_voltage_index_5min') }}"
+        state: >
+          {% set idx = states('sensor.energy_boiler_voltage_index_5min') | float %}
+          {% set in_window = 12 <= now().hour < 20 %}
+          {{ in_window and idx > (0.8 if is_state('binary_sensor.energy_boiler_heating', 'on') else 1.5) }}
+
+      - name: Předpověď FVE platná
+        unique_id: hav2_energy_forecast_valid
+        default_entity_id: binary_sensor.energy_forecast_valid
+        device_class: connectivity
+        icon: mdi:weather-sunny-alert
+        # Solcast aktualizoval do 14 h (přes noc neaktualizuje) a má zítřek
+        state: >
+          {% set polled = states('sensor.solcast_pv_forecast_api_last_polled') | as_datetime(none) %}
+          {{ polled is not none and (now() - polled).total_seconds() < 14 * 3600
+             and states('sensor.solcast_pv_forecast_forecast_tomorrow') | is_number }}

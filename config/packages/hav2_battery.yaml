@@ -1,0 +1,143 @@
+# HAv2 – výkonná vrstva baterie (docs/hav2-architektura.md §2, §5.2, §7)
+# Jediné místo, které zapisuje EMS režim střídače. Volá ho AppDaemon (hav2_app).
+# Povolené režimy a rozsahy ověřené testem EMS 2026-09-25:
+#   auto, battery_standby, charge_battery, discharge_battery; výkon 0–5000 W.
+
+script:
+  hav2_battery_set:
+    alias: HAv2 – nastavit režim baterie
+    description: >
+      Nastaví EMS režim GoodWe podle plánovače HAv2. Zapisuje jen při rozdílu proti
+      aktuálnímu stavu a jen když je systém v režimu Auto a řízení baterie je zapnuté.
+      Hodnoty mimo povolený rozsah odmítne.
+    icon: mdi:home-battery
+    # po sobě jdoucí volání se nesmí přerušit uprostřed zápisu
+    mode: queued
+    max: 3
+    fields:
+      mode:
+        description: auto / standby / charge / discharge
+        required: true
+        example: charge
+        selector:
+          select:
+            options: [auto, standby, charge, discharge]
+      power_w:
+        description: Výkon nabíjení nebo vybíjení (W), pro auto/standby 0
+        required: false
+        default: 0
+        example: 2000
+        selector:
+          number:
+            min: 0
+            max: 5000
+            step: 100
+            unit_of_measurement: W
+      reason:
+        description: Důvod rozhodnutí (do logbooku)
+        required: false
+        example: NT nabíjení 2 kW
+        selector:
+          text:
+    variables:
+      ems_map:
+        auto: auto
+        standby: battery_standby
+        charge: charge_battery
+        discharge: discharge_battery
+      ems_target: "{{ ems_map.get(mode, 'invalid') }}"
+      power_target: >
+        {{ ([[power_w | int(0), 0] | max, 5000] | min // 100 * 100) if mode in ['charge', 'discharge'] else 0 }}
+    sequence:
+      - alias: Pojistka – jen v režimu Auto se zapnutým řízením baterie
+        if:
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: input_select.energy_system_mode
+                state: Auto
+              - condition: state
+                entity_id: input_boolean.energy_battery_control
+                state: "on"
+        then:
+          - action: logbook.log
+            data:
+              name: HAv2 baterie
+              message: "Nezapsáno (režim {{ states('input_select.energy_system_mode') }}): {{ mode }} {{ power_target }} W"
+              entity_id: script.hav2_battery_set
+          - stop: Systém není v režimu Auto se zapnutým řízením baterie
+      - alias: Pojistka – povolený režim
+        if:
+          - condition: template
+            value_template: "{{ ems_target == 'invalid' }}"
+        then:
+          - stop: Nepovolený režim baterie
+            error: true
+      - alias: Nejdřív výkon (aby nový režim nezačal se starým výkonem)
+        if:
+          - condition: template
+            value_template: "{{ states('number.goodwe_ems_power_limit') | float(-1) != power_target | float }}"
+        then:
+          - action: number.set_value
+            target:
+              entity_id: number.goodwe_ems_power_limit
+            data:
+              value: "{{ power_target }}"
+      - alias: Pak EMS režim
+        if:
+          - condition: template
+            value_template: "{{ states('select.goodwe_ems_mode') != ems_target }}"
+        then:
+          - action: select.select_option
+            target:
+              entity_id: select.goodwe_ems_mode
+            data:
+              option: "{{ ems_target }}"
+          - action: logbook.log
+            data:
+              name: HAv2 baterie
+              message: "EMS {{ ems_target }} {{ power_target }} W – {{ reason | default('') }}"
+              entity_id: script.hav2_battery_set
+
+automation:
+  - id: hav2_battery_watchdog
+    alias: HAv2 – watchdog plánovače baterie
+    description: >
+      Když AppDaemon plánovač 3 min neobnoví heartbeat (neběží nebo selhává) a systém
+      řídí baterii, vrátí střídač do bezpečného režimu auto (vlastní spotřeba) a pošle
+      notifikaci. Po obnovení plánovač sám znovu nastaví plán.
+    # jednorázová reakce; další běh až po obnovení a novém výpadku
+    mode: single
+    triggers:
+      - trigger: template
+        value_template: >
+          {{ (now() - (states('input_datetime.hav2_heartbeat') | as_datetime(now()) | as_local)).total_seconds() > 180 }}
+    conditions:
+      - condition: state
+        entity_id: input_select.energy_system_mode
+        state: Auto
+      - condition: state
+        entity_id: input_boolean.energy_battery_control
+        state: "on"
+    actions:
+      - action: number.set_value
+        target:
+          entity_id: number.goodwe_ems_power_limit
+        data:
+          value: 0
+      - action: select.select_option
+        target:
+          entity_id: select.goodwe_ems_mode
+        data:
+          option: auto
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.energy_last_decision
+        data:
+          value: "{{ now().strftime('%H:%M') }} watchdog: plánovač neodpovídá, baterie přepnuta na auto"
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: HAv2 – plánovač baterie neodpovídá
+          message: >
+            Heartbeat je starý {{ ((now() - (states('input_datetime.hav2_heartbeat') | as_datetime(now()) | as_local)).total_seconds() / 60) | round(0) }} min.
+            Baterie přepnuta na auto (vlastní spotřeba). Zkontroluj AppDaemon.

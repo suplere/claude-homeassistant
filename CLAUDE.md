@@ -48,6 +48,14 @@ Do not change entities or devices programmatically from this repo. If changes ar
 needed, make them manually in the Home Assistant UI:
 - Settings → Devices & Services → Entities → Edit
 
+**Exception (approved by the user 2026-09-25):** Claude may programmatically assign
+**labels and categories** (and create the labels/categories themselves) on **HAv2**
+entities, automations, scripts and helpers (`docs/hav2-architektura.md`) via the HA API
+(`ha_config_set_label`, `ha_set_entity` with `label_operation: add`, categories).
+Use labels `hav2` plus one area label `hav2_system` / `hav2_baterie` / `hav2_ev` / `hav2_bazen`.
+Nothing else in the entity/device registry (names, entity_id renames, areas, enable/disable)
+is covered by this exception.
+
 ### Reloading After YAML Changes
 - Automations: `POST /api/services/automation/reload`
 - Scenes: `POST /api/services/scene/reload`

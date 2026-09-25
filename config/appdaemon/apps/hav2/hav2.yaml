@@ -1,0 +1,18 @@
+# HAv2 – AppDaemon konfigurace (docs/hav2-architektura.md §2)
+# Samostatný soubor, protože apps.yaml obsahuje přihlašovací údaje a není v gitu.
+hav2:
+  module: hav2_app
+  class: Hav2
+  pnd_consumption_stat: "cez_pnd:859182400703740246_consumption"
+  pnd_production_stat: "cez_pnd:859182400703740246_production"
+  # změny, po kterých se plán přepočítá hned (s 30s debounce)
+  replan_on:
+    - input_select.energy_system_mode
+    - input_boolean.energy_battery_control
+    - input_number.energy_battery_min_soc
+    - input_number.energy_battery_max_grid_charge_w
+    - input_number.energy_sell_min_spot
+    - input_number.energy_export_block_below
+    - binary_sensor.cez_hdo_lowtariffactive_dum
+    - binary_sensor.energy_forecast_valid
+    - binary_sensor.spot_electricity_has_tomorrow_data_2

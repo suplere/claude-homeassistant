@@ -347,6 +347,18 @@ class ReferenceValidator:
                         if isinstance(name, str) and self._is_valid_object_id(name):
                             entities.add(f"{input_type}.{name}")
 
+            # Scripts and automations defined inline (packages)
+            if isinstance(data.get("script"), dict):
+                for name in data["script"].keys():
+                    if isinstance(name, str) and self._is_valid_object_id(name):
+                        entities.add(f"script.{name}")
+            if isinstance(data.get("automation"), list):
+                for automation in data["automation"]:
+                    if isinstance(automation, dict) and automation.get("alias"):
+                        object_id = self._slugify_object_id(str(automation["alias"]))
+                        if object_id:
+                            entities.add(f"automation.{object_id}")
+
             # Extract template entities
             if "template" in data:
                 template_data = data["template"]

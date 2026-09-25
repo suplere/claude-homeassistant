@@ -1,0 +1,243 @@
+# HAv2 – ovládací vrstva (helpers), docs/hav2-architektura.md §4
+# Bez `initial`, aby HA po restartu obnovil poslední nastavení uživatele.
+# Výchozí hodnoty se nastavují jednorázově po vytvoření.
+
+input_select:
+  energy_system_mode:
+    name: Režim energetického systému
+    icon: mdi:home-lightning-bolt
+    options:
+      - Auto
+      - Jen doporučení
+      - Ručně
+      - Dovolená
+  ev_mode:
+    name: Režim nabíjení EV
+    icon: mdi:ev-station
+    options:
+      - Solár
+      - Solár+NT
+      - Rychle
+      - Vypnuto
+  ev_manual:
+    name: EV ruční ovládání
+    icon: mdi:hand-back-right
+    options:
+      - Auto
+      - Nabíjet teď
+      - Zastavit
+  ev_manual_phases:
+    name: EV ruční fáze
+    icon: mdi:sine-wave
+    options:
+      - Auto
+      - 1f
+      - 3f
+  ev_manual_until:
+    name: EV ruční režim platí
+    icon: mdi:timer-sand
+    options:
+      - Do odpojení
+      - Do cílového SOC
+      - Na 1 h
+      - Na 3 h
+  pool_manual:
+    name: Filtrace ruční ovládání
+    icon: mdi:hand-back-right
+    options:
+      - Auto
+      - Zapnout
+      - Vypnout
+
+input_number:
+  energy_battery_min_soc:
+    name: Baterie minimální SOC
+    icon: mdi:battery-10
+    min: 10
+    max: 50
+    step: 1
+    unit_of_measurement: "%"
+  energy_battery_max_grid_charge_w:
+    name: Baterie max. nabíjení ze sítě
+    icon: mdi:battery-charging-high
+    min: 0
+    max: 5000
+    step: 100
+    unit_of_measurement: W
+  energy_sell_min_spot:
+    name: Prodej z baterie od spotu
+    icon: mdi:cash-fast
+    min: 0
+    max: 20
+    step: 0.1
+    unit_of_measurement: Kč/kWh
+  energy_export_block_below:
+    name: Omezit přetok pod cenou
+    icon: mdi:transmission-tower-off
+    min: -5
+    max: 5
+    step: 0.1
+    unit_of_measurement: Kč/kWh
+  ev_target_soc:
+    name: EV cílový SOC
+    icon: mdi:battery-charging-80
+    min: 20
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+  ev_current_min:
+    name: EV minimální proud
+    icon: mdi:current-ac
+    min: 6
+    max: 16
+    step: 1
+    unit_of_measurement: A
+  ev_current_max:
+    name: EV maximální proud
+    icon: mdi:current-ac
+    min: 6
+    max: 16
+    step: 1
+    unit_of_measurement: A
+  ev_manual_current:
+    name: EV ruční proud
+    icon: mdi:current-ac
+    min: 6
+    max: 11
+    step: 1
+    unit_of_measurement: A
+  ev_regulation_interval_s:
+    name: EV krok regulace
+    icon: mdi:timer-cog
+    min: 30
+    max: 120
+    step: 10
+    unit_of_measurement: s
+  ev_support_min_soc:
+    name: EV dotování z baterie od SOC
+    icon: mdi:battery-arrow-down
+    min: 20
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+  ev_support_max_min:
+    name: EV dotování max. doba
+    icon: mdi:timer-alert
+    min: 1
+    max: 60
+    step: 1
+    unit_of_measurement: min
+  ev_support_max_kwh:
+    name: EV dotování max. energie
+    icon: mdi:lightning-bolt
+    min: 0.1
+    max: 5
+    step: 0.1
+    unit_of_measurement: kWh
+  ev_resume_after_min:
+    name: EV obnovit po stabilním přebytku
+    icon: mdi:timer-play
+    min: 1
+    max: 30
+    step: 1
+    unit_of_measurement: min
+  ev_battery_capacity_kwh:
+    name: EV kapacita baterie
+    icon: mdi:car-battery
+    min: 40
+    max: 100
+    step: 0.1
+    unit_of_measurement: kWh
+  ev_charge_efficiency:
+    name: EV účinnost nabíjení
+    icon: mdi:percent
+    min: 70
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+  pool_hours_required:
+    name: Filtrace požadované hodiny
+    icon: mdi:pool
+    min: 0
+    max: 24
+    step: 0.5
+    unit_of_measurement: h
+  pool_hours_min:
+    name: Filtrace doporučení minimum
+    icon: mdi:pool
+    min: 0
+    max: 24
+    step: 0.5
+    unit_of_measurement: h
+  pool_hours_max:
+    name: Filtrace doporučení maximum
+    icon: mdi:pool
+    min: 0
+    max: 24
+    step: 0.5
+    unit_of_measurement: h
+  pool_min_run_min:
+    name: Filtrace minimální běh
+    icon: mdi:timer-lock
+    min: 10
+    max: 240
+    step: 10
+    unit_of_measurement: min
+  pool_manual_duration_h:
+    name: Filtrace ruční režim platí
+    icon: mdi:timer-sand
+    min: 0.5
+    max: 12
+    step: 0.5
+    unit_of_measurement: h
+
+input_boolean:
+  energy_battery_control:
+    name: HAv2 řídí baterii
+    icon: mdi:home-battery
+  energy_boiler_preheat:
+    name: Experiment předehřev bojleru
+    icon: mdi:water-boiler
+  ev_deadline_hard:
+    name: EV nabít za každou cenu
+    icon: mdi:alert-decagram
+  ev_allow_1f:
+    name: EV povolit 1f (L1)
+    icon: mdi:numeric-1-circle
+  pool_season:
+    name: Sezóna bazénu
+    icon: mdi:pool
+  pool_use_recommendation:
+    name: Filtrace podle doporučení
+    icon: mdi:lightbulb-auto
+
+input_datetime:
+  ev_deadline:
+    name: EV nabito do
+    icon: mdi:calendar-clock
+    has_date: true
+    has_time: true
+  hav2_heartbeat:
+    name: HAv2 heartbeat
+    icon: mdi:heart-pulse
+    has_date: true
+    has_time: true
+  energy_override_until:
+    name: Ruční zásah platí do
+    icon: mdi:timer-sand
+    has_date: true
+    has_time: true
+
+input_text:
+  energy_last_decision:
+    name: Poslední rozhodnutí – baterie
+    icon: mdi:text-box-outline
+    max: 255
+  ev_last_decision:
+    name: Poslední rozhodnutí – EV
+    icon: mdi:text-box-outline
+    max: 255
+  pool_last_decision:
+    name: Poslední rozhodnutí – bazén
+    icon: mdi:text-box-outline
+    max: 255
