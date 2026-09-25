@@ -985,6 +985,9 @@
         == ''charging_off'' %} Nabíjení EV se zastavilo. {% else %} Manuální NT nabíjení
         vypnuto. {% endif %} Domácí baterie odemčena (general mode). Tato session:
         {{ session_kwh | round(2) }} kWh, {{ session_kc | round(1) }} Kč.'
+  - action: button.press
+    target:
+      entity_id: button.ev6_force_refresh
   mode: single
 - id: ev_blokovat_vybijeni_baterie
   alias: EV - blokovat vybíjení baterie při plánovaném nabíjení

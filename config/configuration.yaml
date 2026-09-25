@@ -10,6 +10,11 @@ script: !include scripts.yaml
 scene: !include scenes.yaml
 sensor: !include sensor.yaml
 
+logger:
+  default: info
+  logs:
+    custom_components.cez_pnd: debug
+
 template:
   - sensor:
       - name: "Bazénová filtrace výkon"
