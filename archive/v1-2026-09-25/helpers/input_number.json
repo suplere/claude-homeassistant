@@ -1,0 +1,54 @@
+{
+  "items": [
+    {
+      "id": "battery_capacity",
+      "min": 0.0,
+      "max": 29.0,
+      "name": "Battery Capacity",
+      "icon": "mdi:battery",
+      "unit_of_measurement": "kWh",
+      "step": 0.1,
+      "mode": "slider"
+    },
+    {
+      "id": "ev_nt_energie_pri_startu",
+      "min": 0.0,
+      "max": 100000.0,
+      "name": "EV NT - energie při startu",
+      "icon": "mdi:lightning-bolt",
+      "step": 0.01,
+      "unit_of_measurement": "kWh",
+      "mode": "slider"
+    },
+    {
+      "id": "ev_nt_cena_pri_startu",
+      "min": 0.0,
+      "max": 20.0,
+      "name": "EV NT - cena při startu",
+      "icon": "mdi:cash",
+      "step": 0.01,
+      "unit_of_measurement": "Kč/kWh",
+      "mode": "slider"
+    },
+    {
+      "id": "ev_nt_energie_celkem",
+      "min": 0.0,
+      "max": 100000.0,
+      "name": "EV NT - energie celkem",
+      "icon": "mdi:lightning-bolt",
+      "unit_of_measurement": "kWh",
+      "step": 0.01,
+      "mode": "slider"
+    },
+    {
+      "id": "ev_nt_naklady_celkem",
+      "min": 0.0,
+      "max": 1000000.0,
+      "name": "EV NT - náklady celkem",
+      "unit_of_measurement": "Kč",
+      "step": 0.1,
+      "icon": "mdi:cash",
+      "mode": "slider"
+    }
+  ]
+}

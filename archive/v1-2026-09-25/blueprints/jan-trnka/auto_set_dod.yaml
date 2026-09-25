@@ -1,0 +1,111 @@
+blueprint:
+  name: Auto Set DoD
+  description: Automatically changes battery DoD depending on today's forecast
+  domain: automation
+  input:
+    goodwe_dod_target:
+      name: GoodWe DoD Entity
+      description: The target entity which sets depth of discharge of the battery
+      selector:
+        target:
+          entity:
+          - domain:
+            - number
+            integration: goodwe
+    production_forecast:
+      name: PV Production Forecast
+      description: Forecast of today's PV production
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+          multiple: false
+    threshold_for_changing_dod:
+      name: Threshold for Changing DoD
+      description: Specifies the PV production prediction value that must be met to
+        start automation (kWh)
+      selector:
+        number:
+          max: 50.0
+          min: 0.0
+          step: 1.0
+          unit_of_measurement: kWh
+          mode: slider
+    capacity:
+      name: Battery Capacity
+      description: Capacity value of the battery
+      selector:
+        entity:
+          filter:
+          - domain:
+            - input_number
+          multiple: false
+    average_consumption:
+      name: Average Daily House Consumption
+      description: Average house consumpiton in last week
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+          multiple: false
+    winter_dod:
+      name: Winter DoD Value
+      description: Winter depth of discharge input number
+      selector:
+        entity:
+          filter:
+          - domain:
+            - input_number
+          multiple: false
+    goodwe_actual_soc:
+      name: GoodWe SoC Sensor
+      description: GoodWe actual state of charge sensor
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+            integration: goodwe
+          multiple: false
+  source_url: https://github.com/jan-trnka/home-assistant-pv-system/blob/main/auto_set_dod.yaml
+triggers:
+- trigger: time
+  at: 06:00:00
+conditions:
+- condition: numeric_state
+  entity_id: !input production_forecast
+  above: !input threshold_for_changing_dod
+- condition: state
+  entity_id: input_select.season
+  state: Winter
+variables:
+  winter_dod: !input winter_dod
+  actual_soc: !input goodwe_actual_soc
+  pv_prediction: !input production_forecast
+  capacity: !input capacity
+  average_consumption: !input average_consumption
+  calculated_dod_value: "{% set pv_prediction = states(pv_prediction) | float(default=0)
+    %} {% set capacity = states(capacity) | float(default=1) %} {% set consumption
+    = states(average_consumption) | float(default=0) / 24 * 5 %} {% set winter_dod
+    = states(winter_dod) | float(default=0) %} {% set result = 100 * (pv_prediction
+    - consumption) / capacity | round(1, default=0) %}\n{% if result < winter_dod
+    %}\n  {{ winter_dod | int }}\n{% elif result > 80 %}\n  {{ 80 }}\n{% else %}\n
+    \ {{ result | int }}\n{% endif %}"
+actions:
+- action: number.set_value
+  target: !input goodwe_dod_target
+  data:
+    value: '{{ calculated_dod_value }}'
+- sequence:
+  - wait_for_trigger:
+    - value_template: '{% set SoC = states(actual_soc) | float(default=0) %} {% set
+        winter_dod = states(winter_dod) | float(default=0) %} {{ SoC < (winter_dod
+        + 1) }}'
+      trigger: template
+  - action: number.set_value
+    target: !input goodwe_dod_target
+    data:
+      value: '{{ states(winter_dod) | int(default=50) }}'
+mode: single

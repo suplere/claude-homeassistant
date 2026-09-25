@@ -1,0 +1,271 @@
+[
+  {
+    "entry_id": "7b902390226a35b1e1e4112aae3985ac",
+    "domain": "template",
+    "title": "energy_buy",
+    "options": {
+      "name": "energy_buy",
+      "state": "{{ '%i'|format((iif(states('sensor.active_power_l1')|float < 0, states('sensor.active_power_l1')|float, 0) + iif(states('sensor.active_power_l2')|float < 0, states('sensor.active_power_l2')|float, 0) + iif(states('sensor.active_power_l3')|float < 0, states('sensor.active_power_l3')|float, 0)) * -1) }}",
+      "template_type": "sensor",
+      "unit_of_measurement": "W"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "f6508bf465edcd5da8d3235671272252",
+    "domain": "template",
+    "title": "energy_sell",
+    "options": {
+      "name": "energy_sell",
+      "state": "{{ '%i'|format((iif(states('sensor.active_power_l1')|float > 0, states('sensor.active_power_l1')|float, 0) + iif(states('sensor.active_power_l2')|float > 0, states('sensor.active_power_l2')|float, 0) + iif(states('sensor.active_power_l3')|float > 0, states('sensor.active_power_l3')|float, 0))) }}",
+      "template_type": "sensor",
+      "unit_of_measurement": "W"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "88a05e56c4e33c3caf679cf52bcc3c03",
+    "domain": "integration",
+    "title": "energy_buy_sum",
+    "options": {
+      "method": "left",
+      "name": "energy_buy_sum",
+      "round": 1.0,
+      "source": "sensor.energy_buy",
+      "unit_prefix": "k",
+      "unit_time": "h"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "e8fee98ad5299e655dfa5ff932668d8e",
+    "domain": "integration",
+    "title": "energy_sell_sum",
+    "options": {
+      "method": "left",
+      "name": "energy_sell_sum",
+      "round": 1.0,
+      "source": "sensor.energy_sell",
+      "unit_prefix": "k",
+      "unit_time": "h"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "c4487f0d382b1349ca2c8886be809b10",
+    "domain": "utility_meter",
+    "title": "energy_buy_daily",
+    "options": {
+      "always_available": false,
+      "cycle": "daily",
+      "delta_values": false,
+      "name": "energy_buy_daily",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.energy_buy_sum",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "aa5e5ef50929506b6a8e85aa9ec4af8b",
+    "domain": "utility_meter",
+    "title": "energy_sell_daily",
+    "options": {
+      "always_available": false,
+      "cycle": "daily",
+      "delta_values": false,
+      "name": "energy_sell_daily",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.energy_sell_sum",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "e5acd68e448f3c204ed7ff15ab9c352f",
+    "domain": "template",
+    "title": "fve_battery_charge_w",
+    "options": {
+      "name": "fve_battery_charge_w",
+      "state": "{% if states('sensor.battery_power')|float < 0 %}\n          {{ '%i'|format(states('sensor.battery_power')|float * -1) }}\n        {% else %}\n          {{ 0 }}\n        {% endif %}",
+      "template_type": "sensor",
+      "unit_of_measurement": "W"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "51b41f3371f4f21092d0d67e1b655256",
+    "domain": "template",
+    "title": "fve_battery_discharge_w",
+    "options": {
+      "name": "fve_battery_discharge_w",
+      "state": "{% if states('sensor.battery_power')|float > 0 %}\n          {{ '%i'|format(states('sensor.battery_power')|float) }}\n        {% else %}\n          {{ 0 }}\n        {% endif %}",
+      "template_type": "sensor",
+      "unit_of_measurement": "W"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "eb60085267e363de42a5e3a69d881d9d",
+    "domain": "integration",
+    "title": "house_consumption_sum",
+    "options": {
+      "method": "left",
+      "name": "house_consumption_sum",
+      "round": 1.0,
+      "source": "sensor.house_consumption",
+      "unit_prefix": "k",
+      "unit_time": "h"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "bab248a4c16616301bb9b40358a367f9",
+    "domain": "utility_meter",
+    "title": "house_consumption_daily",
+    "options": {
+      "always_available": false,
+      "cycle": "daily",
+      "delta_values": false,
+      "name": "house_consumption_daily",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.house_consumption_sum",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01J2X6YW1RDQHRAJSBFF2Z76JY",
+    "domain": "template",
+    "title": "Filtrace",
+    "options": {
+      "name": "Filtrace",
+      "state": "{{ '%i'|format((iif(states('sensor.filtrace_vykon')|float > 0, states('sensor.filtrace_vykon')|float, 0))) }}",
+      "template_type": "sensor",
+      "unit_of_measurement": "W"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01J2X73NRP96J93JJXDT8S4F0C",
+    "domain": "integration",
+    "title": "Filtrace Sum",
+    "options": {
+      "method": "left",
+      "name": "Filtrace Sum",
+      "round": 1.0,
+      "source": "sensor.bazenova_filtrace_vykon",
+      "unit_prefix": "k",
+      "unit_time": "h"
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01J2X75WAJ6V9X1P1GZJW9J7H0",
+    "domain": "utility_meter",
+    "title": "Filtrace Daily",
+    "options": {
+      "always_available": false,
+      "cycle": "daily",
+      "delta_values": false,
+      "name": "Filtrace Daily",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.filtrace_sum",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01KPTFAGJTZB9WYCZY8YGNCYSD",
+    "domain": "utility_meter",
+    "title": "ECO Volter Daily Energy",
+    "options": {
+      "always_available": false,
+      "cycle": "daily",
+      "delta_values": false,
+      "name": "ECO Volter Daily Energy",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.ecovolter_revcr01c00002056_charged_energy",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01KR8KNDYX5S0S61C4DQ1F0SQ5",
+    "domain": "utility_meter",
+    "title": "EV energie týdně",
+    "options": {
+      "always_available": false,
+      "cycle": "weekly",
+      "delta_values": false,
+      "name": "EV energie týdně",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.ecovolter_revcr01c00002056_charged_energy",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01KR8KPHSRV8X37NMS5G2SYJBH",
+    "domain": "utility_meter",
+    "title": "EV energie měsíčně",
+    "options": {
+      "always_available": false,
+      "cycle": "monthly",
+      "delta_values": false,
+      "name": "EV energie měsíčně",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.ecovolter_revcr01c00002056_charged_energy",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01M0017SXGHXXSQXPEMANAWN59",
+    "domain": "utility_meter",
+    "title": "EV NT energie měsíc",
+    "options": {
+      "always_available": false,
+      "cycle": "monthly",
+      "delta_values": false,
+      "name": "EV NT energie měsíc",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.ev_nt_energie_celkem",
+      "tariffs": []
+    },
+    "data": {}
+  },
+  {
+    "entry_id": "01M001EGFFMEQRZG30XNCB7EYX",
+    "domain": "utility_meter",
+    "title": "EV NT náklady měsíc",
+    "options": {
+      "always_available": false,
+      "cycle": "monthly",
+      "delta_values": false,
+      "name": "EV NT náklady měsíc",
+      "net_consumption": false,
+      "offset": 0.0,
+      "periodically_resetting": true,
+      "source": "sensor.ev_nt_naklady_celkem",
+      "tariffs": []
+    },
+    "data": {}
+  }
+]

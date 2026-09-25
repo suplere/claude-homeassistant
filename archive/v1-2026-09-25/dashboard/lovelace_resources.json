@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "lovelace_resources",
+  "data": {
+    "items": [
+      {
+        "id": "40b48c032a104ed8ae02b62cc87b937a",
+        "url": "/hacsfiles/lovelace-mushroom/mushroom.js?hacstag=444350375523",
+        "type": "module"
+      },
+      {
+        "id": "5fa98831b4124d41ad216e67d106c62c",
+        "url": "/hacsfiles/power-flow-card-plus/power-flow-card-plus.js?hacstag=618081815037",
+        "type": "module"
+      },
+      {
+        "id": "c7b128cd8b5b4876b94aa1332724b667",
+        "url": "/hacsfiles/ha-sankey-chart/ha-sankey-chart.js?hacstag=455846088640",
+        "type": "module"
+      },
+      {
+        "id": "8c5cfb1a123f4523a7ef2f2e634baf74",
+        "url": "/hacsfiles/apexcharts-card/apexcharts-card.js?hacstag=331701152223",
+        "type": "module"
+      },
+      {
+        "id": "11f7ae4365d34dee91d559e1b0279467",
+        "url": "/hacsfiles/bar-card/bar-card.js?hacstag=163363577320",
+        "type": "module"
+      },
+      {
+        "id": "bce860061d784e5d8b869f851298690b",
+        "url": "/hacsfiles/lovelace-mushroom-better-sliders/mushroom.js?hacstag=586363416302",
+        "type": "module"
+      },
+      {
+        "id": "a2692169d4474cfabfc4e3a15313289f",
+        "url": "/hacsfiles/mushroom-strategy/mushroom-strategy.js?hacstag=619284862320",
+        "type": "module"
+      },
+      {
+        "id": "cbdea108dca8495d853b547c86afaab5",
+        "url": "/hacsfiles/hassio-trash-card/trashcard.js?hacstag=678764124247",
+        "type": "module"
+      },
+      {
+        "id": "ac9b0d4aff6d482cafdcaddddacbe4d0",
+        "url": "/cez_hdo_card/cez-hdo-card.js?v=3.2.3",
+        "type": "module"
+      }
+    ]
+  }
+}

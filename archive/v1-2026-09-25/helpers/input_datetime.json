@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "id": "fve_battery_charge_from",
+      "has_time": true,
+      "has_date": true,
+      "name": "fve_battery_charge_from"
+    },
+    {
+      "id": "fve_battery_charge_to",
+      "has_time": true,
+      "has_date": true,
+      "name": "fve_battery_charge_to",
+      "icon": "mdi:calendar-clock"
+    }
+  ]
+}

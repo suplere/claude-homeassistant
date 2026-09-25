@@ -1,0 +1,52 @@
+fve_grid_export_status:
+  alias: 'FVE: grid export - STATUS'
+  sequence:
+  - service: goodwe.get_parameter
+    data:
+      parameter: grid_export
+      device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+      entity_id: input_text.goodwe_grid_export
+  mode: single
+  icon: mdi:transmission-tower
+'1717590811347':
+  alias: 'FVE: grid export - OFF'
+  sequence:
+  - service: goodwe.set_parameter
+    data:
+      parameter: grid_export
+      value: 0
+      device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+  - service: script.fve_grid_export_status
+    data: {}
+  mode: single
+  icon: mdi:transmission-tower-off
+'1717590841020':
+  alias: 'FVE: grid export - ON'
+  sequence:
+  - service: goodwe.set_parameter
+    data:
+      parameter: grid_export
+      value: 1
+      device_id: ebb0a36fdc7eb73781df6cf51cf4448f
+  - service: script.fve_grid_export_status
+    data: {}
+  mode: single
+  icon: mdi:transmission-tower-export
+filtrace_on:
+  alias: Filtrace ON
+  sequence:
+  - type: turn_on
+    device_id: 9b432627a59a5a8bbae912cb8f499f2d
+    entity_id: 7086253917cb89b0e2f59fa29fbef4a8
+    domain: switch
+  mode: single
+  icon: mdi:power-plug
+filtrace_off:
+  alias: Filtrace OFF
+  sequence:
+  - type: turn_off
+    device_id: 9b432627a59a5a8bbae912cb8f499f2d
+    entity_id: 7086253917cb89b0e2f59fa29fbef4a8
+    domain: switch
+  mode: single
+  icon: mdi:power-plug-off

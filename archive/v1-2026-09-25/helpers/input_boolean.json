@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "id": "fve_battery_charge_enable",
+      "name": "fve_battery_charge_enable"
+    },
+    {
+      "id": "ev_nabijeni_povoleno",
+      "name": "EV nabíjení povoleno",
+      "icon": "mdi:battery-charging-medium"
+    },
+    {
+      "id": "filtrace_overrride",
+      "name": "filtrace_overrride",
+      "icon": "mdi:pool"
+    },
+    {
+      "id": "ev_nabijeni_manualni_nt",
+      "name": "EV Nabíjení manuální NT",
+      "icon": "mdi:car-select"
+    }
+  ]
+}

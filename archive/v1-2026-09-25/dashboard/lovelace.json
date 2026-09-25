@@ -1,0 +1,2000 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "lovelace.lovelace",
+  "data": {
+    "config": {
+      "views": [
+        {
+          "title": "Home",
+          "cards": [
+            {
+              "type": "vertical-stack",
+              "cards": [
+                {
+                  "type": "custom:mushroom-title-card",
+                  "title": "Dnešní spotřeba",
+                  "alignment": "justify"
+                },
+                {
+                  "type": "custom:mushroom-chips-card",
+                  "chips": [
+                    {
+                      "type": "entity",
+                      "entity": "sensor.house_consumption_daily",
+                      "content_info": "state",
+                      "icon_color": "green",
+                      "icon": "mdi:home"
+                    },
+                    {
+                      "type": "entity",
+                      "entity": "sensor.today_s_pv_generation",
+                      "icon": "mdi:solar-power",
+                      "icon_color": "yellow"
+                    },
+                    {
+                      "type": "entity",
+                      "entity": "sensor.energy_sell_daily",
+                      "icon": "mdi:lightning-bolt",
+                      "icon_color": "deep-purple"
+                    },
+                    {
+                      "type": "entity",
+                      "entity": "sensor.energy_buy_daily",
+                      "icon": "mdi:lightning-bolt-circle",
+                      "icon_color": "pink"
+                    }
+                  ],
+                  "alignment": "start"
+                },
+                {
+                  "type": "custom:mushroom-chips-card",
+                  "chips": [
+                    {
+                      "type": "entity",
+                      "entity": "automation.goodwe_grid_export_limit_automat_zapnout",
+                      "use_entity_picture": false,
+                      "content_info": "name",
+                      "name": "Záporná cena - automatizace omezení přítoků"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "vertical-stack",
+              "cards": [
+                {
+                  "type": "custom:mushroom-title-card",
+                  "title": "Zásuvky",
+                  "subtitle": "Nastavení ovládaných zásuvek",
+                  "alignment": "justify"
+                },
+                {
+                  "type": "custom:mushroom-chips-card",
+                  "chips": [
+                    {
+                      "type": "entity",
+                      "entity": "switch.zasuvka_rizena",
+                      "icon_color": "orange",
+                      "tap_action": {
+                        "action": "toggle"
+                      },
+                      "name": "Filtrace",
+                      "use_entity_picture": false
+                    },
+                    {
+                      "type": "entity",
+                      "entity": "sensor.zasuvka_rizena_power",
+                      "icon_color": "indigo",
+                      "use_entity_picture": true
+                    }
+                  ],
+                  "alignment": "start"
+                },
+                {
+                  "type": "custom:mushroom-chips-card",
+                  "chips": [
+                    {
+                      "type": "entity",
+                      "entity": "switch.filtrace_switch",
+                      "icon_color": "deep-purple",
+                      "tap_action": {
+                        "action": "toggle"
+                      },
+                      "name": "Filtrace",
+                      "use_entity_picture": false
+                    },
+                    {
+                      "type": "entity",
+                      "entity": "sensor.bazenova_filtrace_vykon",
+                      "icon_color": "indigo",
+                      "use_entity_picture": true
+                    },
+                    {
+                      "type": "entity",
+                      "entity": "sensor.filtrace_daily"
+                    },
+                    {
+                      "type": "entity",
+                      "entity": "automation.ovladani_filtrace_pritoky",
+                      "name": "Automatika",
+                      "use_entity_picture": false
+                    }
+                  ],
+                  "alignment": "start"
+                },
+                {
+                  "type": "tile",
+                  "entity": "cover.garage_door_dvere",
+                  "tap_action": {
+                    "action": "toggle"
+                  },
+                  "name": "Garáž",
+                  "features_position": "bottom",
+                  "vertical": false
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "experimental": {
+                    "color_threshold": true
+                  },
+                  "graph_span": "7D",
+                  "span": {
+                    "end": "day"
+                  },
+                  "show": {
+                    "last_updated": true
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Filtrace bazenu spuštěna",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "yaxis": [
+                    {
+                      "min": 0,
+                      "max": "~10",
+                      "decimals": 0,
+                      "apex_config": {
+                        "tickAmount": 5
+                      }
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.filtrace_spustena",
+                      "transform": "return Math.round(x * 60) / 60;",
+                      "show": {
+                        "header_color_threshold": true,
+                        "extremas": true,
+                        "as_duration": "hour"
+                      },
+                      "type": "column",
+                      "name": "Doba spuštění",
+                      "group_by": {
+                        "func": "last",
+                        "duration": "1D"
+                      },
+                      "color_threshold": [
+                        {
+                          "value": 1,
+                          "color": "red"
+                        },
+                        {
+                          "value": 3,
+                          "color": "darkred"
+                        },
+                        {
+                          "value": 5,
+                          "color": "green"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "custom:apexcharts-card",
+              "header": {
+                "title": "Elektřina na spotovém trhu",
+                "show": true,
+                "show_states": true,
+                "colorize_states": true
+              },
+              "graph_span": "2d",
+              "span": {
+                "start": "day"
+              },
+              "now": {
+                "show": true,
+                "label": "Nyní"
+              },
+              "series": [
+                {
+                  "entity": "sensor.current_spot_electricity_price",
+                  "name": "Elektřina bez DPH",
+                  "float_precision": 2,
+                  "type": "column",
+                  "color": "green",
+                  "show": {
+                    "in_header": "raw"
+                  },
+                  "data_generator": "return Object.entries(entity.attributes).map(([date, value], index) => {\n  return [new Date(date).getTime(), value];\n});\n"
+                }
+              ]
+            },
+            {
+              "type": "custom:power-flow-card-plus",
+              "clickable_entities": true,
+              "use_new_flow_rate_model": true,
+              "entities": {
+                "individual": [
+                  {
+                    "entity": "sensor.bazenova_filtrace_vykon",
+                    "name": "Filtrace",
+                    "color_icon": true,
+                    "display_zero": true,
+                    "color": "#ff8080",
+                    "icon": "mdi:pool"
+                  },
+                  {
+                    "entity": "sensor.eco_volter_vykon",
+                    "name": "EV nabíjení",
+                    "color_icon": true,
+                    "display_zero": true,
+                    "color": "#2196f3",
+                    "icon": "mdi:ev-station"
+                  }
+                ],
+                "home": {
+                  "entity": "sensor.house_consumption",
+                  "override_state": true
+                },
+                "battery": {
+                  "entity": {
+                    "production": "sensor.fve_battery_charge_w",
+                    "consumption": "sensor.fve_battery_discharge_w"
+                  },
+                  "state_of_charge": "sensor.battery_state_of_charge",
+                  "display_state": "two_way"
+                },
+                "grid": {
+                  "entity": {
+                    "consumption": "sensor.energy_buy",
+                    "production": "sensor.energy_sell"
+                  }
+                },
+                "solar": {
+                  "entity": "sensor.pv_power"
+                },
+                "inverted_entities": "battery"
+              }
+            },
+            {
+              "type": "entities",
+              "entities": [
+                {
+                  "entity": "sensor.davkovac_orp",
+                  "name": "ORP"
+                },
+                {
+                  "entity": "sensor.davkovac_ph",
+                  "name": "PH"
+                },
+                {
+                  "entity": "sensor.davkovac_teplota",
+                  "name": "Teplota"
+                }
+              ],
+              "title": "Davkovac"
+            },
+            {
+              "type": "entities",
+              "entities": [
+                "input_boolean.time_to_use_overflows"
+              ]
+            },
+            {
+              "type": "vertical-stack",
+              "cards": [
+                {
+                  "type": "custom:mushroom-title-card",
+                  "title": "Světla",
+                  "subtitle": "Nastavení světel",
+                  "alignment": "justify"
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.policka_2",
+                  "state_content": [
+                    "state",
+                    "color_mode",
+                    "brightness"
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.policka",
+                  "state_content": [
+                    "state",
+                    "color_mode",
+                    "brightness"
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "entities",
+              "entities": [
+                {
+                  "entity": "input_boolean.ev_nabijeni_povoleno"
+                },
+                {
+                  "entity": "input_boolean.ev_nabijeni_manualni_nt"
+                }
+              ]
+            },
+            {
+              "type": "vertical-stack",
+              "cards": [
+                {
+                  "type": "markdown",
+                  "content": "## ⚡ NT nabíjení EV"
+                },
+                {
+                  "type": "horizontal-stack",
+                  "cards": [
+                    {
+                      "type": "tile",
+                      "entity": "sensor.ev_nt_naklady_mesic",
+                      "name": "Náklady tento měsíc",
+                      "icon": "mdi:cash-multiple"
+                    },
+                    {
+                      "type": "tile",
+                      "entity": "sensor.ev_nt_energie_mesic",
+                      "name": "Energie tento měsíc",
+                      "icon": "mdi:ev-station"
+                    }
+                  ]
+                },
+                {
+                  "type": "statistics-graph",
+                  "title": "NT nabíjení - náklady po měsících",
+                  "chart_type": "bar",
+                  "period": "month",
+                  "days_to_show": 365,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    "sensor.ev_nt_naklady_mesic"
+                  ]
+                },
+                {
+                  "type": "statistics-graph",
+                  "title": "NT nabíjení - energie po měsících",
+                  "chart_type": "bar",
+                  "period": "month",
+                  "days_to_show": 365,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    "sensor.ev_nt_energie_mesic"
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "custom:cez-hdo-card",
+              "title": "ČEZ HDO Status",
+              "show_times": true,
+              "show_duration": true,
+              "compact_mode": false,
+              "entities": {
+                "low_tariff": "",
+                "high_tariff": "",
+                "low_start": "",
+                "low_end": "",
+                "low_duration": "",
+                "high_start": "",
+                "high_end": "",
+                "high_duration": "",
+                "schedule": ""
+              },
+              "show_schedule": true,
+              "show_schedule_prices": true,
+              "show_tariff_prices": true
+            },
+            {
+              "type": "entities",
+              "entities": [
+                {
+                  "entity": "switch.ecovolter_revcr01c00002056_is_charging_enable",
+                  "name": "Nabíjení KIA"
+                },
+                {
+                  "entity": "number.ecovolter_revcr01c00002056_target_current",
+                  "name": "Nabíjecí proud"
+                },
+                {
+                  "entity": "number.goodwe_limit_dodavky_do_site",
+                  "name": "Limit dodávky do sítě"
+                }
+              ],
+              "title": "Nabíjení EV",
+              "visibility": [
+                {
+                  "condition": "state",
+                  "entity": "binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected",
+                  "state": "on"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "sections",
+          "max_columns": 4,
+          "title": "PND",
+          "path": "pnd",
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "7d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND Včerejší stav",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Spotřeba",
+                      "attribute": "consumption",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.consumption[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "var(--error-color)",
+                      "opacity": 0.8,
+                      "invert": true,
+                      "type": "column"
+                    },
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Výroba",
+                      "attribute": "production",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.production[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "var(--success-color)",
+                      "opacity": 0.8,
+                      "type": "column"
+                    }
+                  ],
+                  "apex_config": {
+                    "legend": {
+                      "formatter": "EVAL: (seriesName) => seriesName\n"
+                    }
+                  }
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "10d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND Posledních 10 dní"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Výroba",
+                      "attribute": "production",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.production[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "var(--success-color)",
+                      "opacity": 0.8,
+                      "invert": false,
+                      "type": "column"
+                    },
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Spotřeba",
+                      "attribute": "consumption",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.consumption[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "var(--error-color)",
+                      "opacity": 0.8,
+                      "invert": true,
+                      "type": "column"
+                    }
+                  ],
+                  "apex_config": {
+                    "legend": {
+                      "formatter": "EVAL: (seriesName) => seriesName\n"
+                    }
+                  }
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "1y",
+                  "span": {
+                    "end": "isoWeek"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND Historická Data (Týdenní agregace)"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Výroba",
+                      "attribute": "production",
+                      "data_generator": "return entity.attributes.pnddate.map((pnd, index) => {\n  return [new Date(pnd).getTime(), parseFloat(entity.attributes.production[index])];\n});\n",
+                      "color": "var(--success-color)",
+                      "opacity": 0.8,
+                      "invert": false,
+                      "type": "column",
+                      "group_by": {
+                        "func": "sum",
+                        "duration": "7d"
+                      }
+                    },
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Spotřeba",
+                      "attribute": "consumption",
+                      "data_generator": "return entity.attributes.pnddate.map((pnd, index) => {\n  return [new Date(pnd).getTime(), parseFloat(entity.attributes.consumption[index])];\n});\n",
+                      "color": "var(--error-color)",
+                      "opacity": 0.8,
+                      "invert": true,
+                      "type": "column",
+                      "group_by": {
+                        "func": "sum",
+                        "duration": "7d"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "1y",
+                  "span": {
+                    "end": "month"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND Historická Data (Měsíční agregace)"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Výroba",
+                      "attribute": "production",
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((pnd, index) => {\n  const d = new Date(pnd);\n  const key = d.getFullYear() + '-' + d.getMonth();\n  if (!sums[key]) {\n    sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };\n  }\n  sums[key].value += parseFloat(entity.attributes.production[index]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);\n",
+                      "color": "var(--success-color)",
+                      "opacity": 0.8,
+                      "invert": false,
+                      "type": "column"
+                    },
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Spotřeba",
+                      "attribute": "consumption",
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((pnd, index) => {\n  const d = new Date(pnd);\n  const key = d.getFullYear() + '-' + d.getMonth();\n  if (!sums[key]) {\n    sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };\n  }\n  sums[key].value += parseFloat(entity.attributes.consumption[index]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);\n",
+                      "color": "var(--error-color)",
+                      "opacity": 0.8,
+                      "invert": true,
+                      "type": "column"
+                    }
+                  ],
+                  "apex_config": {
+                    "tooltip": {
+                      "x": {
+                        "formatter": "EVAL: (value) => {\n  const date = new Date(value);\n  date.setDate(date.getDate() + 5);\n  const formatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'long' });\n  return formatter.format(date);\n}\n"
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "7d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND NT/VT Včerejší stav",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "NT",
+                      "attribute": "low_tariff",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.low_tariff[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "#2196F3",
+                      "opacity": 0.8,
+                      "type": "column"
+                    },
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "VT",
+                      "attribute": "high_tariff",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.high_tariff[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "#FF9800",
+                      "opacity": 0.8,
+                      "type": "column"
+                    }
+                  ],
+                  "apex_config": {
+                    "legend": {
+                      "formatter": "EVAL: (seriesName) => seriesName\n"
+                    }
+                  }
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "10d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND NT/VT Posledních 10 dní"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "NT",
+                      "attribute": "low_tariff",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.low_tariff[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "#2196F3",
+                      "opacity": 0.8,
+                      "type": "column"
+                    },
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "VT",
+                      "attribute": "high_tariff",
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((pnd, index) => [new Date(pnd).getTime(), parseFloat(entity.attributes.high_tariff[index])])\n  .filter(([time]) => time < today.getTime());\n",
+                      "color": "#FF9800",
+                      "opacity": 0.8,
+                      "type": "column"
+                    }
+                  ],
+                  "apex_config": {
+                    "legend": {
+                      "formatter": "EVAL: (seriesName) => seriesName\n"
+                    }
+                  }
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "1y",
+                  "span": {
+                    "end": "isoWeek"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND NT/VT Historická Data (Týdenní agregace)"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "NT",
+                      "attribute": "low_tariff",
+                      "data_generator": "return entity.attributes.pnddate.map((pnd, index) => {\n  return [new Date(pnd).getTime(), parseFloat(entity.attributes.low_tariff[index])];\n});\n",
+                      "color": "#2196F3",
+                      "opacity": 0.8,
+                      "type": "column",
+                      "group_by": {
+                        "func": "sum",
+                        "duration": "7d"
+                      }
+                    },
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "VT",
+                      "attribute": "high_tariff",
+                      "data_generator": "return entity.attributes.pnddate.map((pnd, index) => {\n  return [new Date(pnd).getTime(), parseFloat(entity.attributes.high_tariff[index])];\n});\n",
+                      "color": "#FF9800",
+                      "opacity": 0.8,
+                      "type": "column",
+                      "group_by": {
+                        "func": "sum",
+                        "duration": "7d"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "1y",
+                  "span": {
+                    "end": "month"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "PND NT/VT Historická Data (Měsíční agregace)"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "NT",
+                      "attribute": "low_tariff",
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((pnd, index) => {\n  const d = new Date(pnd);\n  const key = d.getFullYear() + '-' + d.getMonth();\n  if (!sums[key]) {\n    sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };\n  }\n  sums[key].value += parseFloat(entity.attributes.low_tariff[index]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);\n",
+                      "color": "#2196F3",
+                      "opacity": 0.8,
+                      "type": "column"
+                    },
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "VT",
+                      "attribute": "high_tariff",
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((pnd, index) => {\n  const d = new Date(pnd);\n  const key = d.getFullYear() + '-' + d.getMonth();\n  if (!sums[key]) {\n    sums[key] = { time: new Date(d.getFullYear(), d.getMonth(), 2).getTime(), value: 0 };\n  }\n  sums[key].value += parseFloat(entity.attributes.high_tariff[index]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, s.value]);\n",
+                      "color": "#FF9800",
+                      "opacity": 0.8,
+                      "type": "column"
+                    }
+                  ],
+                  "apex_config": {
+                    "tooltip": {
+                      "x": {
+                        "formatter": "EVAL: (value) => {\n  const date = new Date(value);\n  date.setDate(date.getDate() + 5);\n  const formatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'long' });\n  return formatter.format(date);\n}\n"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "header": {
+            "layout": "responsive",
+            "badges_position": "bottom",
+            "card": {
+              "type": "markdown",
+              "text_only": true,
+              "content": "# Dobrý den, {{ user }}\nZde jsou data z distribučního portálu ✨"
+            }
+          },
+          "cards": []
+        },
+        {
+          "title": "FVE",
+          "path": "fve",
+          "cards": [
+            {
+              "square": false,
+              "columns": 1,
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "energy-date-selection"
+                },
+                {
+                  "type": "custom:sankey-chart",
+                  "unit_prefix": "k",
+                  "round": 2,
+                  "show_names": true,
+                  "energy_date_selection": true,
+                  "show_icons": false,
+                  "sections": [
+                    {
+                      "entities": [
+                        {
+                          "type": "entity",
+                          "children": [
+                            "sensor.total_battery_charge",
+                            "sensor.energy_sell_daily",
+                            "sensor.house_consumption_daily"
+                          ],
+                          "entity_id": "sensor.total_pv_generation",
+                          "name": "Solar",
+                          "color": "#ff9800"
+                        },
+                        {
+                          "type": "entity",
+                          "children": [
+                            "sensor.house_consumption_daily",
+                            "sensor.total_battery_charge"
+                          ],
+                          "entity_id": "sensor.energy_buy_daily",
+                          "name": "Grid",
+                          "color": "#488fc2"
+                        },
+                        {
+                          "type": "entity",
+                          "children": [
+                            "sensor.house_consumption_daily",
+                            "sensor.energy_sell_daily"
+                          ],
+                          "entity_id": "sensor.total_battery_discharge",
+                          "name": "Baterie",
+                          "color": "#4db6ac"
+                        }
+                      ]
+                    },
+                    {
+                      "entities": [
+                        {
+                          "type": "entity",
+                          "entity_id": "sensor.house_consumption_daily",
+                          "name": "Dům",
+                          "color": "lightblue"
+                        },
+                        {
+                          "type": "entity",
+                          "children": [],
+                          "entity_id": "sensor.total_battery_charge",
+                          "color": "#f06292",
+                          "name": "Baterie"
+                        },
+                        {
+                          "type": "entity",
+                          "children": [],
+                          "entity_id": "sensor.energy_sell_daily",
+                          "color": "#8353d1",
+                          "name": "Přetok"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "custom:apexcharts-card",
+              "apex_config": {
+                "chart": {
+                  "height": "350px"
+                }
+              },
+              "all_series_config": {
+                "unit": " kWh"
+              },
+              "header": {
+                "title": "Předpověď výroby",
+                "show": true,
+                "standard_format": true,
+                "show_states": true,
+                "colorize_states": true
+              },
+              "graph_span": "2d",
+              "span": {
+                "start": "day",
+                "offset": "-0h"
+              },
+              "now": {
+                "show": true,
+                "label": "Nyní"
+              },
+              "yaxis": [
+                {
+                  "id": "kwh",
+                  "min": 0,
+                  "apex_config": {
+                    "tickAmount": 5
+                  }
+                },
+                {
+                  "id": "header_only",
+                  "show": false
+                }
+              ],
+              "series": [
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_today",
+                  "yaxis_id": "kwh",
+                  "type": "area",
+                  "name": "Dnes",
+                  "color": "orange",
+                  "data_generator": "var today = entity.attributes.detailedForecast.map((start, index) => {\n  return [new Date(start[\"period_start\"]).getTime(), entity.attributes.detailedForecast[index][\"pv_estimate\"]];\n});\nvar data = today\nreturn data;\n",
+                  "show": {
+                    "legend_value": false,
+                    "in_header": false
+                  },
+                  "stroke_width": 3,
+                  "float_precision": 2,
+                  "extend_to": false
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_tomorrow",
+                  "yaxis_id": "kwh",
+                  "type": "area",
+                  "name": "Tomorrow",
+                  "color": "grey",
+                  "data_generator": "var today = entity.attributes.detailedForecast.map((start, index) => {\n  return [new Date(start[\"period_start\"]).getTime(), entity.attributes.detailedForecast[index][\"pv_estimate\"]];\n});\nvar data = today\nreturn data;\n",
+                  "show": {
+                    "legend_value": false,
+                    "in_header": false
+                  },
+                  "stroke_width": 3,
+                  "float_precision": 2,
+                  "extend_to": false
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_today",
+                  "yaxis_id": "header_only",
+                  "name": "Dnes",
+                  "color": "orange",
+                  "show": {
+                    "legend_value": true,
+                    "in_header": true,
+                    "in_chart": false
+                  }
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_remaining_today",
+                  "yaxis_id": "header_only",
+                  "name": "Zbývá",
+                  "color": "orange",
+                  "show": {
+                    "legend_value": true,
+                    "in_header": true,
+                    "in_chart": false
+                  }
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_tomorrow",
+                  "yaxis_id": "header_only",
+                  "name": "Zítra",
+                  "color": "grey",
+                  "show": {
+                    "legend_value": true,
+                    "in_header": true,
+                    "in_chart": false
+                  }
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_api_last_polled",
+                  "yaxis_id": "header_only",
+                  "name": "Poslední update",
+                  "unit": " min.",
+                  "transform": "return ((Date.now()) - (new Date(x).getTime())) / 60 / 60 / 24",
+                  "show": {
+                    "legend_value": true,
+                    "in_header": true,
+                    "in_chart": false
+                  }
+                }
+              ]
+            },
+            {
+              "type": "custom:bar-card",
+              "style": "bar-card-value {\n  font-size: 12px;\n  font-weight: bold;\n}",
+              "positions": {
+                "icon": "off",
+                "indicator": "inside",
+                "name": "outside",
+                "value": "outside"
+              },
+              "direction": "up",
+              "height": "50px",
+              "width": "30px",
+              "stack": "horizontal",
+              "unit_of_measurement": " ",
+              "decimal": 1,
+              "max": 35,
+              "severity": [
+                {
+                  "color": "Red",
+                  "from": 0,
+                  "to": 10
+                },
+                {
+                  "color": "#ffb800",
+                  "from": 10,
+                  "to": 20
+                },
+                {
+                  "color": "Green",
+                  "from": 20,
+                  "to": 35
+                }
+              ],
+              "entities": [
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_today",
+                  "name": "Dnes"
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_tomorrow",
+                  "name": "Zítra"
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_day_3",
+                  "name": "3D"
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_day_4",
+                  "name": "4D"
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_day_5",
+                  "name": "5D"
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_day_6",
+                  "name": "6D"
+                },
+                {
+                  "entity": "sensor.solcast_pv_forecast_forecast_day_7",
+                  "name": "7D"
+                }
+              ]
+            },
+            {
+              "type": "custom:apexcharts-card",
+              "header": {
+                "title": "Elektřina na spotovém trhu",
+                "show": true,
+                "show_states": true,
+                "colorize_states": true
+              },
+              "graph_span": "2d",
+              "span": {
+                "start": "day"
+              },
+              "now": {
+                "show": true,
+                "label": "Nyní"
+              },
+              "series": [
+                {
+                  "entity": "sensor.current_spot_electricity_price",
+                  "name": "Elektřina bez DPH",
+                  "float_precision": 2,
+                  "type": "column",
+                  "color": "green",
+                  "show": {
+                    "in_header": "raw"
+                  },
+                  "data_generator": "return Object.entries(entity.attributes).map(([date, value], index) => {\n  return [new Date(date).getTime(), value];\n});\n"
+                }
+              ]
+            },
+            {
+              "type": "custom:power-flow-card-plus",
+              "clickable_entities": true,
+              "use_new_flow_rate_model": true,
+              "entities": {
+                "home": {
+                  "entity": "sensor.house_consumption",
+                  "override_state": true
+                },
+                "battery": {
+                  "entity": {
+                    "production": "sensor.fve_battery_charge_w",
+                    "consumption": "sensor.fve_battery_discharge_w"
+                  },
+                  "state_of_charge": "sensor.battery_state_of_charge",
+                  "display_state": "two_way"
+                },
+                "grid": {
+                  "entity": {
+                    "consumption": "sensor.energy_buy",
+                    "production": "sensor.energy_sell"
+                  }
+                },
+                "solar": {
+                  "entity": "sensor.pv_power"
+                },
+                "inverted_entities": "battery"
+              }
+            },
+            {
+              "type": "entities",
+              "entities": [
+                {
+                  "entity": "sensor.active_power_l1"
+                },
+                {
+                  "entity": "sensor.active_power_l2"
+                },
+                {
+                  "entity": "sensor.active_power_l3"
+                },
+                {
+                  "entity": "sensor.active_power_total"
+                },
+                {
+                  "entity": "sensor.load_l1"
+                },
+                {
+                  "entity": "sensor.load_l2"
+                },
+                {
+                  "entity": "sensor.load_l3"
+                },
+                {
+                  "entity": "sensor.load"
+                },
+                {
+                  "entity": "sensor.inverter_temperature_air"
+                },
+                {
+                  "entity": "sensor.inverter_temperature_module"
+                },
+                {
+                  "entity": "sensor.inverter_temperature_radiator"
+                },
+                {
+                  "entity": "sensor.load_mode_l1"
+                },
+                {
+                  "entity": "sensor.load_mode_l2"
+                },
+                {
+                  "entity": "sensor.load_mode_l3"
+                },
+                {
+                  "entity": "sensor.today_energy_import"
+                },
+                {
+                  "entity": "sensor.today_load"
+                },
+                {
+                  "entity": "sensor.total_energy_export"
+                },
+                {
+                  "entity": "sensor.total_energy_import"
+                },
+                {
+                  "entity": "sensor.total_load"
+                },
+                {
+                  "entity": "sensor.total_power"
+                }
+              ],
+              "title": "GoodWe"
+            }
+          ]
+        },
+        {
+          "type": "sections",
+          "max_columns": 3,
+          "title": "EV",
+          "path": "ev",
+          "header": {
+            "card": {
+              "type": "markdown",
+              "text_only": true,
+              "content": "# Elektromobil — KIA EV6\nNabíjení a energetický kontext"
+            }
+          },
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Přehled stavu"
+                },
+                {
+                  "type": "custom:mushroom-chips-card",
+                  "alignment": "start",
+                  "chips": [
+                    {
+                      "type": "template",
+                      "icon": "mdi:car-electric",
+                      "icon_color": "{% if is_state('binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected', 'on') %}green{% else %}grey{% endif %}",
+                      "content": "{% if is_state('binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected', 'on') %}Připojeno{% else %}Odpojeno{% endif %}",
+                      "tap_action": {
+                        "action": "none"
+                      }
+                    },
+                    {
+                      "type": "template",
+                      "icon": "mdi:battery-charging",
+                      "icon_color": "{% if is_state('binary_sensor.ecovolter_revcr01c00002056_is_charging', 'on') %}blue{% else %}grey{% endif %}",
+                      "content": "{% if is_state('binary_sensor.ecovolter_revcr01c00002056_is_charging', 'on') %}Nabíjí {{ states('sensor.ecovolter_revcr01c00002056_actual_power') | float(0) | round(1) }} kW{% else %}Nenabíjí{% endif %}",
+                      "tap_action": {
+                        "action": "none"
+                      }
+                    },
+                    {
+                      "type": "template",
+                      "icon": "mdi:battery",
+                      "icon_color": "{% set soc = states('sensor.ev6_ev_battery_level') | int(0) %}{% if soc > 70 %}green{% elif soc > 30 %}yellow{% else %}red{% endif %}",
+                      "content": "{{ states('sensor.ev6_ev_battery_level') }} %",
+                      "tap_action": {
+                        "action": "none"
+                      }
+                    },
+                    {
+                      "type": "template",
+                      "icon": "mdi:map-marker-distance",
+                      "icon_color": "cyan",
+                      "content": "{{ states('sensor.ev6_ev_range') }} km",
+                      "tap_action": {
+                        "action": "none"
+                      }
+                    },
+                    {
+                      "type": "template",
+                      "icon": "mdi:currency-eur",
+                      "icon_color": "{% set price = states('sensor.current_spot_electricity_price') | float(0) %}{% if price < 0 %}red{% elif is_state('binary_sensor.spot_electricity_is_cheapest', 'on') %}green{% else %}orange{% endif %}",
+                      "content": "{{ states('sensor.current_spot_electricity_price') | float(0) | round(2) }} Kč",
+                      "tap_action": {
+                        "action": "none"
+                      }
+                    },
+                    {
+                      "type": "template",
+                      "icon": "mdi:robot",
+                      "icon_color": "{% if is_state('input_boolean.ev_nabijeni_povoleno', 'on') %}green{% else %}red{% endif %}",
+                      "content": "Auto-nabíjení",
+                      "entity": "input_boolean.ev_nabijeni_povoleno",
+                      "tap_action": {
+                        "action": "toggle"
+                      }
+                    },
+                    {
+                      "type": "template",
+                      "icon": "mdi:solar-power",
+                      "icon_color": "yellow",
+                      "content": "{{ states('sensor.solcast_pv_forecast_power_now') | float(0) | round(0) }} W",
+                      "tap_action": {
+                        "action": "none"
+                      }
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": 36,
+                    "rows": 1
+                  }
+                }
+              ],
+              "column_span": 3
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Stav vozu"
+                },
+                {
+                  "type": "custom:mushroom-title-card",
+                  "title": "KIA EV6 — Stav vozu",
+                  "subtitle": "Data z KIA API (aktualizace při nabíjení nebo ručně)"
+                },
+                {
+                  "type": "gauge",
+                  "entity": "sensor.ev6_ev_battery_level",
+                  "name": "Baterie EV6",
+                  "min": 0,
+                  "max": 100,
+                  "needle": true,
+                  "segments": [
+                    {
+                      "from": 0,
+                      "color": "#db4437"
+                    },
+                    {
+                      "from": 20,
+                      "color": "#f4b400"
+                    },
+                    {
+                      "from": 50,
+                      "color": "#0f9d58"
+                    },
+                    {
+                      "from": 80,
+                      "color": "#4285f4"
+                    }
+                  ]
+                },
+                {
+                  "type": "glance",
+                  "show_name": true,
+                  "show_icon": true,
+                  "show_state": true,
+                  "state_color": true,
+                  "entities": [
+                    {
+                      "entity": "sensor.ev6_ev_battery_level",
+                      "name": "SoC baterie"
+                    },
+                    {
+                      "entity": "sensor.ev6_ev_range",
+                      "name": "Dojezd"
+                    },
+                    {
+                      "entity": "sensor.ev6_estimated_charge_duration",
+                      "name": "Do nabití"
+                    },
+                    {
+                      "entity": "number.ev6_ac_charging_limit",
+                      "name": "AC limit"
+                    },
+                    {
+                      "entity": "sensor.ev6_ev_charging_power",
+                      "name": "Výkon (KIA)"
+                    },
+                    {
+                      "entity": "sensor.ev6_odometer",
+                      "name": "Odometr"
+                    },
+                    {
+                      "entity": "sensor.ev6_car_battery_level"
+                    }
+                  ]
+                },
+                {
+                  "type": "glance",
+                  "show_name": true,
+                  "show_state": true,
+                  "entities": [
+                    {
+                      "entity": "sensor.ev6_average_energy_consumption",
+                      "name": "Průměrná spotřeba"
+                    },
+                    {
+                      "entity": "sensor.ev6_90_day_energy_consumption",
+                      "name": "Spotřeba 90 dní"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "title": "Stavy zásuvky a nabíjení",
+                  "entities": [
+                    {
+                      "entity": "binary_sensor.ev6_ev_battery_plug",
+                      "name": "Zásuvka zapojena (KIA)"
+                    },
+                    {
+                      "entity": "binary_sensor.ev6_ev_battery_charge",
+                      "name": "Nabíjí se (KIA)"
+                    },
+                    {
+                      "entity": "binary_sensor.ev6_ev_charge_port",
+                      "name": "Nabíjecí port"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Nabíjení LIVE"
+                },
+                {
+                  "type": "custom:mushroom-title-card",
+                  "title": "EcoVolter — Nabíjení LIVE",
+                  "subtitle": "Aktualizace každých 15 s"
+                },
+                {
+                  "type": "gauge",
+                  "entity": "sensor.ecovolter_revcr01c00002056_actual_power",
+                  "name": "Výkon nabíjení (kW)",
+                  "min": 0,
+                  "max": 11,
+                  "needle": true,
+                  "segments": [
+                    {
+                      "from": 0,
+                      "color": "#9e9e9e"
+                    },
+                    {
+                      "from": 0.3,
+                      "color": "#2196f3"
+                    },
+                    {
+                      "from": 4.5,
+                      "color": "#4caf50"
+                    },
+                    {
+                      "from": 7.5,
+                      "color": "#ff9800"
+                    }
+                  ]
+                },
+                {
+                  "type": "glance",
+                  "show_name": true,
+                  "show_icon": true,
+                  "show_state": true,
+                  "state_color": true,
+                  "entities": [
+                    {
+                      "entity": "binary_sensor.ecovolter_revcr01c00002056_is_charging",
+                      "name": "Nabíjí se"
+                    },
+                    {
+                      "entity": "binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected",
+                      "name": "Auto připojeno"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_actual_power",
+                      "name": "Výkon kW"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_charged_energy",
+                      "name": "Session kWh"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_charging_time",
+                      "name": "Doba session"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_charging_cost",
+                      "name": "Cena session"
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "header": {
+                    "show": true,
+                    "title": "Fázové proudy (A)",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "graph_span": "10min",
+                  "yaxis": [
+                    {
+                      "min": 0,
+                      "max": 12,
+                      "decimals": 1
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_current_l1",
+                      "name": "L1",
+                      "color": "#f44336",
+                      "type": "column",
+                      "group_by": {
+                        "func": "last",
+                        "duration": "1min"
+                      }
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_current_l2",
+                      "name": "L2",
+                      "color": "#2196f3",
+                      "type": "column",
+                      "group_by": {
+                        "func": "last",
+                        "duration": "1min"
+                      }
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_current_l3",
+                      "name": "L3",
+                      "color": "#4caf50",
+                      "type": "column",
+                      "group_by": {
+                        "func": "last",
+                        "duration": "1min"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "glance",
+                  "show_name": true,
+                  "show_state": true,
+                  "entities": [
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy",
+                      "name": "Dnes kWh"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_total_charged_energy",
+                      "name": "Celkem kWh"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_total_charging_count",
+                      "name": "Počet session"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "title": "Módy nabíjení",
+                  "entities": [
+                    {
+                      "entity": "binary_sensor.ecovolter_revcr01c00002056_is_three_phase_mode_active",
+                      "name": "3-fázový mód aktivní"
+                    },
+                    {
+                      "entity": "binary_sensor.ecovolter_revcr01c00002056_is_boost_mode_active",
+                      "name": "Boost mód aktivní"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_remaining_boost_time",
+                      "name": "Zbývající boost čas"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Ovládání"
+                },
+                {
+                  "type": "custom:mushroom-title-card",
+                  "title": "Ovládání nabíjení",
+                  "subtitle": "EcoVolter Pro II · Automatizace"
+                },
+                {
+                  "type": "entities",
+                  "title": "Nabíjecí parametry",
+                  "entities": [
+                    {
+                      "entity": "switch.ecovolter_revcr01c00002056_is_charging_enable",
+                      "name": "Nabíjení zapnuto"
+                    },
+                    {
+                      "entity": "number.ecovolter_revcr01c00002056_target_current",
+                      "name": "Cílový proud (A)"
+                    },
+                    {
+                      "entity": "input_boolean.ev_nabijeni_povoleno",
+                      "name": "Automatické nabíjení"
+                    },
+                    {
+                      "entity": "number.ev6_ac_charging_limit",
+                      "name": "KIA AC limit (%)"
+                    },
+                    {
+                      "entity": "number.ev6_dc_charging_limit",
+                      "name": "KIA DC limit (%)"
+                    },
+                    {
+                      "entity": "button.ev6_force_refresh"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "title": "Stav automatizací",
+                  "entities": [
+                    {
+                      "entity": "automation.ev_nabijeni_zaporne_ceny_nebo_pretoky",
+                      "name": "Hlavní automatizace"
+                    },
+                    {
+                      "entity": "automation.ev_regulace_proudu_pri_zaporne_cene",
+                      "name": "Regulace proudu"
+                    },
+                    {
+                      "entity": "automation.ev_zastavit_prilis_velky_import",
+                      "name": "Stop — velký import"
+                    },
+                    {
+                      "entity": "automation.ev_zastavit_plna_baterie_ev",
+                      "name": "Stop — plná baterie"
+                    },
+                    {
+                      "entity": "automation.kia_ev6_force_update_pri_zacatku_nabijeni",
+                      "name": "KIA force update"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "title": "Boost / 3-fázový mód",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected",
+                      "state": "on"
+                    }
+                  ],
+                  "entities": [
+                    {
+                      "entity": "switch.ecovolter_revcr01c00002056_is_boost_mode_enable",
+                      "name": "Boost mód"
+                    },
+                    {
+                      "entity": "switch.ecovolter_revcr01c00002056_is_three_phase_mode_enable",
+                      "name": "3-fázový mód"
+                    },
+                    {
+                      "entity": "number.ecovolter_revcr01c00002056_boost_current",
+                      "name": "Boost proud (A)"
+                    },
+                    {
+                      "entity": "number.ecovolter_revcr01c00002056_boost_time",
+                      "name": "Boost čas (min)"
+                    },
+                    {
+                      "entity": "number.ecovolter_revcr01c00002056_max_current",
+                      "name": "Max proud (A)"
+                    },
+                    {
+                      "entity": "number.goodwe_limit_dodavky_do_site",
+                      "name": "GoodWe export limit (W)"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "title": "Diagnostika EcoVolteru",
+                  "show_header_toggle": false,
+                  "entities": [
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_temperature_internal",
+                      "name": "Teplota uvnitř"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_voltage_l1",
+                      "name": "Napětí L1 (V)"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_voltage_l2",
+                      "name": "Napětí L2 (V)"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_voltage_l3",
+                      "name": "Napětí L3 (V)"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Energetický kontext"
+                },
+                {
+                  "type": "custom:mushroom-title-card",
+                  "title": "Energetický kontext",
+                  "subtitle": "Solar · Síť · Baterie · OTE cena"
+                },
+                {
+                  "type": "custom:power-flow-card-plus",
+                  "clickable_entities": true,
+                  "use_new_flow_rate_model": true,
+                  "entities": {
+                    "individual": [
+                      {
+                        "entity": "sensor.eco_volter_vykon",
+                        "name": "EV nabíjení",
+                        "color_icon": true,
+                        "display_zero": true,
+                        "color": "#2196f3",
+                        "icon": "mdi:ev-station"
+                      },
+                      {
+                        "entity": "sensor.bazenova_filtrace_vykon",
+                        "name": "Filtrace",
+                        "color_icon": true,
+                        "display_zero": true,
+                        "color": "#ff8080",
+                        "icon": "mdi:pool"
+                      }
+                    ],
+                    "home": {
+                      "entity": "sensor.house_consumption",
+                      "override_state": true
+                    },
+                    "battery": {
+                      "entity": {
+                        "production": "sensor.fve_battery_charge_w",
+                        "consumption": "sensor.fve_battery_discharge_w"
+                      },
+                      "state_of_charge": "sensor.battery_state_of_charge",
+                      "display_state": "two_way"
+                    },
+                    "grid": {
+                      "entity": {
+                        "consumption": "sensor.energy_buy",
+                        "production": "sensor.energy_sell"
+                      }
+                    },
+                    "solar": {
+                      "entity": "sensor.pv_power"
+                    },
+                    "inverted_entities": "battery"
+                  }
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "header": {
+                    "title": "Spotová cena elektřiny",
+                    "show": true,
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "graph_span": "2d",
+                  "span": {
+                    "start": "day"
+                  },
+                  "now": {
+                    "show": true,
+                    "label": "Nyní"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.current_spot_electricity_price",
+                      "name": "Elektřina bez DPH (Kč/kWh)",
+                      "float_precision": 2,
+                      "type": "column",
+                      "color": "green",
+                      "show": {
+                        "in_header": "raw"
+                      },
+                      "data_generator": "return Object.entries(entity.attributes).map(([date, value], index) => {\n  return [new Date(date).getTime(), value];\n});\n"
+                    }
+                  ]
+                },
+                {
+                  "type": "glance",
+                  "show_name": true,
+                  "show_state": true,
+                  "entities": [
+                    {
+                      "entity": "sensor.solcast_pv_forecast_power_now",
+                      "name": "Solcast nyní (W)"
+                    },
+                    {
+                      "entity": "sensor.solcast_pv_forecast_forecast_remaining_today",
+                      "name": "Zbývá dnes kWh"
+                    },
+                    {
+                      "entity": "sensor.battery_state_of_charge",
+                      "name": "Baterie domu %"
+                    },
+                    {
+                      "entity": "sensor.pv_power",
+                      "name": "Solar GoodWe W"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Historie nabíjení"
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "header": {
+                    "show": true,
+                    "title": "Výkon nabíjení dnes + SoC EV6",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "graph_span": "24h",
+                  "span": {
+                    "start": "day"
+                  },
+                  "now": {
+                    "show": true,
+                    "label": "Nyní"
+                  },
+                  "yaxis": [
+                    {
+                      "id": "kw",
+                      "min": 0,
+                      "decimals": 1,
+                      "apex_config": {
+                        "tickAmount": 5
+                      }
+                    },
+                    {
+                      "id": "soc",
+                      "min": 0,
+                      "max": 100,
+                      "show": false,
+                      "opposite": true
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_actual_power",
+                      "name": "EcoVolter (kW)",
+                      "yaxis_id": "kw",
+                      "type": "area",
+                      "color": "#2196f3",
+                      "fill_raw": "zero",
+                      "stroke_width": 2,
+                      "group_by": {
+                        "func": "avg",
+                        "duration": "2min"
+                      },
+                      "show": {
+                        "in_header": true
+                      }
+                    },
+                    {
+                      "entity": "sensor.ev6_ev_battery_level",
+                      "name": "SoC EV6 (%)",
+                      "yaxis_id": "soc",
+                      "type": "line",
+                      "color": "#4caf50",
+                      "stroke_width": 2,
+                      "extend_to": "now",
+                      "show": {
+                        "in_header": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "header": {
+                    "show": true,
+                    "title": "EV energie vs. Solar — 7 dní"
+                  },
+                  "graph_span": "7d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "yaxis": [
+                    {
+                      "min": 0,
+                      "decimals": 1
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy",
+                      "name": "EV nabito (kWh)",
+                      "color": "#2196f3",
+                      "type": "column",
+                      "group_by": {
+                        "func": "last",
+                        "duration": "1d"
+                      }
+                    },
+                    {
+                      "entity": "sensor.today_s_pv_generation",
+                      "name": "Solar výroba (kWh)",
+                      "color": "#ff9800",
+                      "type": "column",
+                      "group_by": {
+                        "func": "last",
+                        "duration": "1d"
+                      }
+                    },
+                    {
+                      "entity": "sensor.energy_buy_daily",
+                      "name": "Nákup ze sítě (kWh)",
+                      "color": "#f44336",
+                      "type": "line",
+                      "stroke_width": 2,
+                      "group_by": {
+                        "func": "last",
+                        "duration": "1d"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "header": {
+                    "show": true,
+                    "title": "Detail nabíjení — posledních 12 h",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "graph_span": "12h",
+                  "now": {
+                    "show": true,
+                    "label": "Nyní"
+                  },
+                  "yaxis": [
+                    {
+                      "id": "kw",
+                      "min": 0,
+                      "decimals": 2,
+                      "apex_config": {
+                        "tickAmount": 4
+                      }
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_actual_power",
+                      "name": "EcoVolter (kW)",
+                      "yaxis_id": "kw",
+                      "type": "area",
+                      "color": "#2196f3",
+                      "fill_raw": "zero",
+                      "group_by": {
+                        "func": "avg",
+                        "duration": "1min"
+                      },
+                      "show": {
+                        "in_header": true
+                      }
+                    },
+                    {
+                      "entity": "sensor.pv_power",
+                      "name": "Solar (kW)",
+                      "yaxis_id": "kw",
+                      "type": "line",
+                      "color": "#ff9800",
+                      "transform": "return x / 1000;",
+                      "stroke_width": 1,
+                      "group_by": {
+                        "func": "avg",
+                        "duration": "1min"
+                      }
+                    },
+                    {
+                      "entity": "sensor.energy_buy",
+                      "name": "Import sítě (kW)",
+                      "yaxis_id": "kw",
+                      "type": "line",
+                      "color": "#f44336",
+                      "transform": "return x / 1000;",
+                      "stroke_width": 1,
+                      "opacity": 0.6,
+                      "group_by": {
+                        "func": "avg",
+                        "duration": "1min"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Poloha vozidla",
+                  "heading_style": "title"
+                },
+                {
+                  "type": "map",
+                  "entities": [
+                    {
+                      "entity": "device_tracker.ev6_location",
+                      "label_mode": "icon"
+                    }
+                  ],
+                  "theme_mode": "auto"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
