@@ -180,3 +180,18 @@ def test_simulate_standby_keeps_soc():
     res, _ = simulate(slots, [Action(MODE_STANDBY)] * len(slots), BATT, Prices())
     assert res[-1].soc_pct == pytest.approx(BATT.soc_pct)
     assert res[0].grid_import_kwh == pytest.approx(slots[0].load_kwh)
+
+
+def test_hourly_table_rows_are_text_and_aggregated():
+    from hav2_planner import hourly_table
+
+    now = datetime(2026, 9, 25, 21, 0, tzinfo=TZ)
+    slots = make_slots(now, 0, 0.3)
+    plan = plan_battery(slots, BATT, Prices())
+    table = hourly_table(plan, slots, Prices())
+    assert len(table) == 24
+    assert table[0]["t"] == "21:00" and table[3]["t"] == "26.09. 00:00"
+    assert all(isinstance(v, str) and v for row in table for v in row.values())
+    first_import = sum(r.grid_import_kwh for r in plan.results[:4])
+    assert table[0]["nakup"] == f"{first_import:.2f}"
+    assert any(row["rezim"] == "nabíjet ze sítě" for row in table)

@@ -333,3 +333,43 @@ def compact(plan: Plan, slots: Sequence[Slot], every: int = 2) -> List[list]:
         out.append([r.start.isoformat(timespec="minutes"), r.mode, round(r.power_kw, 2), r.soc_pct,
                     round(r.grid_import_kwh, 3), round(r.grid_export_kwh, 3)])
     return out
+
+
+MODE_LABELS = {
+    MODE_AUTO: "vlastní spotřeba",
+    MODE_STANDBY: "držet",
+    MODE_CHARGE: "nabíjet ze sítě",
+    MODE_DISCHARGE: "prodej z baterie",
+}
+
+
+def hourly_table(plan: Plan, slots: Sequence[Slot], prices: Prices, hours: int = 24) -> List[Dict[str, str]]:
+    """Plán po hodinách pro tabulku na dashboardu (hodnoty jako text – AppDaemon zahazuje nuly)."""
+    rows: Dict[datetime, dict] = {}
+    for r, s in zip(plan.results, slots):
+        h = r.start.replace(minute=0)
+        row = rows.setdefault(h, {"mode": r.mode, "kw": 0.0, "soc": r.soc_pct, "imp": 0.0, "exp": 0.0,
+                                  "nt": s.is_nt, "spot": s.spot})
+        if r.mode != MODE_AUTO:
+            row["mode"] = r.mode
+        row["kw"] = max(row["kw"], r.power_kw)
+        row["soc"] = r.soc_pct
+        row["imp"] += r.grid_import_kwh
+        row["exp"] += r.grid_export_kwh
+    out = []
+    first_day = None
+    for h in sorted(rows)[:hours]:
+        row = rows[h]
+        first_day = first_day or h.date()
+        label = h.strftime("%H:%M") if h.date() == first_day else h.strftime("%d.%m. %H:%M")
+        out.append({
+            "t": label,
+            "rezim": MODE_LABELS.get(row["mode"], row["mode"]),
+            "kw": f"{row['kw']:.1f}" if row["mode"] in (MODE_CHARGE, MODE_DISCHARGE) else "–",
+            "soc": f"{row['soc']:.0f} %",
+            "nakup": f"{row['imp']:.2f}",
+            "prodej": f"{row['exp']:.2f}",
+            "tarif": "NT" if row["nt"] else "VT",
+            "spot": f"{row['spot'] * prices.sell_coef:.2f}",
+        })
+    return out

@@ -64,21 +64,31 @@ views:
                   name: Bazén
                   icon: mdi:pool
                   display_zero: true
+          - type: heading
+            heading: Fáze (+ prodej / − nákup)
+            heading_style: subtitle
+            icon: mdi:sine-wave
           - type: tile
             entity: sensor.meter_active_power_l1
-            name: L1 (+ prodej / − nákup)
+            name: L1
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
           - type: tile
             entity: sensor.meter_active_power_l2
             name: L2
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
           - type: tile
             entity: sensor.meter_active_power_l3
             name: L3
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
       - type: grid
         cards:
           - type: heading
@@ -87,39 +97,28 @@ views:
           - type: tile
             entity: input_select.energy_system_mode
             name: Režim
+            grid_options:
+              columns: 12
+            features_position: inline
             features:
               - type: select-options
-          - type: tile
-            entity: input_boolean.energy_battery_control
-            name: Řídí baterii
-            grid_options:
-              columns: 4
-            features:
-              - type: toggle
-          - type: tile
-            entity: input_boolean.ev_control
-            name: Řídí EV
-            grid_options:
-              columns: 4
-            features:
-              - type: toggle
-          - type: tile
-            entity: input_boolean.pool_control
-            name: Řídí bazén
-            grid_options:
-              columns: 4
-            features:
-              - type: toggle
+          - type: entities
+            title: HAv2 řídí
+            state_color: true
+            entities:
+              - entity: input_boolean.energy_battery_control
+                name: Baterii
+              - entity: input_boolean.ev_control
+                name: Nabíjení EV
+              - entity: input_boolean.pool_control
+                name: Filtraci
           - type: markdown
             content: |
               {% set m = states('input_select.energy_system_mode') %}
               {% if m != 'Auto' %}**Režim {{ m }}** – HAv2 nic nezapisuje, jen doporučuje.{% endif %}
-
               {% set ev = states('input_select.ev_manual') %}{% set pool = states('input_select.pool_manual') %}
               {% if ev != 'Auto' %}🚗 **EV ručně: {{ ev }}** ({{ states('input_select.ev_manual_until') }}){% endif %}
-
               {% if pool != 'Auto' %}🏊 **Filtrace ručně: {{ pool }}** (na {{ states('input_number.pool_manual_duration_h') | float(0) }} h){% endif %}
-
               {% set o = states('input_datetime.energy_override_until') | as_datetime(none) %}
               {% if o and o | as_local > now() %}✋ **Ruční zásah platí do {{ (o | as_local).strftime('%H:%M') }}**{% endif %}
       - type: grid
@@ -127,21 +126,20 @@ views:
           - type: heading
             heading: Rozhodnutí
             icon: mdi:lightbulb-on-outline
-          - type: tile
-            entity: sensor.energy_plan
-            name: Baterie
-            grid_options:
-              columns: 4
-          - type: tile
-            entity: sensor.ev_regulator
-            name: EV
-            grid_options:
-              columns: 4
-          - type: tile
-            entity: sensor.pool_controller
-            name: Bazén
-            grid_options:
-              columns: 4
+          - type: entities
+            entities:
+              - entity: sensor.energy_plan
+                name: Baterie
+                icon: mdi:home-battery
+                secondary_info: last-changed
+              - entity: sensor.ev_regulator
+                name: EV
+                icon: mdi:car-electric
+                secondary_info: last-changed
+              - entity: sensor.pool_controller
+                name: Bazén
+                icon: mdi:pool
+                secondary_info: last-changed
           - type: markdown
             content: |
               **Baterie:** {{ states('input_text.energy_last_decision') }}
@@ -159,7 +157,6 @@ views:
             name: Náklady dnes (netto)
             grid_options:
               columns: 6
-
   # ================================================================== PLÁN
   - title: Plán
     path: plan
@@ -173,7 +170,11 @@ views:
           - type: heading
             heading: Plán baterie a FVE (dnes a zítra)
             icon: mdi:chart-timeline-variant
-          - type: custom:apexcharts-card
+          - &plan_chart
+            type: custom:apexcharts-card
+            visibility:
+              - condition: screen
+                media_query: "(min-width: 768px)"
             grid_options:
               columns: full
             graph_span: 32h
@@ -252,11 +253,26 @@ views:
                 yaxis_id: soc
                 data_generator: |
                   return JSON.parse(entity.attributes.slots_json || '[]').map(r => [new Date(r[0]).getTime(), r[3]]);
+          - <<: *plan_chart
+            visibility:
+              - condition: screen
+                media_query: "(max-width: 767px)"
+            graph_span: 12h
+            apex_config:
+              chart:
+                height: 280
+              legend:
+                show: true
+                fontSize: 11px
           - type: heading
             heading: Ceny (dnes a zítra)
             heading_style: subtitle
             icon: mdi:cash
-          - type: custom:apexcharts-card
+          - &price_chart
+            type: custom:apexcharts-card
+            visibility:
+              - condition: screen
+                media_query: "(min-width: 768px)"
             grid_options:
               columns: full
             graph_span: 48h
@@ -306,57 +322,184 @@ views:
                   const v = parseFloat(entity.state) * (parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.85);
                   const d = new Date(); d.setHours(0, 0, 0, 0);
                   return [[d.getTime(), v], [d.getTime() + 48 * 3600e3, v]];
+          - <<: *price_chart
+            visibility:
+              - condition: screen
+                media_query: "(max-width: 767px)"
+            graph_span: 24h
+            span:
+              start: hour
       - type: grid
         cards:
           - type: heading
             heading: Baterie – plán
             icon: mdi:home-battery
           - type: markdown
+            text_only: true
             content: |
-              {% set p = 'sensor.energy_plan' %}
-              **Teď:** {{ states(p) }} {{ state_attr(p, 'power_kw') }} kW
-              {{ '(provádí se)' if state_attr(p, 'executing') == 'ano' else '(jen doporučení)' }}
-
-              {{ state_attr(p, 'reason') }}
-
-              | | |
-              |---|---|
-              | Nabití ze sítě v NT | {{ state_attr(p, 'grid_charge_kwh') }} kWh |
-              | Prodejní sloty | {{ state_attr(p, 'sell_slots') }} |
-              | Min. SOC v plánu | {{ state_attr(p, 'soc_min_plan') }} % |
-              | FVE zbytek dnes / zítra | {{ state_attr(p, 'pv_rest_today_kwh') }} / {{ state_attr(p, 'pv_tomorrow_kwh') }} kWh |
-              | Spotřeba zítra | {{ state_attr(p, 'load_tomorrow_kwh') }} kWh |
-              | Náklady zbytek dne / zítra | {{ state_attr(p, 'cost_today_rest') }} / {{ state_attr(p, 'cost_tomorrow') }} Kč |
-              | Předpověď platná | {{ state_attr(p, 'forecast_ok') }} ({{ state_attr(p, 'nt_source') }}) |
-
-              <small>Přepočteno {{ (state_attr(p, 'generated') | as_datetime | as_local).strftime('%H:%M') if state_attr(p, 'generated') else '–' }}
-              · {{ state_attr(p, 'trigger') }}</small>
+              **{{ state_attr('sensor.energy_plan', 'reason') }}**
+              {{ '' if state_attr('sensor.energy_plan', 'executing') == 'ano' else '· jen doporučení' }}
+          - type: entities
+            entities:
+              - entity: sensor.energy_plan
+                name: Režim teď
+                secondary_info: last-updated
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: grid_charge_kwh
+                name: Nabití ze sítě v NT
+                icon: mdi:transmission-tower-import
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: sell_slots
+                name: Prodejní sloty (15 min)
+                icon: mdi:cash-fast
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: soc_min_plan
+                name: Nejnižší SOC v plánu
+                icon: mdi:battery-low
+                suffix: "%"
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: pv_rest_today_kwh
+                name: FVE zbytek dnes
+                icon: mdi:solar-power
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: pv_tomorrow_kwh
+                name: FVE zítra
+                icon: mdi:solar-power-variant
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: load_tomorrow_kwh
+                name: Spotřeba domu zítra
+                icon: mdi:home-lightning-bolt
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: cost_today_rest
+                name: Náklady zbytek dne
+                icon: mdi:cash
+                suffix: Kč
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: cost_tomorrow
+                name: Náklady zítra
+                icon: mdi:cash-clock
+                suffix: Kč
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: forecast_ok
+                name: Předpověď FVE platná
+                icon: mdi:weather-sunny-alert
       - type: grid
         cards:
           - type: heading
             heading: EV a bazén – plán
             icon: mdi:calendar-clock
-          - type: markdown
-            content: |
-              {% set e = 'sensor.ev_plan' %}
-              **EV:** {{ states(e) }}
-
-              {% set slots = state_attr(e, 'grid_slots_json') | default('[]', true) | from_json %}
-              {% if slots %}Ze sítě: {{ (slots | first)[0] | as_datetime | as_local | as_timestamp | timestamp_custom('%d.%m. %H:%M') }}
-              – {{ ((slots | last)[0] | as_datetime + timedelta(minutes=15)) | as_local | as_timestamp | timestamp_custom('%H:%M') }}
-              ({{ slots | count / 4 }} h), odhad {{ state_attr(e, 'est_grid_cost') }} Kč{% endif %}
-
-              {% if state_attr(e, 'battery_reserve_w') | float(0) > 0 %}Rezerva pro baterii domu: {{ state_attr(e, 'battery_reserve_w') }} W{% endif %}
-
-              **Bazén:** {{ states('sensor.pool_plan') }}
-          - type: markdown
-            title: Plán po hodinách (příštích 12 h)
-            content: |
-              | Čas | Režim | kW | SOC | Nákup | Prodej |
-              |---|---|---|---|---|---|
-              {% for r in (state_attr('sensor.energy_plan', 'slots_json') | default('[]', true) | from_json)[:24:2] -%}
-              | {{ (r[0] | as_datetime | as_local).strftime('%H:%M') }} | {{ r[1] }} | {{ r[2] }} | {{ r[3] | round(0) }} % | {{ (r[4] * 4) | abs | round(1) }} | {{ (r[5] * 4) | abs | round(1) }} |
-              {% endfor %}
+          - type: entities
+            entities:
+              - entity: sensor.ev_plan
+                name: EV
+                icon: mdi:car-electric
+              - type: attribute
+                entity: sensor.ev_plan
+                attribute: solar_kwh
+                name: EV ze slunce
+                icon: mdi:solar-power
+                suffix: kWh
+              - type: attribute
+                entity: sensor.ev_plan
+                attribute: nt_kwh
+                name: EV ze sítě v NT
+                icon: mdi:weather-night
+                suffix: kWh
+              - type: attribute
+                entity: sensor.ev_plan
+                attribute: vt_kwh
+                name: EV ze sítě ve VT
+                icon: mdi:white-balance-sunny
+                suffix: kWh
+              - type: attribute
+                entity: sensor.ev_plan
+                attribute: est_grid_cost
+                name: EV odhad nákladů ze sítě
+                icon: mdi:cash
+                suffix: Kč
+              - entity: sensor.pool_plan
+                name: Bazén
+                icon: mdi:pool
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Plán po hodinách (24 h)
+            icon: mdi:table-clock
+          # počítač: všechny sloupce
+          - type: custom:flex-table-card
+            visibility:
+              - condition: screen
+                media_query: "(min-width: 768px)"
+            grid_options:
+              columns: full
+            entities:
+              include: sensor.energy_plan
+            columns:
+              - name: Čas
+                data: table.t
+              - name: Baterie
+                data: table.rezim
+              - name: kW
+                data: table.kw
+                align: right
+              - name: SOC
+                data: table.soc
+                align: right
+              - name: Nákup kWh
+                data: table.nakup
+                align: right
+              - name: Prodej kWh
+                data: table.prodej
+                align: right
+              - name: Tarif
+                data: table.tarif
+                align: center
+              - name: Výkup Kč/kWh
+                data: table.spot
+                align: right
+            css:
+              table+: "width: 100%; border-collapse: collapse;"
+              tbody tr:nth-child(odd): "background-color: rgba(127, 127, 127, 0.07);"
+          # mobil: jen nejdůležitější sloupce
+          - type: custom:flex-table-card
+            visibility:
+              - condition: screen
+                media_query: "(max-width: 767px)"
+            grid_options:
+              columns: full
+            entities:
+              include: sensor.energy_plan
+            columns:
+              - name: Čas
+                data: table.t
+              - name: Baterie
+                data: table.rezim
+              - name: SOC
+                data: table.soc
+                align: right
+              - name: Nákup
+                data: table.nakup
+                align: right
+              - name: Prodej
+                data: table.prodej
+                align: right
+            css:
+              table+: "width: 100%; border-collapse: collapse; font-size: 0.9em;"
+              tbody tr:nth-child(odd): "background-color: rgba(127, 127, 127, 0.07);"
 
   # ==================================================================== EV
   - title: EV
@@ -419,39 +562,55 @@ views:
           - type: tile
             entity: input_select.ev_mode
             name: Režim
+            grid_options:
+              columns: 12
+            features_position: inline
             features:
               - type: select-options
           - type: tile
             entity: input_number.ev_target_soc
             name: Cílový SOC
+            grid_options:
+              columns: 12
+            features_position: inline
             features:
               - type: numeric-input
                 style: slider
           - type: tile
             entity: input_datetime.ev_deadline
             name: Nabito do
+            grid_options:
+              columns: 12
+            features_position: inline
             features:
               - type: date-set
           - type: tile
             entity: input_boolean.ev_deadline_hard
-            name: Za každou cenu
+            name: Za každou cenu (i VT)
+            grid_options:
+              columns: 12
+            features_position: inline
             features:
               - type: toggle
           - type: tile
             entity: sensor.ev_soc_estimate
             name: SOC (odhad)
             grid_options:
-              columns: 4
+              columns: 6
           - type: tile
             entity: sensor.ev_energy_needed_kwh
-            name: Chybí
+            name: Chybí do cíle
             grid_options:
-              columns: 4
+              columns: 6
           - type: tile
             entity: sensor.ev_deadline_slack_h
-            name: Rezerva
+            name: Rezerva do termínu
+            visibility:
+              - condition: state
+                entity: sensor.ev_deadline_slack_h
+                state_not: unavailable
             grid_options:
-              columns: 4
+              columns: 12
           - type: markdown
             content: |
               {% set e = 'sensor.ev_plan' %}
@@ -514,18 +673,24 @@ views:
           - type: tile
             entity: sensor.ev_session_energy
             name: Energie
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
           - type: tile
             entity: sensor.ev_session_cost
             name: Náklady
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
           - type: tile
             entity: sensor.ev_session_avg_price
             name: Kč/kWh
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
       - type: grid
         cards:
           - type: heading
@@ -566,25 +731,36 @@ views:
             name: Tento rok
             grid_options:
               columns: 6
-          - type: markdown
-            content: |
-              {% set cost = states('sensor.ev_charging_cost_total') | float(0) %}
-              {% set e = ['sensor.ev_energy_solar_total', 'sensor.ev_energy_battery_total',
-                          'sensor.ev_energy_grid_nt_total', 'sensor.ev_energy_grid_vt_total']
-                         | map('states') | map('float', 0) | list %}
-              {% set kwh = e | sum %}
-              {% set price = cost / kwh if kwh > 0 else 0 %}
-              {% set cons = states('sensor.ev6_average_energy_consumption') | float(0) / 10 %}
-              {% set eff = states('input_number.ev_charge_efficiency') | float(90) / 100 %}
-              {% set vt_m = states('sensor.ev_charging_cost_if_vt_monthly') | float(0) %}
-              {% set m = states('sensor.ev_charging_cost_monthly') | float(0) %}
-              | | |
-              |---|---|
-              | Nabito celkem (od 25. 9.) | {{ kwh | round(1) }} kWh za {{ cost | round(0) }} Kč |
-              | Průměrná cena | **{{ price | round(2) }} Kč/kWh** |
-              | Podíl zdrojů | slunce {{ (e[0] / kwh * 100) | round(0) if kwh else 0 }} % · baterie {{ (e[1] / kwh * 100) | round(0) if kwh else 0 }} % · NT {{ (e[2] / kwh * 100) | round(0) if kwh else 0 }} % · VT {{ (e[3] / kwh * 100) | round(0) if kwh else 0 }} % |
-              | Úspora proti VT (měsíc) | **{{ (vt_m - m) | round(0) }} Kč** |
-              {% if cons > 0 %}| Cena na 100 km | **{{ (price * cons / eff) | round(0) }} Kč** (spotřeba {{ cons }} kWh/100 km) |{% endif %}
+          - type: tile
+            entity: sensor.ev_charging_avg_price
+            name: Průměrná cena
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_cost_per_100km
+            name: Na 100 km
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_own_energy_share_pct
+            name: Slunce + baterie
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_saving_vs_vt_monthly
+            name: Úspora proti VT (měsíc)
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_charging_energy_total
+            name: Nabito od 25. 9.
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_charging_cost_total
+            name: Náklady od 25. 9.
+            grid_options:
+              columns: 6
       - type: grid
         column_span: 2
         cards:
@@ -707,19 +883,10 @@ views:
               · slunce ~{{ state_attr(p, 'solar_hours_left') | float(0) | round(1) }} h
               · NT ~{{ state_attr(p, 'nt_hours_expected') | float(0) | round(1) }} h
           - type: tile
-            entity: input_boolean.pool_season
-            name: Sezóna
+            entity: sensor.pool_hours_done_today
+            name: Odběhnuto
             grid_options:
               columns: 6
-            features:
-              - type: toggle
-          - type: tile
-            entity: input_boolean.pool_use_recommendation
-            name: Podle doporučení
-            grid_options:
-              columns: 6
-            features:
-              - type: toggle
           - type: tile
             entity: sensor.pool_hours_recommended
             name: Doporučeno
@@ -729,15 +896,27 @@ views:
             entity: input_number.pool_hours_required
             name: Požadováno
             grid_options:
-              columns: 6
+              columns: 12
+            features_position: inline
             features:
               - type: numeric-input
                 style: buttons
-          - type: history-graph
-            title: Filtrace hodiny za den
-            hours_to_show: 336
+          - type: entities
+            state_color: true
             entities:
-              - entity: sensor.pool_filtration_hours_day
+              - entity: input_boolean.pool_season
+                name: Sezóna bazénu
+              - entity: input_boolean.pool_use_recommendation
+                name: Filtrovat podle doporučení
+          - type: statistics-graph
+            title: Filtrace hodiny za den (14 dní)
+            chart_type: bar
+            period: day
+            days_to_show: 14
+            stat_types:
+              - max
+            entities:
+              - entity: sensor.filtrace_spustena
                 name: Hodiny
       - type: grid
         cards:
@@ -747,18 +926,24 @@ views:
           - type: tile
             entity: sensor.davkovac_ph
             name: pH
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
           - type: tile
             entity: sensor.davkovac_orp
             name: ORP
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
           - type: tile
             entity: sensor.pool_water_temperature
             name: Teplota
+            vertical: true
             grid_options:
               columns: 4
+              rows: 2
           - type: history-graph
             title: pH a ORP (48 h)
             hours_to_show: 48
@@ -845,15 +1030,40 @@ views:
           - type: tile
             entity: sensor.pv_power
             name: Výroba teď
-          - type: markdown
-            content: |
-              {% set f = 'sensor.energy_pv_forecast_corrected' %}
-              | | opraveno | Solcast |
-              |---|---|---|
-              | Zbytek dnes | {{ states(f) }} kWh | |
-              | Dnes celkem | {{ state_attr(f, 'today_kwh') }} kWh | {{ state_attr(f, 'solcast_raw_today_kwh') }} kWh |
-              | Zítra | {{ state_attr(f, 'tomorrow_kwh') }} kWh | {{ state_attr(f, 'solcast_raw_tomorrow_kwh') }} kWh |
-              | Zítra konzervativně | {{ state_attr(f, 'tomorrow_conservative_kwh') }} kWh | |
+          - type: entities
+            entities:
+              - entity: sensor.energy_pv_forecast_corrected
+                name: Zbytek dnes (opraveno)
+              - type: attribute
+                entity: sensor.energy_pv_forecast_corrected
+                attribute: today_kwh
+                name: Dnes celkem (opraveno)
+                icon: mdi:solar-power
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_pv_forecast_corrected
+                attribute: solcast_raw_today_kwh
+                name: Dnes Solcast
+                icon: mdi:weather-sunny
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_pv_forecast_corrected
+                attribute: tomorrow_kwh
+                name: Zítra (opraveno)
+                icon: mdi:solar-power-variant
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_pv_forecast_corrected
+                attribute: solcast_raw_tomorrow_kwh
+                name: Zítra Solcast
+                icon: mdi:weather-partly-cloudy
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_pv_forecast_corrected
+                attribute: tomorrow_conservative_kwh
+                name: Zítra konzervativně
+                icon: mdi:weather-cloudy
+                suffix: kWh
           - type: history-graph
             title: SOC, FVE a baterie (24 h)
             hours_to_show: 24
@@ -946,6 +1156,8 @@ views:
           - type: tile
             entity: sensor.energy_grid_cross_energy
             name: Souběžný nákup+prodej
+            grid_options:
+              columns: 12
       - type: grid
         column_span: 2
         cards:
@@ -1021,22 +1233,41 @@ views:
           - type: heading
             heading: Zdraví zdrojů dat
             icon: mdi:heart-pulse
-          - type: markdown
-            content: |
-              {% macro age(ts) %}{% set t = ts | as_datetime(none) %}{% if t %}{{ ((now() - t | as_local).total_seconds() / 60) | round(0) | int }} min{% else %}–{% endif %}{% endmacro %}
-              {% macro ok(cond) %}{{ '✅' if cond else '⚠️' }}{% endmacro %}
-              {% set hb = states('input_datetime.hav2_heartbeat') | as_datetime(none) %}
-              {% set hb_ok = hb is not none and (now() - hb | as_local).total_seconds() < 180 %}
-              | Zdroj | Stav |
-              |---|---|
-              | {{ ok(hb_ok) }} AppDaemon heartbeat | před {{ age(states('input_datetime.hav2_heartbeat')) }} |
-              | {{ ok(is_state('binary_sensor.energy_forecast_valid', 'on')) }} Solcast | API {{ states('sensor.solcast_pv_forecast_api_used') }}/{{ states('sensor.solcast_pv_forecast_api_limit') }} |
-              | {{ ok(has_value('switch.ecovolter_revcr01c00002056_is_charging_enable')) }} EcoVolter | {{ 'dostupný' if has_value('switch.ecovolter_revcr01c00002056_is_charging_enable') else 'nedostupný' }} |
-              | {{ ok(has_value('sensor.ev6_ev_battery_level')) }} Kia data | stará {{ age(states('sensor.ev6_last_updated_at')) }} |
-              | {{ ok(has_value('sensor.cez_hdo_schedule_dum')) }} HDO rozvrh | {{ states('binary_sensor.cez_hdo_lowtariffactive_dum') | replace('on', 'NT') | replace('off', 'VT') }} |
-              | {{ ok(has_value('sensor.current_spot_electricity_price')) }} Spot | zítra: {{ 'ano' if is_state('binary_sensor.spot_electricity_has_tomorrow_data_2', 'on') else 'ne' }} |
-              | {{ ok(has_value('sensor.pnd_data')) }} PND | poslední den {{ (state_attr('sensor.pnd_data', 'pnddate') or ['–']) | last }} |
-              | {{ ok(states('sensor.energy_plan') != 'error') }} Plán baterie | {{ age(state_attr('sensor.energy_plan', 'generated')) }} · profil: {{ state_attr('sensor.energy_load_forecast', 'source') }} |
+          - type: entities
+            state_color: true
+            entities:
+              - entity: input_datetime.hav2_heartbeat
+                name: AppDaemon heartbeat (max. 3 min)
+                secondary_info: last-changed
+              - type: attribute
+                entity: sensor.energy_plan
+                attribute: generated
+                name: Plán baterie přepočten
+                icon: mdi:calendar-refresh
+                format: relative
+              - type: attribute
+                entity: sensor.energy_load_forecast
+                attribute: source
+                name: Profil spotřeby
+                icon: mdi:chart-bell-curve
+              - entity: binary_sensor.energy_forecast_valid
+                name: Solcast předpověď
+              - entity: sensor.solcast_pv_forecast_api_used
+                name: Solcast API použito (limit 10)
+                icon: mdi:api
+              - entity: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
+                name: EcoVolter (auto připojeno)
+              - entity: sensor.ev6_last_updated_at
+                name: Kia data aktualizována
+                icon: mdi:car-clock
+              - entity: binary_sensor.cez_hdo_lowtariffactive_dum
+                name: HDO nízký tarif
+              - entity: binary_sensor.spot_electricity_has_tomorrow_data_2
+                name: Spot ceny na zítra
+              - entity: sensor.pnd_data
+                name: PND data stažena
+                icon: mdi:file-compare
+                secondary_info: last-updated
       - type: grid
         cards:
           - type: heading

@@ -352,3 +352,66 @@ template:
           {% set polled = states('sensor.solcast_pv_forecast_api_last_polled') | as_datetime(none) %}
           {{ polled is not none and (now() - polled).total_seconds() < 14 * 3600
              and states('sensor.solcast_pv_forecast_forecast_tomorrow') | is_number }}
+
+  # ------------------------------------------------ EV náklady – souhrny pro dashboard
+  - sensor:
+      - name: EV nabito celkem
+        unique_id: hav2_ev_charging_energy_total
+        default_entity_id: sensor.ev_charging_energy_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:ev-plug-type2
+        # součet energie EV podle zdroje (od nasazení HAv2 25. 9. 2026)
+        availability: >
+          {{ ['sensor.ev_energy_solar_total', 'sensor.ev_energy_battery_total',
+              'sensor.ev_energy_grid_nt_total', 'sensor.ev_energy_grid_vt_total'] | select('has_value') | list | count == 4 }}
+        state: >
+          {{ (['sensor.ev_energy_solar_total', 'sensor.ev_energy_battery_total',
+               'sensor.ev_energy_grid_nt_total', 'sensor.ev_energy_grid_vt_total']
+              | map('states') | map('float') | sum) | round(3) }}
+
+      - name: EV průměrná cena nabíjení
+        unique_id: hav2_ev_charging_avg_price
+        default_entity_id: sensor.ev_charging_avg_price
+        unit_of_measurement: Kč/kWh
+        state_class: measurement
+        icon: mdi:cash-check
+        availability: "{{ states('sensor.ev_charging_energy_total') | float(0) > 0 and has_value('sensor.ev_charging_cost_total') }}"
+        state: >
+          {{ (states('sensor.ev_charging_cost_total') | float / states('sensor.ev_charging_energy_total') | float) | round(2) }}
+
+      - name: EV vlastní energie
+        unique_id: hav2_ev_own_energy_share
+        default_entity_id: sensor.ev_own_energy_share_pct
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:solar-power
+        # podíl slunce + baterie domu na nabité energii
+        availability: "{{ states('sensor.ev_charging_energy_total') | float(0) > 0 }}"
+        state: >
+          {{ ((states('sensor.ev_energy_solar_total') | float(0) + states('sensor.ev_energy_battery_total') | float(0))
+              / states('sensor.ev_charging_energy_total') | float * 100) | round(0) }}
+
+      - name: EV úspora proti VT tento měsíc
+        unique_id: hav2_ev_saving_vs_vt_monthly
+        default_entity_id: sensor.ev_saving_vs_vt_monthly
+        unit_of_measurement: Kč
+        state_class: measurement
+        icon: mdi:piggy-bank-outline
+        availability: "{{ has_value('sensor.ev_charging_cost_if_vt_monthly') and has_value('sensor.ev_charging_cost_monthly') }}"
+        state: >
+          {{ (states('sensor.ev_charging_cost_if_vt_monthly') | float - states('sensor.ev_charging_cost_monthly') | float) | round(0) }}
+
+      - name: EV cena na 100 km
+        unique_id: hav2_ev_cost_per_100km
+        default_entity_id: sensor.ev_cost_per_100km
+        unit_of_measurement: Kč
+        state_class: measurement
+        icon: mdi:road-variant
+        # průměrná cena × spotřeba Kia (Wh/km → kWh/100 km) / účinnost nabíjení
+        availability: >
+          {{ has_value('sensor.ev_charging_avg_price') and states('sensor.ev6_average_energy_consumption') | float(0) > 0 }}
+        state: >
+          {{ (states('sensor.ev_charging_avg_price') | float * states('sensor.ev6_average_energy_consumption') | float / 10
+              / (states('input_number.ev_charge_efficiency') | float(90) / 100)) | round(0) }}

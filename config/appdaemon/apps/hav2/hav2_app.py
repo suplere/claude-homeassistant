@@ -287,6 +287,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             "candidates": plan.candidates,
             "slots_json": json.dumps(P.compact(plan, slots, every=2), ensure_ascii=False),
             "slots_columns": "čas, režim, kW, SOC %, nákup kWh, prodej kWh (po 30 min)",
+            # hodinová tabulka pro flex-table-card (seznam řádků, hodnoty jako text)
+            "table": P.hourly_table(plan, slots, prices),
             "trigger": reason,
             "generated": now.isoformat(),
         })
