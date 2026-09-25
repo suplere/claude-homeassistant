@@ -236,6 +236,8 @@ class YAMLValidator:
         yaml_files: List[Path] = []
         for pattern in ["*.yaml", "*.yml"]:
             yaml_files.extend(self.config_dir.glob(pattern))
+            # Package files (homeassistant: packages: !include_dir_named packages)
+            yaml_files.extend((self.config_dir / "packages").rglob(pattern))
 
         # Skip blueprints directory - these are templates and don't need validation
         return yaml_files

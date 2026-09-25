@@ -1,6 +1,9 @@
 # Loads default set of integrations. Do not remove.
 default_config:
 
+homeassistant:
+  packages: !include_dir_named packages
+
 # Load frontend themes from the themes folder
 frontend:
   themes: !include_dir_merge_named themes
@@ -116,8 +119,7 @@ template:
       - name: "Base Final Daily House Consumption"
         unique_id: base_final_daily_house_consumption
         unit_of_measurement: "kWh"
-        device_class: energy
-        state_class: total_increasing
+        state_class: measurement
         state: >
           {% set total = states('sensor.house_consumption_daily') | float(default=0) %}
           {% set filtration_h = states('sensor.filtrace_spustena') | float(default=0) %}
@@ -156,8 +158,8 @@ input_number:
     min: 0
     max: 2000
     unit_of_measurement: W
-    step: 50
-    initial: 450
+    step: 10
+    initial: 500  # změřeno z fázové bilance L2 při sepnutí (2026-09-23), Shelly měří jen cívku
 
 input_boolean:
   time_to_use_overflows:

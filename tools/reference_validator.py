@@ -291,18 +291,37 @@ class ReferenceValidator:
 
         return entities
 
-    def _extract_from_configuration(self) -> Set[str]:
-        """Extract entities defined in configuration.yaml."""
-        entities: Set[str] = set()
-        config_file = self.config_dir / "configuration.yaml"
+    def get_package_files(self) -> List[Path]:
+        """Get YAML files in the packages directory (homeassistant: packages:)."""
+        packages_dir = self.config_dir / "packages"
+        if not packages_dir.is_dir():
+            return []
+        files: List[Path] = []
+        for pattern in ["*.yaml", "*.yml"]:
+            files.extend(packages_dir.rglob(pattern))
+        return sorted(files)
 
-        if not config_file.exists():
-            return entities
+    def _extract_from_configuration(self) -> Set[str]:
+        """Extract entities defined in configuration.yaml and package files."""
+        entities: Set[str] = set()
+        for config_file in [self.config_dir / "configuration.yaml"] + (
+            self.get_package_files()
+        ):
+            if not config_file.exists():
+                continue
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    data = yaml.load(f, Loader=HAYamlLoader)
+            except Exception:
+                continue  # Ignore errors, will be caught by YAML validator
+            entities.update(self._extract_from_config_data(data))
+        return entities
+
+    def _extract_from_config_data(self, data: Any) -> Set[str]:
+        """Extract entities defined in one configuration/package mapping."""
+        entities: Set[str] = set()
 
         try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                data = yaml.load(f, Loader=HAYamlLoader)
-
             if not isinstance(data, dict):
                 return entities
 
@@ -355,6 +374,14 @@ class ReferenceValidator:
                                             name, str
                                         ) and self._is_valid_object_id(name):
                                             entities.add(f"{sensor_type}.{name}")
+                                # Other platforms (integration, statistics, ...)
+                                # derive entity_id from name
+                                elif "platform" in item and item.get("name"):
+                                    object_id = self._slugify_object_id(
+                                        str(item["name"])
+                                    )
+                                    if object_id:
+                                        entities.add(f"{sensor_type}.{object_id}")
 
         except Exception:
             pass  # Ignore errors
@@ -813,6 +840,7 @@ class ReferenceValidator:
         yaml_files: List[Path] = []
         for pattern in ["*.yaml", "*.yml"]:
             yaml_files.extend(self.config_dir.glob(pattern))
+        yaml_files.extend(self.get_package_files())
 
         # Skip blueprints directory - these are templates with !input tags
         return yaml_files

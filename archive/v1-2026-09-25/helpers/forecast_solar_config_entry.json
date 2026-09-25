@@ -1,0 +1,30 @@
+{
+  "entry_id": "63e8924729a7274e2d6770f583237514",
+  "domain": "forecast_solar",
+  "title": "Domov",
+  "data": {
+    "latitude": 50.1341419,
+    "longitude": 16.180384
+  },
+  "options": {
+    "api_key": null,
+    "damping_evening": 0.0,
+    "damping_morning": 0.0,
+    "inverter_size": 10000
+  },
+  "version": 3,
+  "minor_version": 1,
+  "subentries": [
+    {
+      "data": {
+        "azimuth": 180,
+        "declination": 13,
+        "modules_power": 7500
+      },
+      "subentry_id": "01KR6V7W8STF7XS74A5NR8H818",
+      "subentry_type": "plane",
+      "title": "13° / 180° / 7500W",
+      "unique_id": null
+    }
+  ]
+}

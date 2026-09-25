@@ -1,0 +1,488 @@
+# HAv2 – datová vrstva: statistiky nákladů, fázové bilance a EV (krok A)
+# Návrh: docs/HAv2_prompt.md, plán v archive/v1-2026-09-25/README.md
+#
+# Zásady:
+# - Fakturace v ČR je po fázích → nákup/prodej vždy ze Σ fázových hodnot
+#   (sensor.energy_buy / sensor.energy_sell, resp. meter_active_power_l1..l3,
+#   kladná hodnota = dodávka do sítě). Součtové čítače GoodWe se nepoužívají.
+# - Kontrola proti fakturačním datům PND (D+1) – sensor.energy_pnd_deviation_*.
+
+input_number:
+  energy_price_vt:
+    name: Cena nákupu VT
+    icon: mdi:cash-plus
+    min: 0
+    max: 20
+    step: 0.01
+    unit_of_measurement: Kč/kWh
+    initial: 6.1
+  energy_price_nt:
+    name: Cena nákupu NT
+    icon: mdi:cash-minus
+    min: 0
+    max: 20
+    step: 0.01
+    unit_of_measurement: Kč/kWh
+    initial: 3.51
+  energy_sell_coefficient:
+    name: Koeficient výkupu (× spot)
+    icon: mdi:percent
+    min: 0
+    max: 1
+    step: 0.01
+    initial: 0.85
+  energy_battery_efficiency:
+    name: Účinnost cyklu baterie
+    icon: mdi:battery-sync
+    min: 50
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    initial: 90
+  energy_battery_wear_cost:
+    name: Opotřebení baterie
+    icon: mdi:battery-minus-variant
+    min: 0
+    max: 5
+    step: 0.1
+    unit_of_measurement: Kč/kWh
+    initial: 1.0
+
+sensor:
+  - platform: integration
+    name: energy_grid_cross_energy
+    unique_id: hav2_energy_grid_cross_energy
+    source: sensor.energy_grid_cross_w
+    method: left
+    round: 3
+    unit_prefix: k
+    unit_time: h
+  - platform: integration
+    name: energy_base_house_energy
+    unique_id: hav2_energy_base_house_energy
+    source: sensor.base_house_consumption
+    method: left
+    round: 3
+    unit_prefix: k
+    unit_time: h
+
+template:
+  # ---------------------------------------------------------------- ceny a fáze
+  - sensor:
+      - name: Cena nákupu teď
+        unique_id: hav2_energy_price_buy_now
+        default_entity_id: sensor.energy_price_buy_now
+        unit_of_measurement: Kč/kWh
+        device_class: monetary
+        icon: mdi:cash-plus
+        state: >
+          {% set hdo = states('binary_sensor.cez_hdo_lowtariffactive_dum') %}
+          {% set nt = is_state('binary_sensor.cez_hdo_lowtariffactive_dum', 'on')
+             if hdo in ['on', 'off'] else (now().hour >= 22 or now().hour < 6) %}
+          {{ states('input_number.energy_price_nt') | float(3.51) if nt
+             else states('input_number.energy_price_vt') | float(6.1) }}
+        attributes:
+          tariff: >
+            {% set hdo = states('binary_sensor.cez_hdo_lowtariffactive_dum') %}
+            {% if hdo in ['on', 'off'] %}{{ 'NT' if hdo == 'on' else 'VT' }}
+            {% else %}{{ 'NT' if now().hour >= 22 or now().hour < 6 else 'VT' }}{% endif %}
+          source: "{{ 'hdo' if states('binary_sensor.cez_hdo_lowtariffactive_dum') in ['on', 'off'] else 'fallback_22_06' }}"
+
+      - name: Cena prodeje teď
+        unique_id: hav2_energy_price_sell_now
+        default_entity_id: sensor.energy_price_sell_now
+        unit_of_measurement: Kč/kWh
+        device_class: monetary
+        icon: mdi:cash-refund
+        availability: "{{ has_value('sensor.current_spot_electricity_price') }}"
+        state: >
+          {{ (states('sensor.current_spot_electricity_price') | float
+              * states('input_number.energy_sell_coefficient') | float(0.85)) | round(4) }}
+
+      - name: Nejslabší fázová bilance
+        unique_id: hav2_energy_phase_balance_min_w
+        default_entity_id: sensor.energy_phase_balance_min_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:sine-wave
+        # kladná = nejmenší přetok ze tří fází, záporná = na některé fázi se nakupuje
+        availability: >
+          {{ ['sensor.meter_active_power_l1', 'sensor.meter_active_power_l2',
+              'sensor.meter_active_power_l3'] | select('has_value') | list | count == 3 }}
+        state: >
+          {{ [states('sensor.meter_active_power_l1') | float,
+              states('sensor.meter_active_power_l2') | float,
+              states('sensor.meter_active_power_l3') | float] | min | round(0) }}
+        attributes:
+          l1: "{{ states('sensor.meter_active_power_l1') | float(0) | round(0) }}"
+          l2: "{{ states('sensor.meter_active_power_l2') | float(0) | round(0) }}"
+          l3: "{{ states('sensor.meter_active_power_l3') | float(0) | round(0) }}"
+
+      - name: Největší fázový nákup
+        unique_id: hav2_energy_phase_import_max_w
+        default_entity_id: sensor.energy_phase_import_max_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:transmission-tower-import
+        availability: "{{ has_value('sensor.energy_phase_balance_min_w') }}"
+        state: "{{ [0 - states('sensor.energy_phase_balance_min_w') | float, 0] | max }}"
+
+      - name: Souběžný nákup a prodej
+        unique_id: hav2_energy_grid_cross_w
+        default_entity_id: sensor.energy_grid_cross_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:swap-horizontal
+        # výkon, který se na jedné fázi kupuje a zároveň na jiné prodává (ztráta z nesymetrie)
+        availability: "{{ has_value('sensor.energy_buy') and has_value('sensor.energy_sell') }}"
+        state: "{{ [states('sensor.energy_buy') | float, states('sensor.energy_sell') | float] | min }}"
+
+      - name: Hodnota energie v baterii
+        unique_id: hav2_energy_battery_energy_value
+        default_entity_id: sensor.energy_battery_energy_value
+        unit_of_measurement: Kč/kWh
+        device_class: monetary
+        icon: mdi:battery-heart-variant
+        # cena uložené kWh na výstupu baterie = pořizovací cena / účinnost + opotřebení
+        availability: "{{ has_value('sensor.energy_battery_stored_cost') }}"
+        state: >
+          {{ (states('sensor.energy_battery_stored_cost') | float
+              / (states('input_number.energy_battery_efficiency') | float(90) / 100)
+              + states('input_number.energy_battery_wear_cost') | float(1.0)) | round(3) }}
+
+      - name: Náklady na energii netto
+        unique_id: hav2_energy_net_cost_total
+        default_entity_id: sensor.energy_net_cost_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        icon: mdi:scale-balance
+        availability: >
+          {{ has_value('sensor.energy_import_cost_total') and has_value('sensor.energy_export_revenue_total') }}
+        state: >
+          {{ (states('sensor.energy_import_cost_total') | float
+              - states('sensor.energy_export_revenue_total') | float) | round(2) }}
+
+      - name: EV průměrná cena session
+        unique_id: hav2_ev_session_avg_price
+        default_entity_id: sensor.ev_session_avg_price
+        unit_of_measurement: Kč/kWh
+        device_class: monetary
+        icon: mdi:ev-station
+        availability: "{{ states('sensor.ev_session_energy') | float(0) > 0 }}"
+        state: >
+          {{ (states('sensor.ev_session_cost') | float / states('sensor.ev_session_energy') | float) | round(2) }}
+
+  # ------------------------------------------------ nákup / prodej v Kč (po fázích)
+  - triggers:
+      - trigger: state
+        entity_id: sensor.energy_buy_sum
+        id: buy
+      - trigger: state
+        entity_id: sensor.energy_sell_sum
+        id: sell
+    variables:
+      delta: >
+        {% set f = trigger.from_state.state if trigger.from_state else none %}
+        {% set t = trigger.to_state.state if trigger.to_state else none %}
+        {% if f | is_number and t | is_number %}
+          {% set d = t | float - f | float %}
+          {{ d if 0 < d < 5 else 0 }}
+        {% else %}0{% endif %}
+      d_buy: "{{ delta if trigger.id == 'buy' else 0 }}"
+      d_sell: "{{ delta if trigger.id == 'sell' else 0 }}"
+      is_nt: "{{ is_state_attr('sensor.energy_price_buy_now', 'tariff', 'NT') }}"
+      price_buy: "{{ states('sensor.energy_price_buy_now') | float(6.1) }}"
+      price_sell: "{{ states('sensor.energy_price_sell_now') | float(0) }}"
+    sensor:
+      - name: Náklady nákup ze sítě
+        unique_id: hav2_energy_import_cost_total
+        default_entity_id: sensor.energy_import_cost_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        icon: mdi:cash-minus
+        state: "{{ (this.state | float(0) + d_buy * price_buy) | round(3) }}"
+      - name: Výnos prodej do sítě
+        unique_id: hav2_energy_export_revenue_total
+        default_entity_id: sensor.energy_export_revenue_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        icon: mdi:cash-plus
+        state: "{{ (this.state | float(0) + d_sell * price_sell) | round(3) }}"
+      - name: Nákup ze sítě NT
+        unique_id: hav2_energy_import_nt_total
+        default_entity_id: sensor.energy_import_nt_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: "{{ (this.state | float(0) + (d_buy if is_nt else 0)) | round(3) }}"
+      - name: Nákup ze sítě VT
+        unique_id: hav2_energy_import_vt_total
+        default_entity_id: sensor.energy_import_vt_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: "{{ (this.state | float(0) + (0 if is_nt else d_buy)) | round(3) }}"
+
+  # ------------------------------------------- pořizovací cena energie v baterii
+  - triggers:
+      - trigger: state
+        entity_id: sensor.total_battery_charge
+    variables:
+      delta: >
+        {% set f = trigger.from_state.state if trigger.from_state else none %}
+        {% set t = trigger.to_state.state if trigger.to_state else none %}
+        {% if f | is_number and t | is_number %}
+          {% set d = t | float - f | float %}
+          {{ d if 0 < d < 5 else 0 }}
+        {% else %}0{% endif %}
+      charge_w: "{{ states('sensor.fve_battery_charge_w') | float(0) }}"
+      # nákup nejdřív pokrývá dům, zbytek jde do baterie
+      grid_to_battery_w: >
+        {{ [[states('sensor.energy_buy') | float(0) - states('sensor.base_house_consumption') | float(0)
+             - states('sensor.eco_volter_vykon') | float(0) - states('sensor.bazenova_filtrace_vykon') | float(0), 0] | max,
+            charge_w] | min }}
+      grid_share: "{{ (grid_to_battery_w / charge_w) if charge_w > 0 else 0 }}"
+      cost_in: >
+        {{ grid_share * states('sensor.energy_price_buy_now') | float(6.1)
+           + (1 - grid_share) * [states('sensor.energy_price_sell_now') | float(0), 0] | max }}
+      stored_kwh: >
+        {{ states('sensor.battery_state_of_charge') | float(50) / 100
+           * states('input_number.battery_capacity') | float(10) }}
+    sensor:
+      - name: Pořizovací cena energie v baterii
+        unique_id: hav2_energy_battery_stored_cost
+        default_entity_id: sensor.energy_battery_stored_cost
+        unit_of_measurement: Kč/kWh
+        state_class: measurement
+        icon: mdi:battery-charging-high
+        # vážený průměr: stávající energie za dosavadní cenu + nově nabitá za cenu zdroje
+        state: >
+          {% if not this.state | is_number %}{{ cost_in | round(3) }}
+          {% elif delta > 0 %}
+            {% set before = [stored_kwh - delta, 0.1] | max %}
+            {{ ((this.state | float * before + delta * cost_in) / (before + delta)) | round(3) }}
+          {% else %}{{ this.state }}{% endif %}
+        attributes:
+          last_grid_share: "{{ grid_share | round(2) }}"
+
+  # ------------------------------------------ náklady na nabíjení EV dle zdroje
+  - triggers:
+      - trigger: state
+        entity_id: sensor.ecovolter_revcr01c00002056_total_charged_energy
+        id: energy
+      - trigger: state
+        entity_id: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
+        from: "off"
+        to: "on"
+        id: connect
+    variables:
+      d: >
+        {% if trigger.id == 'energy' %}
+          {% set f = trigger.from_state.state if trigger.from_state else none %}
+          {% set t = trigger.to_state.state if trigger.to_state else none %}
+          {% if f | is_number and t | is_number %}
+            {% set x = t | float - f | float %}
+            {{ x if 0 < x < 5 else 0 }}
+          {% else %}0{% endif %}
+        {% else %}0{% endif %}
+      # zdroje podle aktuální bilance domu (poměrově): síť (Σ fázových nákupů), baterie, zbytek FVE
+      load_w: "{{ states('sensor.house_consumption') | float(0) }}"
+      share_grid: "{{ [states('sensor.energy_buy') | float(0) / load_w, 1] | min if load_w > 0 else 1 }}"
+      share_battery: "{{ [states('sensor.fve_battery_discharge_w') | float(0) / load_w, 1 - share_grid] | min if load_w > 0 else 0 }}"
+      share_solar: "{{ [1 - share_grid - share_battery, 0] | max }}"
+      is_nt: "{{ is_state_attr('sensor.energy_price_buy_now', 'tariff', 'NT') }}"
+      price_grid: "{{ states('sensor.energy_price_buy_now') | float(6.1) }}"
+      price_solar: "{{ [states('sensor.energy_price_sell_now') | float(0), 0] | max }}"
+      price_battery: "{{ states('sensor.energy_battery_energy_value') | float(states('input_number.energy_price_vt') | float(6.1)) }}"
+      e_solar: "{{ d * share_solar }}"
+      e_battery: "{{ d * share_battery }}"
+      e_grid: "{{ d * share_grid }}"
+      cost: "{{ e_solar * price_solar + e_battery * price_battery + e_grid * price_grid }}"
+    sensor:
+      - name: EV energie ze slunce
+        unique_id: hav2_ev_energy_solar_total
+        default_entity_id: sensor.ev_energy_solar_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:solar-power
+        state: "{{ (this.state | float(0) + e_solar) | round(4) }}"
+      - name: EV energie z baterie
+        unique_id: hav2_ev_energy_battery_total
+        default_entity_id: sensor.ev_energy_battery_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:home-battery
+        state: "{{ (this.state | float(0) + e_battery) | round(4) }}"
+      - name: EV energie ze sítě NT
+        unique_id: hav2_ev_energy_grid_nt_total
+        default_entity_id: sensor.ev_energy_grid_nt_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:transmission-tower
+        state: "{{ (this.state | float(0) + (e_grid if is_nt else 0)) | round(4) }}"
+      - name: EV energie ze sítě VT
+        unique_id: hav2_ev_energy_grid_vt_total
+        default_entity_id: sensor.ev_energy_grid_vt_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:transmission-tower
+        state: "{{ (this.state | float(0) + (0 if is_nt else e_grid)) | round(4) }}"
+      - name: EV náklady celkem
+        unique_id: hav2_ev_charging_cost_total
+        default_entity_id: sensor.ev_charging_cost_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        icon: mdi:cash
+        state: "{{ (this.state | float(0) + cost) | round(3) }}"
+      - name: EV náklady slunce
+        unique_id: hav2_ev_charging_cost_solar_total
+        default_entity_id: sensor.ev_charging_cost_solar_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        state: "{{ (this.state | float(0) + e_solar * price_solar) | round(3) }}"
+      - name: EV náklady baterie
+        unique_id: hav2_ev_charging_cost_battery_total
+        default_entity_id: sensor.ev_charging_cost_battery_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        state: "{{ (this.state | float(0) + e_battery * price_battery) | round(3) }}"
+      - name: EV náklady síť NT
+        unique_id: hav2_ev_charging_cost_grid_nt_total
+        default_entity_id: sensor.ev_charging_cost_grid_nt_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        state: "{{ (this.state | float(0) + (e_grid * price_grid if is_nt else 0)) | round(3) }}"
+      - name: EV náklady síť VT
+        unique_id: hav2_ev_charging_cost_grid_vt_total
+        default_entity_id: sensor.ev_charging_cost_grid_vt_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        state: "{{ (this.state | float(0) + (0 if is_nt else e_grid * price_grid)) | round(3) }}"
+      - name: EV náklady kdyby vše ve VT
+        unique_id: hav2_ev_charging_cost_if_vt_total
+        default_entity_id: sensor.ev_charging_cost_if_vt_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        icon: mdi:cash-remove
+        # srovnávací metrika: úspora = tato hodnota − EV náklady celkem
+        state: "{{ (this.state | float(0) + d * states('input_number.energy_price_vt') | float(6.1)) | round(3) }}"
+      - name: EV energie session
+        unique_id: hav2_ev_session_energy
+        default_entity_id: sensor.ev_session_energy
+        unit_of_measurement: kWh
+        device_class: energy
+        icon: mdi:ev-station
+        state: "{{ 0 if trigger.id == 'connect' else (this.state | float(0) + d) | round(3) }}"
+      - name: EV náklady session
+        unique_id: hav2_ev_session_cost
+        default_entity_id: sensor.ev_session_cost
+        unit_of_measurement: Kč
+        device_class: monetary
+        icon: mdi:cash-clock
+        state: "{{ 0 if trigger.id == 'connect' else (this.state | float(0) + cost) | round(2) }}"
+        attributes:
+          started: >
+            {{ now().isoformat() if trigger.id == 'connect' else this.attributes.get('started') }}
+
+  # ------------------------------------------------ denní snímky a kontrola s PND
+  - triggers:
+      - trigger: time
+        at: "23:59:50"
+    sensor:
+      - name: Filtrace hodiny za den
+        unique_id: hav2_pool_filtration_hours_day
+        default_entity_id: sensor.pool_filtration_hours_day
+        unit_of_measurement: h
+        device_class: duration
+        state_class: measurement
+        icon: mdi:pump
+        state: "{{ states('sensor.filtrace_spustena') | float(0) | round(2) }}"
+      - name: Nákup ze sítě za den
+        unique_id: hav2_energy_grid_import_day
+        default_entity_id: sensor.energy_grid_import_day
+        unit_of_measurement: kWh
+        state_class: measurement
+        icon: mdi:transmission-tower-import
+        state: "{{ states('sensor.energy_buy_daily') | float(0) | round(2) }}"
+        attributes:
+          history: >
+            {% set h = this.attributes.get('history', []) | list %}
+            {{ (h + [[now().date() | string, states('sensor.energy_buy_daily') | float(0) | round(2)]])[-14:] }}
+      - name: Prodej do sítě za den
+        unique_id: hav2_energy_grid_export_day
+        default_entity_id: sensor.energy_grid_export_day
+        unit_of_measurement: kWh
+        state_class: measurement
+        icon: mdi:transmission-tower-export
+        state: "{{ states('sensor.energy_sell_daily') | float(0) | round(2) }}"
+        attributes:
+          history: >
+            {% set h = this.attributes.get('history', []) | list %}
+            {{ (h + [[now().date() | string, states('sensor.energy_sell_daily') | float(0) | round(2)]])[-14:] }}
+
+  - sensor:
+      - name: Odchylka nákupu proti PND
+        unique_id: hav2_energy_pnd_deviation_import_pct
+        default_entity_id: sensor.energy_pnd_deviation_import_pct
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:file-compare
+        # (PND − HA) / PND za poslední den, který je v obou zdrojích
+        availability: >
+          {{ (state_attr('sensor.energy_grid_import_day', 'history') or []) | map('first')
+             | select('in', state_attr('sensor.pnd_data', 'pnddate') or []) | list | count > 0 }}
+        state: >
+          {% set dates = state_attr('sensor.pnd_data', 'pnddate') or [] %}
+          {% set vals = state_attr('sensor.pnd_data', 'consumption') or [] %}
+          {% set ns = namespace(r=none) %}
+          {% for d, v in state_attr('sensor.energy_grid_import_day', 'history') or [] %}
+            {% if d in dates and vals[dates.index(d)] | float(0) > 0 %}
+              {% set p = vals[dates.index(d)] | float %}
+              {% set ns.r = ((p - v) / p * 100) | round(1) %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.r if ns.r is not none else 0 }}
+        attributes:
+          compared_day: >
+            {% set dates = state_attr('sensor.pnd_data', 'pnddate') or [] %}
+            {% set ns = namespace(r=none) %}
+            {% for d, v in state_attr('sensor.energy_grid_import_day', 'history') or [] %}
+              {% if d in dates %}{% set ns.r = d %}{% endif %}
+            {% endfor %}
+            {{ ns.r }}
+      - name: Odchylka prodeje proti PND
+        unique_id: hav2_energy_pnd_deviation_export_pct
+        default_entity_id: sensor.energy_pnd_deviation_export_pct
+        unit_of_measurement: "%"
+        state_class: measurement
+        icon: mdi:file-compare
+        availability: >
+          {{ (state_attr('sensor.energy_grid_export_day', 'history') or []) | map('first')
+             | select('in', state_attr('sensor.pnd_data', 'pnddate') or []) | list | count > 0 }}
+        state: >
+          {% set dates = state_attr('sensor.pnd_data', 'pnddate') or [] %}
+          {% set vals = state_attr('sensor.pnd_data', 'production') or [] %}
+          {% set ns = namespace(r=none) %}
+          {% for d, v in state_attr('sensor.energy_grid_export_day', 'history') or [] %}
+            {% if d in dates and vals[dates.index(d)] | float(0) > 0 %}
+              {% set p = vals[dates.index(d)] | float %}
+              {% set ns.r = ((p - v) / p * 100) | round(1) %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.r if ns.r is not none else 0 }}

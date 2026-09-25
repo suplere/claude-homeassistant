@@ -61,3 +61,8 @@ Vše, co HAv2 smaže nebo nahradí, je tady uložené v plné definici.
    - Blueprinty zkopírovat do `config/blueprints/automation/jan-trnka/`.
    - UI helpery znovu vytvořit v UI podle `helpers/*.json`.
    - Dashboard: Raw configuration editor, vložit `views` z `dashboard/lovelace.json`.
+
+## Odstraněno 2026-09-25
+| Co | Důvod | Záloha | Obnova |
+|---|---|---|---|
+| Integrace Forecast.Solar „Domov“ (11 entit `sensor.energy_production_*`, `sensor.power_production_*`, `sensor.energy_current_hour`, `sensor.energy_next_hour`, `sensor.power_highest_peak_time_*`) | Nikde se nepoužívala; kalibrace ukázala 2× větší chybu a profil posunutý o 30–50 min proti Solcastu | `helpers/forecast_solar_config_entry.json` | Nastavení → Zařízení a služby → Přidat integraci → Forecast.Solar, hodnoty ze zálohy |
