@@ -1,0 +1,112 @@
+# HAv2 – výkonná vrstva filtrace bazénu (docs/hav2-architektura.md §2, §5.5, §7)
+# Jediné místo, které spíná čerpadlo filtrace. Volá ho AppDaemon (hav2_app).
+
+input_boolean:
+  pool_control:
+    name: HAv2 řídí filtraci
+    icon: mdi:pool
+
+script:
+  hav2_pool_set:
+    alias: HAv2 – nastavit filtraci
+    description: >
+      Zapne nebo vypne čerpadlo filtrace podle HAv2. Spíná jen při rozdílu proti
+      aktuálnímu stavu a jen když je systém v režimu Auto a řízení filtrace je zapnuté.
+    icon: mdi:pool
+    # po sobě jdoucí volání se nesmí přerušit uprostřed zápisu
+    mode: queued
+    max: 3
+    fields:
+      "on":
+        description: Zapnout (true) nebo vypnout (false)
+        required: true
+        example: true
+        selector:
+          boolean:
+      reason:
+        description: Důvod rozhodnutí (do logbooku)
+        required: false
+        example: přebytek 900 W → start
+        selector:
+          text:
+    variables:
+      want_on: "{{ on | bool(false) }}"
+    sequence:
+      - alias: Pojistka – jen v režimu Auto se zapnutým řízením filtrace
+        if:
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: input_select.energy_system_mode
+                state: Auto
+              - condition: state
+                entity_id: input_boolean.pool_control
+                state: "on"
+        then:
+          - action: logbook.log
+            data:
+              name: HAv2 bazén
+              message: "Nezapsáno (režim {{ states('input_select.energy_system_mode') }}): {{ 'zapnout' if want_on else 'vypnout' }}"
+              entity_id: script.hav2_pool_set
+          - stop: Systém není v režimu Auto se zapnutým řízením filtrace
+      - alias: Sepnout jen při rozdílu
+        if:
+          - condition: template
+            value_template: "{{ has_value('switch.filtrace_switch') and is_state('switch.filtrace_switch', 'on') != want_on }}"
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ want_on }}"
+            then:
+              - action: switch.turn_on
+                target:
+                  entity_id: switch.filtrace_switch
+            else:
+              - action: switch.turn_off
+                target:
+                  entity_id: switch.filtrace_switch
+          - action: logbook.log
+            data:
+              name: HAv2 bazén
+              message: "Filtrace {{ 'zapnuta' if want_on else 'vypnuta' }} – {{ reason | default('') }}"
+              entity_id: script.hav2_pool_set
+
+automation:
+  - id: hav2_pool_watchdog
+    alias: HAv2 – watchdog řízení filtrace
+    description: >
+      Když AppDaemon 3 min neobnoví heartbeat a systém řídí filtraci, vypne čerpadlo
+      (mimo NT, v NT nechá doběhnout) a pošle notifikaci. Po obnovení řízení pokračuje.
+    # jednorázová reakce; další běh až po obnovení a novém výpadku
+    mode: single
+    triggers:
+      - trigger: template
+        value_template: >
+          {{ (now() - (states('input_datetime.hav2_heartbeat') | as_datetime(now()) | as_local)).total_seconds() > 180 }}
+    conditions:
+      - condition: state
+        entity_id: input_select.energy_system_mode
+        state: Auto
+      - condition: state
+        entity_id: input_boolean.pool_control
+        state: "on"
+    actions:
+      - if:
+          - condition: state
+            entity_id: binary_sensor.cez_hdo_lowtariffactive_dum
+            state: "off"
+        then:
+          - action: switch.turn_off
+            target:
+              entity_id: switch.filtrace_switch
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.pool_last_decision
+        data:
+          value: "{{ now().strftime('%H:%M') }} watchdog: řízení neodpovídá, filtrace {{ 'běží v NT' if is_state('binary_sensor.cez_hdo_lowtariffactive_dum', 'on') else 'vypnuta' }}"
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: HAv2 – řízení filtrace neodpovídá
+          message: >
+            Heartbeat je starý {{ ((now() - (states('input_datetime.hav2_heartbeat') | as_datetime(now()) | as_local)).total_seconds() / 60) | round(0) }} min.
+            Filtrace {{ 'nechána v NT' if is_state('binary_sensor.cez_hdo_lowtariffactive_dum', 'on') else 'vypnuta' }}. Zkontroluj AppDaemon.

@@ -21,3 +21,4 @@ hav2:
     - input_datetime.ev_deadline
     - input_boolean.ev_deadline_hard
     - input_boolean.ev_control
+    - input_boolean.pool_control

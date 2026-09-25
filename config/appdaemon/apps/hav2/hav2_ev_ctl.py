@@ -154,7 +154,10 @@ class EvControl:
         return sum(kw for _, kw in pv) / len(pv) - base >= lowest_kw
 
     def ev_inputs(self, now: datetime, available: bool, enabled: bool, amps: int, phases: int) -> E.RegInputs:
-        pool_w = self.fnum("sensor.bazenova_filtrace_vykon", 0)
+        # filtrace má přednost; v doporučení podle virtuálního čerpadla řízení filtrace
+        virtual_pool = getattr(self, "pool_virtual", None)
+        pool_w = (self.fnum("input_number.filtrace_vykon_w", 500) if virtual_pool else 0.0) \
+            if virtual_pool is not None else self.fnum("sensor.bazenova_filtrace_vykon", 0)
         surplus = self.fnum("sensor.energy_surplus_smoothed_w", 0) - pool_w - self.ev_reserve_w
         needed = self.get_state("sensor.ev_energy_needed_kwh")
         try:

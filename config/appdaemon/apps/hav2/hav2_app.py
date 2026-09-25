@@ -1,6 +1,7 @@
 """HAv2 – AppDaemon aplikace: plánovač baterie a EV (docs/hav2-architektura.md §2, §5.2–5.4, §6).
 
-EV část (plán + regulátor proudu) je v mixinu hav2_ev_ctl.EvControl.
+EV část (plán + regulátor proudu) je v mixinu hav2_ev_ctl.EvControl,
+filtrace bazénu v mixinu hav2_pool_ctl.PoolControl.
 
 Čte data z HA, počítá plán (hav2_planner) a publikuje ho:
   sensor.energy_plan            – doporučený režim teď + plán po 30 min v atributech
@@ -25,6 +26,7 @@ import appdaemon.plugins.hass.hassapi as hass
 
 import hav2_planner as P
 from hav2_ev_ctl import EvControl
+from hav2_pool_ctl import PoolControl
 
 TZ = ZoneInfo("Europe/Prague")
 
@@ -36,7 +38,7 @@ STAT_BUY = "sensor.energy_buy_sum"
 STAT_SELL = "sensor.energy_sell_sum"
 
 
-class Hav2(EvControl, hass.Hass):
+class Hav2(EvControl, PoolControl, hass.Hass):
     def initialize(self) -> None:
         self.pnd_consumption = self.args.get("pnd_consumption_stat")
         self.pnd_production = self.args.get("pnd_production_stat")
@@ -54,6 +56,7 @@ class Hav2(EvControl, hass.Hass):
         for ent in self.args.get("replan_on", []):
             self.listen_state(self.on_input_change, ent)
         self.ev_init(TZ)
+        self.pool_init(TZ)
         self.log("HAv2 plánovač spuštěn")
 
     # --------------------------------------------------------------- utility
@@ -248,6 +251,10 @@ class Hav2(EvControl, hass.Hass):
             self.ev_replan(now, slots, plan, is_nt)
         except Exception as err:  # noqa: BLE001 – chyba EV nesmí shodit plán baterie
             self.log(f"plán EV selhal: {err}", level="ERROR")
+        try:
+            self.pool_replan(now, slots, is_nt)
+        except Exception as err:  # noqa: BLE001
+            self.log(f"plán filtrace selhal: {err}", level="ERROR")
         act = plan.now
         mode = self.get_state("input_select.energy_system_mode")
         control = self.get_state("input_boolean.energy_battery_control") == "on"
