@@ -16,3 +16,8 @@ hav2:
     - binary_sensor.cez_hdo_lowtariffactive_dum
     - binary_sensor.energy_forecast_valid
     - binary_sensor.spot_electricity_has_tomorrow_data_2
+    - input_select.ev_mode
+    - input_number.ev_target_soc
+    - input_datetime.ev_deadline
+    - input_boolean.ev_deadline_hard
+    - input_boolean.ev_control
