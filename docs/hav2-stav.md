@@ -11,11 +11,18 @@ Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura
 | Krok A – statistiky a náklady | hotovo (`packages/hav2_statistics.yaml`, GUI utility metery, Energy dashboard s cenami) |
 | 2 – návrh | schváleno 25. 9. 2026 |
 | 3 – implementace | **hotovo** – datová vrstva, baterie, EV, bazén, dashboard `energie-v2` |
-| 4 – ověření a převzetí řízení | **čeká**: pár dní pozorování v režimu „Jen doporučení“ |
+| 4 – ověření a převzetí řízení | **test Auto běží od 26. 9. 2026 13:58** (víkend + svátek 28. 9.), všechny oblasti |
 
-**Aktuální režim:** `input_select.energy_system_mode` = **Jen doporučení**. Přepínače
-`input_boolean.energy_battery_control`, `ev_control`, `pool_control` jsou **vypnuté**.
-HAv2 nic nezapisuje do střídače, wallboxu ani čerpadla – řízení mají stále staré automatizace v1.
+**Aktuální režim (test):** `input_select.energy_system_mode` = **Auto**, přepínače
+`input_boolean.energy_battery_control`, `ev_control`, `pool_control` **zapnuté**. DoD 80 %.
+Staré automatizace v1 jsou **vypnuté, ne smazané** (16 ks: TTUO, Auto Set DoD, Fully Charge Once a Week,
+Discharge to Grid, Eco Discharge ×2, Disable Overflow, Prediktivní přetoky, 7× `ev_*`, Ovládání filtrace)
+a `input_boolean.time_to_use_overflows` = off. HA záloha před testem `81c05fcd`.
+**Návrat:** režim „Jen doporučení“ + zapnout uvedené automatizace a TTUO (limit přetoku se vrátí sám).
+Po testu rozhodnout: smazat v1 (podle archivu) nebo vrátit.
+
+**Data z testu:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní,
+stáhne `make pull`, mimo git) + historie HA + PND D+1.
 
 ## 2. Mapa systému
 
@@ -43,10 +50,10 @@ jinak jen zapíšou do logbooku „Nezapsáno“.
 | `hav2_pool.py` / `hav2_pool_ctl.py` | řízení filtrace (smyčka 60 s) / napojení na HA |
 | `hav2_boiler.py` | bojler a zbytková odchylka z PND (volá `Hav2.pnd_check` v 07:30 a po stažení PND) |
 
-Publikuje: `sensor.energy_plan`, `sensor.energy_load_forecast`, `sensor.ev_plan`, `sensor.ev_regulator`,
+Publikuje: `sensor.energy_plan`, `sensor.energy_export_control`, `sensor.energy_load_forecast`, `sensor.ev_plan`, `sensor.ev_regulator`,
 `sensor.pool_plan`, `sensor.pool_controller`, `sensor.energy_boiler_pnd_daily`, `input_text.*_last_decision`, `input_datetime.hav2_heartbeat`.
 
-Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (51 testů).
+Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (63 testů).
 
 ### Dashboard `energie-v2`
 Zdroj pravdy `dashboards/energie-v2.yaml`, nahrání:

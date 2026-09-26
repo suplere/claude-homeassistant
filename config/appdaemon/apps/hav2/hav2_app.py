@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import statistics
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -26,8 +27,8 @@ import appdaemon.plugins.hass.hassapi as hass
 
 import hav2_boiler as BO
 import hav2_planner as P
-from hav2_ev_ctl import EvControl
-from hav2_pool_ctl import PoolControl
+from hav2_ev_ctl import EV_CONNECTED, EvControl
+from hav2_pool_ctl import PUMP, PoolControl
 
 TZ = ZoneInfo("Europe/Prague")
 
@@ -37,6 +38,57 @@ STAT_EV = "sensor.ecovolter_revcr01c00002056_total_charged_energy"
 STAT_POOL = "sensor.filtrace_sum"
 STAT_BUY = "sensor.energy_buy_sum"
 STAT_SELL = "sensor.energy_sell_sum"
+
+EXPORT_LIMIT = "number.goodwe_limit_dodavky_do_site"
+EXPORT_NORMAL_W = 10000  # běžný limit přetoku (jako v1 „Disable Overflow“)
+# minutový záznam dat pro ladění (config/appdaemon/hav2_data/RRRR-MM-DD.jsonl, stahuje make pull)
+DATA_DIR = Path(__file__).resolve().parents[2] / "hav2_data"
+DATA_KEEP_DAYS = 60
+DATA_STATES = {
+    "pv_w": "sensor.pv_power",
+    "house_w": "sensor.house_consumption",
+    "base_w": "sensor.base_house_consumption",
+    "grid_w": "sensor.meter_active_power_total",  # + přetok, − nákup (GoodWe)
+    "grid_l1_w": "sensor.meter_active_power_l1",
+    "grid_l2_w": "sensor.meter_active_power_l2",
+    "grid_l3_w": "sensor.meter_active_power_l3",
+    "batt_w": "sensor.battery_power",  # + vybíjení
+    "soc": "sensor.battery_state_of_charge",
+    "ems": "select.goodwe_ems_mode",
+    "ems_w": "number.goodwe_ems_power_limit",
+    "export_limit_w": "number.goodwe_limit_dodavky_do_site",
+    "surplus_w": "sensor.energy_surplus_smoothed_w",
+    "breaker_headroom_a": "sensor.energy_breaker_headroom_a",
+    "boiler_idx": "sensor.energy_boiler_voltage_index",
+    "boiler_on": "binary_sensor.energy_boiler_heating",
+    "spot": "sensor.current_spot_electricity_price",
+    "sell": "sensor.energy_price_sell_now",
+    "nt": "binary_sensor.cez_hdo_lowtariffactive_dum",
+    "ev_connected": "binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected",
+    "ev_enabled": "switch.ecovolter_revcr01c00002056_is_charging_enable",
+    "ev_amps": "number.ecovolter_revcr01c00002056_target_current",
+    "ev_3f": "switch.ecovolter_revcr01c00002056_is_three_phase_mode_enable",
+    "ev_w": "sensor.eco_volter_vykon",
+    "ev_soc": "sensor.ev_soc_estimate",
+    "ev_need_kwh": "sensor.ev_energy_needed_kwh",
+    "pool_on": "switch.filtrace_switch",
+    "pool_done_h": "sensor.pool_hours_done_today",
+    "system_mode": "input_select.energy_system_mode",
+    "plan": "sensor.energy_plan",
+    "ev_reg": "sensor.ev_regulator",
+    "pool_ctl": "sensor.pool_controller",
+    "export_ctl": "sensor.energy_export_control",
+}
+DATA_ATTRS = {
+    "plan_reason": ("sensor.energy_plan", "reason"),
+    "plan_kw": ("sensor.energy_plan", "power_kw"),
+    "ev_reason": ("sensor.ev_regulator", "reason"),
+    "ev_plan": ("sensor.ev_plan", "state"),
+    "ev_reserve_w": ("sensor.ev_plan", "battery_reserve_w"),
+    "pool_reason": ("sensor.pool_controller", "reason"),
+    "export_reason": ("sensor.energy_export_control", "reason"),
+}
+DEFER_HYST_W = 300  # odložené nabíjení: nákup > 300 W → auto, přetok > 300 W → zpět standby
 
 
 class Hav2(EvControl, PoolControl, hass.Hass):
@@ -49,6 +101,11 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.last_decision: Optional[Tuple[str, float]] = None
         self._pending = None
         self.last_success: Optional[datetime] = None
+        self.plan_act: Optional[P.Action] = None
+        self.plan_reason = ""
+        self.defer_live = "standby"
+        self.export_blocked = False
+        self.export_published = None
 
         self.run_every(self.heartbeat, "now", 60)
         self.run_daily(self.refresh_profile, "00:05:00")
@@ -62,6 +119,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.run_daily(self.pnd_check, "07:30:00")
         self.listen_state(lambda *a, **k: self.run_in(self.pnd_check, 120), "sensor.pnd_data")
         self.pool_init(TZ)
+        # odložené nabíjení (pojistka proti nákupu) a omezení přetoku při záporném výkupu
+        self.run_every(self.live_loop, "now+45", 60)
         self.log("HAv2 plánovač spuštěn")
 
     # --------------------------------------------------------------- utility
@@ -298,7 +357,10 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             sell_min_spot=self.fnum("input_number.energy_sell_min_spot", 7.2),
             export_block_below=self.fnum("input_number.energy_export_block_below", 0.0),
         )
-        plan = P.plan_battery(slots, batt, prices)
+        # EV, které ještě potřebuje energii, spotřebuje polední přetok samo → odložení
+        # nabíjení baterie by ji mohlo nechat večer nenabitou (plánovač EV nezná)
+        allow_defer = not self.ev_wants_energy()
+        plan = P.plan_battery(slots, batt, prices, allow_defer=allow_defer)
         try:
             self.ev_replan(now, slots, plan, is_nt)
         except Exception as err:  # noqa: BLE001 – chyba EV nesmí shodit plán baterie
@@ -337,6 +399,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             "nt_source": nt_source,
             "profile_source": self.profile_source,
             "candidates": plan.candidates,
+            "defer_slots": str(plan.defer_slots),
+            "defer_allowed": "ano" if allow_defer else "ne (EV potřebuje energii)",
             "slots_json": json.dumps(P.compact(plan, slots, every=2), ensure_ascii=False),
             "slots_columns": "čas, režim, kW, SOC %, nákup kWh, prodej kWh (po 30 min)",
             # hodinová tabulka pro flex-table-card (seznam řádků, hodnoty jako text)
@@ -356,7 +420,118 @@ class Hav2(EvControl, PoolControl, hass.Hass):
                               value=text[:255])
             self.call_service("logbook/log", name="HAv2 baterie", message=text[:500])
             self.log(text)
+        self.plan_act, self.plan_reason = act, plan.reason
+        if act.mode != P.MODE_DEFER:
+            self.defer_live = "standby"
         if execute:
-            # idempotentní: skript zapisuje do střídače jen při rozdílu proti aktuálnímu stavu
-            self.call_service("script/hav2_battery_set", mode=act.mode,
-                              power_w=int(round(act.power_kw * 1000)), reason=plan.reason[:200])
+            self.battery_apply()
+
+    # ------------------------------------------------- výkon plánu baterie
+    def battery_apply(self) -> None:
+        """Zapíše aktuální akci plánu (idempotentní – skript zapisuje jen při rozdílu)."""
+        act = self.plan_act
+        if act is None:
+            return
+        mode = act.mode
+        if mode == P.MODE_DEFER:
+            mode = "standby" if self.defer_live == "standby" else "auto"
+        self.call_service("script/hav2_battery_set", mode=mode,
+                          power_w=int(round(act.power_kw * 1000)), reason=self.plan_reason[:200])
+
+    def battery_executing(self) -> bool:
+        return (self.get_state("input_select.energy_system_mode") == "Auto"
+                and self.get_state("input_boolean.energy_battery_control") == "on")
+
+    def ev_wants_energy(self) -> bool:
+        if self.get_state(EV_CONNECTED) != "on" or self.get_state("input_select.ev_mode") == "Vypnuto":
+            return False
+        try:
+            return float(self.get_state("sensor.ev_energy_needed_kwh")) > 0.05
+        except (TypeError, ValueError):
+            return True  # SOC auta neznámý → počítat s tím, že nabíjí
+
+    def live_loop(self, kwargs: Dict[str, Any]) -> None:
+        try:
+            self._defer_guard()
+            self._export_control()
+        except Exception as err:  # noqa: BLE001
+            self.log(f"živá smyčka baterie selhala: {err}", level="ERROR")
+        try:
+            self._record_data()
+        except Exception as err:  # noqa: BLE001 – záznam nesmí ovlivnit řízení
+            self.log(f"záznam dat selhal: {err}", level="WARNING")
+
+    def _record_data(self) -> None:
+        now = datetime.now(TZ)
+        row: Dict[str, Any] = {"t": now.isoformat(timespec="seconds"), "defer_live": self.defer_live}
+        for key, ent in DATA_STATES.items():
+            row[key] = self.get_state(ent)
+        for key, (ent, attr) in DATA_ATTRS.items():
+            row[key] = self.get_state(ent) if attr == "state" else self.get_state(ent, attribute=attr)
+        DATA_DIR.mkdir(exist_ok=True)
+        with open(DATA_DIR / f"{now:%Y-%m-%d}.jsonl", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+        if now.hour == 0 and now.minute == 0:
+            for old in DATA_DIR.glob("*.jsonl"):
+                if old.stem < f"{now - timedelta(days=DATA_KEEP_DAYS):%Y-%m-%d}":
+                    old.unlink()
+
+    def _defer_guard(self) -> None:
+        """Odložené nabíjení = battery_standby; když dům začne nakupovat, vrátit auto (a zpět)."""
+        if not self.plan_act or self.plan_act.mode != P.MODE_DEFER:
+            return
+        grid = self.fnum("sensor.meter_active_power_total", 0)  # + přetok, − nákup
+        prev = self.defer_live
+        if self.defer_live == "standby" and grid < -DEFER_HYST_W:
+            self.defer_live = "auto"
+        elif self.defer_live == "auto" and grid > DEFER_HYST_W:
+            self.defer_live = "standby"
+        if self.defer_live != prev:
+            self.log(f"odložené nabíjení: síť {grid:.0f} W → {self.defer_live}")
+            if self.battery_executing():
+                self.battery_apply()
+
+    def _export_control(self) -> None:
+        """Záporný výkup: limit přetoku 0 W, až když EV, bazén ani baterie nic nepřijmou.
+
+        Při limitu 0 GoodWe omezí FVE na spotřebu domu, takže přebytek pro EV a filtraci
+        (FVE − dům) klesne k nule – proto se omezuje jen tehdy, když řízené spotřebiče nic
+        nechtějí, a hned se uvolní, když něco začne chtít (připojení auta, chybějící hodiny).
+        """
+        now = datetime.now(TZ)
+        sell = self.fnum("sensor.energy_price_sell_now", 99.0)
+        below = self.fnum("input_number.energy_export_block_below", 0.0)
+        soc = self.fnum("sensor.battery_state_of_charge", 0)
+        pool_on = (self.pool_virtual if getattr(self, "pool_virtual", None) is not None and not self.pool_executing()
+                   else self.get_state(PUMP) == "on")
+        pool_missing = (self.get_state("input_boolean.pool_season") == "on"
+                        and self.pool_target() - self.fnum("sensor.pool_hours_done_today", 0) > 0.05)
+        ev_idle = not self.ev_wants_energy() and self.fnum("sensor.eco_volter_vykon", 0) < 100
+        # (splněno, text když splněno, text když ne)
+        checks = [
+            (sell < below, f"výkup {sell:.2f} < {below:.2f} Kč/kWh", f"výkup {sell:.2f} ≥ {below:.2f} Kč/kWh"),
+            (soc >= (95 if self.export_blocked else 97), f"baterie {soc:.0f} %", f"baterie jen {soc:.0f} %"),
+            (ev_idle, "EV nic nechce", "EV chce nabíjet"),
+            (not pool_on and not pool_missing, "filtrace hotová",
+             "filtrace běží" if pool_on else "filtraci chybí hodiny"),
+            (self.fnum("sensor.pv_power", 0) > 200, "FVE vyrábí", "FVE nevyrábí"),
+        ]
+        block = all(ok for ok, _, _ in checks)
+        reason = ("přetok omezen na 0 W: " + ", ".join(t for _, t, _ in checks)) if block else \
+            ("přetok povolen: " + ", ".join(f for ok, _, f in checks if not ok))
+        self.export_blocked = block
+        execute = self.battery_executing()
+        limit = 0 if block else EXPORT_NORMAL_W
+        key = (block, execute)
+        if key != self.export_published:
+            self.export_published = key
+            prefix = "" if execute else "[doporučení] "
+            self.call_service("logbook/log", name="HAv2 přetok", message=f"{prefix}{reason}"[:500])
+            self.log(f"{prefix}{reason}")
+        self.set_state("sensor.energy_export_control", state="omezeno" if block else "povoleno", attributes={
+            "friendly_name": "HAv2 omezení přetoku", "icon": "mdi:transmission-tower-export",
+            "limit_w": str(limit), "reason": reason, "executing": "ano" if execute else "ne",
+            "updated": now.isoformat(),
+        })
+        if execute and self.fnum(EXPORT_LIMIT, -1) != limit:
+            self.call_service("script/hav2_export_set", limit_w=limit, reason=reason[:200])

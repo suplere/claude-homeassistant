@@ -107,6 +107,15 @@ class EvControl:
             nt_price=self.fnum("input_number.energy_price_nt", 3.51),
             vt_price=self.fnum("input_number.energy_price_vt", 6.1),
         )
+        # NT za koncem slotů (a před termínem) – naplánuje se, až bude v horizontu
+        if params.deadline and slots:
+            t = slots[-1].start + timedelta(minutes=15)
+            later = 0.0
+            while t < params.deadline:
+                if is_nt(t):
+                    later += params.grid_kw * 0.25
+                t += timedelta(minutes=15)
+            params.later_nt_kwh = later
         ev_plan = E.plan_ev(ev_slots, params, now)
         if not connected:
             ev_plan.reason = "auto nepřipojeno"

@@ -182,8 +182,15 @@ Ceny a parametry baterie jsou už z kroku A (`energy_price_vt/nt`, `energy_sell_
 | VT, běžný den | – | `auto` (vlastní spotřeba) |
 | VT, spot špička | spot ≥ `energy_sell_min_spot` **a** simulace: baterie se do večera dobije z FVE na plán | `discharge_battery` (výkon podle rezervy), nejvýš do plánovaného SOC |
 | Záporná / velmi nízká cena | spot × 0,85 < `energy_export_block_below` | limit přetoku = 0 W **až po** vyčerpání spotřebičů: EV → bazén → baterie (+ experiment bojler) |
+| Záporný výkup v poledne, dopoledne kladný | simulace i s FVE × 0,8 nabije baterii do 17:00 na ≥ 95 % **a** EV nic nechce | `defer` dopoledne: `battery_standby` (přetok do sítě za kladnou cenu), při nákupu > 300 W hned `auto`; baterie se nabije v záporných hodinách |
 | SOC ≤ min SOC | kdykoli | `auto` + DoD drží rezervu (ochrana i při výpadku HA) |
 | Výpadek předpovědi | `energy_forecast_valid` = off | konzervativní: FVE = poslední platná × 0,5, jinak 0 |
+
+**Omezení přetoku (implementace):** `Hav2._export_control` každou minutu, `sensor.energy_export_control`,
+zápis přes `script.hav2_export_set` (0 / 10 000 W, jen v Auto s řízením baterie). Omezí se jen když výkup
+< práh, baterie ≥ 97 % (uvolní pod 95 %), EV nic nechce, filtrace je hotová a neběží, FVE vyrábí – při limitu 0
+GoodWe omezí FVE na spotřebu domu a přebytek pro EV/filtraci by klesl k nule. `automation.hav2_obnovit_limit_pretoku_po_vypnuti_rizeni`
+a watchdog baterie vrací 10 000 W.
 
 **Algoritmus:**
 1. Sloty po 15 min od teď do zítřka 24:00.
@@ -196,7 +203,9 @@ Ceny a parametry baterie jsou už z kroku A (`energy_price_vt/nt`, `energy_sell_
 1. **Při připojení auta:** `kia_uvo.force_update` (max. 2× denně). SOC → `ev_soc_estimate`, spočítá se `ev_energy_needed_kwh`.
 2. **Rozdělení energie do slotů podle režimu:**
    - **Solár:** jen sloty s očekávaným přebytkem ≥ 1,3 kW (1f) nebo ≥ 4,2 kW (3f).
-   - **Solár+NT:** nejdřív FVE sloty do termínu, zbytek NT (22–06). V NT 3f 11 A ≈ 7 kW (auto bere méně, než je nastaveno), pozor na jistič (§7).
+   - **Solár+NT:** nejdřív FVE sloty do termínu, zbytek NT (22–06) – v **posledním** NT bloku před termínem
+     (dřív může nabíjet slunce). NT za koncem předpovědi (sloty do zítřka 24:00) a před termínem se jen rezervuje
+     („NT později“) a naplánuje se, až bude v horizontu. V NT 3f 11 A ≈ 7 kW (auto bere méně, než je nastaveno), pozor na jistič (§7).
    - **Rychle:** hned, max. proud, jakákoli cena.
    - **Vypnuto:** nic.
 3. **Termín:**

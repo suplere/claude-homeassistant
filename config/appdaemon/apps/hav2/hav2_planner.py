@@ -22,6 +22,9 @@ MODE_AUTO = "auto"
 MODE_STANDBY = "standby"
 MODE_CHARGE = "charge"
 MODE_DISCHARGE = "discharge"
+# baterie se z přetoku nenabíjí (přetok jde do sítě, dokud je výkup kladný), deficit kryje jako auto;
+# nabije se až v hodinách se záporným výkupem. Výkonná vrstva: battery_standby, při nákupu auto.
+MODE_DEFER = "defer"
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,7 @@ class Plan:
     reason: str = ""
     hits_min_soc_in_vt: bool = False
     candidates: Dict[str, float] = field(default_factory=dict)
+    defer_slots: int = 0
 
     @property
     def now(self) -> Action:
@@ -173,6 +177,9 @@ def simulate(
                 b_in = min(net, batt.max_charge_kw * dt, max(0.0, soc_max - soc) / eta)
             else:
                 b_out = min(-net, batt.max_discharge_kw * dt, max(0.0, soc - soc_min) * eta)
+        elif act.mode == MODE_DEFER:
+            if net < 0:
+                b_out = min(-net, batt.max_discharge_kw * dt, max(0.0, soc - soc_min) * eta)
         elif act.mode == MODE_CHARGE:
             b_in = min(act.power_kw * dt, batt.max_charge_kw * dt, max(0.0, soc_max - soc) / eta)
         elif act.mode == MODE_DISCHARGE:
@@ -234,7 +241,7 @@ def _actions_for_charge(slots: Sequence[Slot], nt_idx: List[int], energy_kwh: Op
 
 
 def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
-                 step_kwh: float = 0.5) -> Plan:
+                 step_kwh: float = 0.5, allow_defer: bool = True) -> Plan:
     if not slots:
         raise ValueError("no slots")
     nt_idx = _first_nt_block(slots)
@@ -268,6 +275,11 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
     e_best, cost_best, acts, res = best
     e_best = e_best or 0.0
 
+    # záporný výkup: nabíjení baterie z přetoku odložit do záporných hodin
+    defer_slots = 0
+    if allow_defer:
+        acts, res, cost_best, defer_slots = _plan_defer(slots, acts, res, cost_best, batt, prices)
+
     # prodej ve spotové špičce: jen VT sloty nad prahem, jen když to sníží náklady
     sell_slots = 0
     peak = sorted(
@@ -293,9 +305,58 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
     min_soc = batt.min_soc_pct + 0.05
     hits_min = any(r.soc_pct <= min_soc for r, s in zip(res, slots) if not s.is_nt)
     plan = Plan(acts, res, round(cost_best, 2), round(e_best, 2), sell_slots,
-                hits_min_soc_in_vt=hits_min, candidates=candidates)
+                hits_min_soc_in_vt=hits_min, candidates=candidates, defer_slots=defer_slots)
     plan.reason = explain(plan, slots, batt, prices, worth)
     return plan
+
+
+DEFER_PV_SAFETY = 0.8  # odložení musí vyjít i s FVE × 0,8
+DEFER_FULL_SOC = 95.0
+DEFER_FULL_BY_HOUR = 17
+
+
+def _max_soc_before(results: Sequence[SlotResult], day, hour: int) -> float:
+    return max((r.soc_pct for r in results if r.start.date() == day and r.start.hour < hour), default=0.0)
+
+
+def _plan_defer(slots: Sequence[Slot], acts: List[Action], res: List[SlotResult], cost: float,
+                batt: BatteryParams, prices: Prices) -> Tuple[List[Action], List[SlotResult], float, int]:
+    """Pro každý den se záporným výkupem zkusí odložit nabíjení z přetoku na dopoledne.
+
+    Kandidát = sloty s přebytkem od začátku dne do času `k` (po 30 min, nejdéle do první
+    záporné hodiny) v režimu MODE_DEFER. Bere se nejlevnější, a jen když se baterie i s FVE × 0,8
+    nabije před 17:00 aspoň na DEFER_FULL_SOC.
+    """
+    safe_slots = [replace(s, pv_kwh=s.pv_kwh * DEFER_PV_SAFETY) for s in slots]
+    for day in sorted({s.start.date() for s in slots}):
+        idx = [i for i, s in enumerate(slots) if s.start.date() == day]
+        neg = [i for i in idx if slots[i].spot * prices.sell_coef < prices.export_block_below
+               and slots[i].pv_kwh > slots[i].load_kwh + slots[i].grid_only_kwh
+               and slots[i].start.hour < DEFER_FULL_BY_HOUR]
+        if not neg:
+            continue
+        first_neg = neg[0]
+        surplus = [i for i in idx if i < first_neg and acts[i].mode == MODE_AUTO
+                   and slots[i].pv_kwh > slots[i].load_kwh]
+        if not surplus:
+            continue
+        best = None
+        for n in range(2, len(surplus) + 2, 2):
+            chosen = surplus[:n]
+            trial = list(acts)
+            for i in chosen:
+                trial[i] = Action(MODE_DEFER, 0.0)
+            tres, tcost = simulate(slots, trial, batt, prices)
+            if tcost >= cost - 0.05 or (best and tcost >= best[2] - 0.05):
+                continue
+            sres, _ = simulate(safe_slots, trial, batt, prices)
+            if _max_soc_before(sres, day, DEFER_FULL_BY_HOUR) < DEFER_FULL_SOC:
+                continue
+            best = (trial, tres, tcost, len(chosen))
+        if best:
+            acts, res, cost = best[0], best[1], best[2]
+    n_defer = sum(1 for a in acts if a.mode == MODE_DEFER)
+    return acts, res, cost, n_defer
 
 
 def explain(plan: Plan, slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
@@ -311,6 +372,12 @@ def explain(plan: Plan, slots: Sequence[Slot], batt: BatteryParams, prices: Pric
             return (f"NT: baterie drží energii na VT, nabití {plan.grid_charge_kwh:.1f} kWh "
                     f"na konci NT")
         return "NT: baterie drží energii na ranní VT (dům jede ze sítě za NT)"
+    if now.mode == MODE_DEFER:
+        neg = next((s for s in slots if s.spot * prices.sell_coef < prices.export_block_below
+                    and s.pv_kwh > s.load_kwh), None)
+        when = f" od {neg.start:%H:%M}" if neg else ""
+        return (f"nabíjení z přetoku odloženo na záporný výkup{when}, přetok teď do sítě za "
+                f"{s0.spot * prices.sell_coef:.2f} Kč/kWh")
     if now.mode == MODE_DISCHARGE:
         return f"spotová špička {s0.spot:.2f} Kč/kWh ≥ {prices.sell_min_spot:.2f}: prodej z baterie"
     parts = ["vlastní spotřeba"]
@@ -321,6 +388,8 @@ def explain(plan: Plan, slots: Sequence[Slot], batt: BatteryParams, prices: Pric
             parts.append(f"NT bez nabíjení, FVE zítra {pv_tomorrow:.1f} kWh baterii dobije")
     elif plan.grid_charge_kwh > 0:
         parts.append(f"v NT plánováno nabití {plan.grid_charge_kwh:.1f} kWh")
+    if plan.defer_slots:
+        parts.append(f"nabíjení z přetoku odloženo na záporné ceny ({plan.defer_slots}× 15 min)")
     if plan.sell_slots:
         parts.append(f"prodej ve špičce {plan.sell_slots}× 15 min")
     if plan.hits_min_soc_in_vt:
@@ -344,6 +413,7 @@ MODE_LABELS = {
     MODE_STANDBY: "držet",
     MODE_CHARGE: "nabíjet ze sítě",
     MODE_DISCHARGE: "prodej z baterie",
+    MODE_DEFER: "odložit nabíjení",
 }
 
 

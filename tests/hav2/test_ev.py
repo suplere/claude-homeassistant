@@ -270,3 +270,26 @@ def test_boost_resume_starts_3f():
     inp = inputs(surplus_w=3400, cur_enabled=False, battery_soc=95, sell_price=0.1, battery_refill=True)
     cmd, _ = run(reg, inp, 6)
     assert cmd.enable and cmd.phases == 3 and cmd.amps == 6
+
+
+# ------------------------------------------------ NT až v poslední noci před termínem
+
+
+def test_plan_uses_latest_nt_block_before_deadline():
+    now = datetime(2026, 9, 26, 14, 0, tzinfo=TZ)
+    deadline = datetime(2026, 9, 28, 6, 0, tzinfo=TZ)  # dvě noci v horizontu
+    plan = plan_ev(ev_slots(now, 40, 1.0), EvPlanParams(needed_kwh=20, mode="Solár+NT", deadline=deadline), now)
+    nights = {t.date() if t.hour >= 22 else (t - timedelta(days=1)).date() for t in plan.grid_slots}
+    assert nights == {datetime(2026, 9, 27).date()}
+    assert min(plan.grid_slots).hour == 22
+
+
+def test_plan_defers_nt_beyond_forecast_horizon():
+    # sloty do neděle 24:00, termín úterý 06:00 → NT pondělní noci se naplánuje později
+    now = datetime(2026, 9, 26, 14, 0, tzinfo=TZ)
+    deadline = datetime(2026, 9, 29, 6, 0, tzinfo=TZ)
+    plan = plan_ev(ev_slots(now, 34, 1.0), EvPlanParams(needed_kwh=33, mode="Solár+NT", deadline=deadline,
+                                                        later_nt_kwh=56.0), now)
+    assert plan.grid_slots == {}
+    assert plan.nt_kwh > 0 and plan.shortfall_kwh == 0
+    assert "později" in plan.reason

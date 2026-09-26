@@ -99,7 +99,103 @@ script:
               message: "EMS {{ ems_target }} {{ power_target }} W – {{ reason | default('') }}"
               entity_id: script.hav2_battery_set
 
+  hav2_export_set:
+    alias: HAv2 – nastavit limit přetoku
+    description: >
+      Limit přetoku do sítě GoodWe (0 W při záporném výkupu, jinak 10 000 W). Zapisuje jen
+      při rozdílu a jen když je systém v režimu Auto a řízení baterie je zapnuté.
+    icon: mdi:transmission-tower-export
+    mode: queued
+    max: 3
+    fields:
+      limit_w:
+        description: Limit přetoku (W)
+        required: true
+        example: 0
+        selector:
+          number:
+            min: 0
+            max: 10000
+            step: 100
+            unit_of_measurement: W
+      reason:
+        description: Důvod rozhodnutí (do logbooku)
+        required: false
+        selector:
+          text:
+    variables:
+      limit_target: "{{ [[limit_w | int(10000), 0] | max, 10000] | min // 100 * 100 }}"
+    sequence:
+      - alias: Pojistka – jen v režimu Auto se zapnutým řízením baterie
+        if:
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: input_select.energy_system_mode
+                state: Auto
+              - condition: state
+                entity_id: input_boolean.energy_battery_control
+                state: "on"
+        then:
+          - action: logbook.log
+            data:
+              name: HAv2 přetok
+              message: "Nezapsáno (režim {{ states('input_select.energy_system_mode') }}): limit {{ limit_target }} W"
+              entity_id: script.hav2_export_set
+          - stop: Systém není v režimu Auto se zapnutým řízením baterie
+      - alias: Řízení dodávky musí být zapnuté, jinak limit neplatí
+        if:
+          - condition: state
+            entity_id: switch.goodwe_rizeni_dodavky_do_site
+            state: "off"
+        then:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.goodwe_rizeni_dodavky_do_site
+      - if:
+          - condition: template
+            value_template: "{{ states('number.goodwe_limit_dodavky_do_site') | float(-1) != limit_target | float }}"
+        then:
+          - action: number.set_value
+            target:
+              entity_id: number.goodwe_limit_dodavky_do_site
+            data:
+              value: "{{ limit_target }}"
+          - action: logbook.log
+            data:
+              name: HAv2 přetok
+              message: "Limit přetoku {{ limit_target }} W – {{ reason | default('') }}"
+              entity_id: script.hav2_export_set
+
 automation:
+  - id: hav2_export_restore
+    alias: HAv2 – obnovit limit přetoku po vypnutí řízení
+    description: >
+      Když HAv2 přestane řídit baterii (jiný režim než Auto nebo vypnuté řízení baterie)
+      a limit přetoku zůstal na 0 W, vrátí ho na 10 000 W, aby FVE nezůstala omezená.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: input_select.energy_system_mode
+        from: Auto
+      - trigger: state
+        entity_id: input_boolean.energy_battery_control
+        to: "off"
+    conditions:
+      - condition: numeric_state
+        entity_id: number.goodwe_limit_dodavky_do_site
+        below: 100
+    actions:
+      - action: number.set_value
+        target:
+          entity_id: number.goodwe_limit_dodavky_do_site
+        data:
+          value: 10000
+      - action: logbook.log
+        data:
+          name: HAv2 přetok
+          message: Řízení baterie vypnuto – limit přetoku vrácen na 10 000 W
+
   - id: hav2_battery_watchdog
     alias: HAv2 – watchdog plánovače baterie
     description: >
@@ -130,6 +226,11 @@ automation:
           entity_id: select.goodwe_ems_mode
         data:
           option: auto
+      - action: number.set_value
+        target:
+          entity_id: number.goodwe_limit_dodavky_do_site
+        data:
+          value: 10000
       - action: input_text.set_value
         target:
           entity_id: input_text.energy_last_decision
@@ -140,4 +241,4 @@ automation:
           title: HAv2 – plánovač baterie neodpovídá
           message: >
             Heartbeat je starý {{ ((now() - (states('input_datetime.hav2_heartbeat') | as_datetime(now()) | as_local)).total_seconds() / 60) | round(0) }} min.
-            Baterie přepnuta na auto (vlastní spotřeba). Zkontroluj AppDaemon.
+            Baterie přepnuta na auto (vlastní spotřeba), limit přetoku 10 000 W. Zkontroluj AppDaemon.

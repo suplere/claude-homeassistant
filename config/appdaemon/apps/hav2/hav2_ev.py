@@ -69,6 +69,9 @@ class EvPlanParams:
     solar_confidence: float = 0.7  # jak velkou část předpovězeného přebytku počítat
     nt_price: float = 3.51
     vt_price: float = 6.10
+    # NT energie dostupná až za koncem slotů (předpověď FVE sahá do zítřka 24:00), ale před
+    # termínem – ta se naplánuje, až bude vidět; mezitím může nabíjet slunce dalších dní
+    later_nt_kwh: float = 0.0
 
 
 @dataclass
@@ -93,7 +96,8 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
 
     Bez termínu je horizont do zítřka 18:00: v NT se nabije jen to, co do té doby
     nepokryje předpovězený přebytek (odjezdy jsou nepravidelné, termín zadává uživatel).
-    NT se plánuje od začátku bloku (baterie domu se nabíjí na jeho konci), VT co nejpozději.
+    NT se plánuje v posledním NT bloku před termínem (dřív může nabíjet slunce), v bloku
+    od začátku (baterie domu se nabíjí na jeho konci), VT co nejpozději.
     """
     need = max(0.0, p.needed_kwh)
     empty = EvPlan(need, 0.0, 0.0, 0.0, 0.0, {}, None, "")
@@ -116,12 +120,21 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
     solar = min(need, sum(s.solar_kwh for s in window) * p.solar_confidence)
     rest = need - solar
     grid: Dict[datetime, str] = {}
-    nt_kwh = vt_kwh = 0.0
+    nt_kwh = vt_kwh = later_kwh = 0.0
     if p.mode == "Solár+NT" and rest > 0.05:
+        later_kwh = min(rest, max(0.0, p.later_nt_kwh))
+        rest -= later_kwh
+        blocks: List[List[EvSlot]] = []
         for s in window:
-            if rest <= 0.05:
-                break
             if s.is_nt:
+                if blocks and blocks[-1][-1].start + timedelta(minutes=15) == s.start:
+                    blocks[-1].append(s)
+                else:
+                    blocks.append([s])
+        for block in reversed(blocks):
+            for s in block:
+                if rest <= 0.05:
+                    break
                 e = min(rest, p.grid_kw * 0.25 * s.fraction)
                 grid[s.start] = "NT"
                 nt_kwh += e
@@ -140,6 +153,8 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
     parts = [f"potřeba {need:.1f} kWh", f"slunce ~{solar:.1f}"]
     if nt_kwh:
         parts.append(f"NT {nt_kwh:.1f}")
+    if later_kwh:
+        parts.append(f"NT později {later_kwh:.1f} (poslední noc před termínem)")
     if vt_kwh:
         parts.append(f"VT {vt_kwh:.1f}")
     if p.deadline and p.deadline > now:
@@ -150,8 +165,8 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
         parts.append("bez termínu (NT jen na to, co nepokryje slunce do zítřka 18:00)")
     else:
         parts.append("jen slunce")
-    cost = nt_kwh * p.nt_price + vt_kwh * p.vt_price
-    return EvPlan(need, round(solar, 2), round(nt_kwh, 2), round(vt_kwh, 2), round(shortfall, 2),
+    cost = (nt_kwh + later_kwh) * p.nt_price + vt_kwh * p.vt_price
+    return EvPlan(need, round(solar, 2), round(nt_kwh + later_kwh, 2), round(vt_kwh, 2), round(shortfall, 2),
                   dict(sorted(grid.items())), horizon, ", ".join(parts), round(cost, 2))
 
 

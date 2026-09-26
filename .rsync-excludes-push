@@ -41,3 +41,6 @@ www/
 # All changes should be made via HA UI or API
 # ===========================================
 .storage/
+
+# HAv2 minutový záznam dat (vytváří AppDaemon v HA)
+appdaemon/hav2_data/

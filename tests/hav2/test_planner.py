@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "config/appdaemon/a
 from hav2_planner import (  # noqa: E402
     MODE_AUTO,
     MODE_CHARGE,
+    MODE_DEFER,
     MODE_DISCHARGE,
     MODE_STANDBY,
     BatteryParams,
@@ -207,3 +208,47 @@ def test_missing_tomorrow_spot_uses_same_hour_yesterday():
     evening_tomorrow = next(s for s in slots if s.start == datetime(2026, 9, 27, 20, 0, tzinfo=TZ))
     assert noon_tomorrow.spot == 0.05
     assert evening_tomorrow.spot == 4.5
+
+
+NEG_NOON = {**{h: 2.0 for h in range(24)}, **{h: -0.5 for h in range(11, 16)}}
+
+
+def test_negative_noon_defers_morning_charging_and_still_fills():
+    now = datetime(2026, 9, 27, 6, 30, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=30.0, min_soc_pct=20.0)
+    slots = make_slots(now, 6.0, 6.0, spot=NEG_NOON)
+    plan = plan_battery(slots, batt, Prices())
+    today = [(r, a) for r, a in zip(plan.results, plan.actions) if r.start.date() == now.date()]
+    deferred = [r.start.hour for r, a in today if a.mode == MODE_DEFER]
+    assert deferred and max(deferred) < 11
+    assert max(r.soc_pct for r, _ in today if r.start.hour < 17) >= 95
+    base = plan_battery(slots, batt, Prices(), allow_defer=False)
+    assert plan.cost < base.cost
+    assert "odložit nabíjení" in {row["rezim"] for row in __import__("hav2_planner").hourly_table(plan, slots, Prices())}
+
+
+def test_no_defer_without_negative_price_or_when_disabled():
+    now = datetime(2026, 9, 27, 6, 30, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=30.0, min_soc_pct=20.0)
+    plan = plan_battery(make_slots(now, 6.0, 6.0), batt, Prices())
+    assert plan.defer_slots == 0
+    plan = plan_battery(make_slots(now, 6.0, 6.0, spot=NEG_NOON), batt, Prices(), allow_defer=False)
+    assert plan.defer_slots == 0
+
+
+def test_no_defer_when_weak_sun_could_not_fill_battery():
+    now = datetime(2026, 9, 27, 6, 30, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=20.0, min_soc_pct=20.0)
+    plan = plan_battery(make_slots(now, 1.8, 1.8, spot=NEG_NOON), batt, Prices())
+    assert plan.defer_slots == 0
+
+
+def test_simulate_defer_exports_surplus_but_covers_deficit():
+    now = datetime(2026, 9, 27, 10, 0, tzinfo=TZ)
+    slots = make_slots(now, 6.0, 0)[:2]
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=50.0, min_soc_pct=20.0)
+    res, _ = simulate(slots, [__import__("hav2_planner").Action(MODE_DEFER)] * 2, batt, Prices())
+    assert res[-1].soc_pct == 50.0 and res[0].grid_export_kwh > 0
+    night = make_slots(datetime(2026, 9, 27, 23, 0, tzinfo=TZ), 0, 0)[:2]
+    res, _ = simulate(night, [__import__("hav2_planner").Action(MODE_DEFER)] * 2, batt, Prices())
+    assert res[-1].soc_pct < 50.0 and res[0].grid_import_kwh == 0

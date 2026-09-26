@@ -147,3 +147,6 @@ coverage.xml
 
 # Virtual Environment symlink (points to ../venv)
 # Note: Both venv/ and venv symlink are ignored above
+
+# HAv2 minutový záznam dat (stahuje make pull, do gitu nepatří)
+config/appdaemon/hav2_data/
