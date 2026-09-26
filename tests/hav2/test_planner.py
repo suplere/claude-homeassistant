@@ -252,3 +252,23 @@ def test_simulate_defer_exports_surplus_but_covers_deficit():
     night = make_slots(datetime(2026, 9, 27, 23, 0, tzinfo=TZ), 0, 0)[:2]
     res, _ = simulate(night, [__import__("hav2_planner").Action(MODE_DEFER)] * 2, batt, Prices())
     assert res[-1].soc_pct < 50.0 and res[0].grid_import_kwh == 0
+
+
+def test_force_full_charges_to_100_in_nt_when_sun_cannot():
+    now = datetime(2026, 12, 10, 21, 0, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=50.0, min_soc_pct=20.0)
+    slots = make_slots(now, 0, 0.8, load_kw=0.25)  # zima, slunce baterii nenabije
+    normal = plan_battery(slots, batt, Prices())
+    full = plan_battery(slots, batt, Prices(), force_full=True)
+    assert not normal.full_charge
+    assert full.full_charge and full.grid_charge_kwh > normal.grid_charge_kwh
+    first_block_end = next(r for r, s in zip(full.results, slots) if s.start.hour == 5 and s.start.minute == 45)
+    assert first_block_end.soc_pct >= 99.0
+    assert "100 %" in full.reason
+
+
+def test_force_full_skipped_when_sun_fills_next_day():
+    now = datetime(2026, 6, 10, 21, 0, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=60.0, min_soc_pct=20.0)
+    plan = plan_battery(make_slots(now, 0, 6.0), batt, Prices(), force_full=True)
+    assert not plan.full_charge and plan.grid_charge_kwh == 0

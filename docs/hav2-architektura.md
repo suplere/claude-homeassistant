@@ -186,6 +186,12 @@ Ceny a parametry baterie jsou už z kroku A (`energy_price_vt/nt`, `energy_sell_
 | SOC ≤ min SOC | kdykoli | `auto` + DoD drží rezervu (ochrana i při výpadku HA) |
 | Výpadek předpovědi | `energy_forecast_valid` = off | konzervativní: FVE = poslední platná × 0,5, jinak 0 |
 
+**Plné nabití (doplněno 26. 9.):** baterie Pylontech Force H2 × 3 (LiFePO4). Výrobce předepisuje vyrovnání
+článků nabitím na 100 % aspoň jednou za 3 měsíce; BMS si ho při delší době bez plného nabití vyžádá sám přes
+komunikaci se střídačem. HAv2 navíc hlídá `input_datetime.energy_battery_last_full` (automatizace při SOC ≥ 99 %)
+a když baterie nebyla plná `input_number.energy_battery_full_every_days` (nastaveno 30 dní, kvůli přesnosti SOC
+pro plánovač), nabije ji den před termínem v nejbližší NT na 100 % – jen když ji druhý den nenabije slunce.
+
 **Omezení přetoku (implementace):** `Hav2._export_control` každou minutu, `sensor.energy_export_control`,
 zápis přes `script.hav2_export_set` (0 / 10 000 W, jen v Auto s řízením baterie). Omezí se jen když výkup
 < práh, baterie ≥ 97 % (uvolní pod 95 %), EV nic nechce, filtrace je hotová a neběží, FVE vyrábí – při limitu 0

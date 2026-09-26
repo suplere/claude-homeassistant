@@ -50,6 +50,13 @@ input_select:
       - Vypnout
 
 input_number:
+  energy_battery_full_every_days:
+    name: Baterie nabít na 100 % aspoň jednou za
+    icon: mdi:battery-sync
+    min: 3
+    max: 30
+    step: 1
+    unit_of_measurement: dní
   energy_battery_min_soc:
     name: Baterie minimální SOC
     icon: mdi:battery-10
@@ -212,6 +219,11 @@ input_boolean:
     icon: mdi:lightbulb-auto
 
 input_datetime:
+  energy_battery_last_full:
+    name: Baterie naposledy na 100 %
+    icon: mdi:battery-check
+    has_date: true
+    has_time: true
   ev_deadline:
     name: EV nabito do
     icon: mdi:calendar-clock

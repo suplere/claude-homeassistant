@@ -360,7 +360,15 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         # EV, které ještě potřebuje energii, spotřebuje polední přetok samo → odložení
         # nabíjení baterie by ji mohlo nechat večer nenabitou (plánovač EV nezná)
         allow_defer = not self.ev_wants_energy()
-        plan = P.plan_battery(slots, batt, prices, allow_defer=allow_defer)
+        # plné nabití jednou za N dní; den před termínem se naplánuje do nejbližší NT
+        full_every = self.fnum("input_number.energy_battery_full_every_days", 7)
+        try:
+            last_full = datetime.fromisoformat(str(self.get_state("input_datetime.energy_battery_last_full")))
+            days_since_full = (now - last_full.replace(tzinfo=TZ)).total_seconds() / 86400
+        except (TypeError, ValueError):
+            days_since_full = 99.0
+        force_full = days_since_full >= full_every - 1
+        plan = P.plan_battery(slots, batt, prices, allow_defer=allow_defer, force_full=force_full)
         try:
             self.ev_replan(now, slots, plan, is_nt)
         except Exception as err:  # noqa: BLE001 – chyba EV nesmí shodit plán baterie
@@ -400,6 +408,9 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             "profile_source": self.profile_source,
             "candidates": plan.candidates,
             "defer_slots": str(plan.defer_slots),
+            "days_since_full": f"{days_since_full:.1f}",
+            "full_charge_due": "ano" if force_full else "ne",
+            "full_charge_planned": "ano" if plan.full_charge else "ne",
             "defer_allowed": "ano" if allow_defer else "ne (EV potřebuje energii)",
             "slots_json": json.dumps(P.compact(plan, slots, every=2), ensure_ascii=False),
             "slots_columns": "čas, režim, kW, SOC %, nákup kWh, prodej kWh (po 30 min)",

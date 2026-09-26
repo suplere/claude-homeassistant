@@ -168,6 +168,31 @@ script:
               entity_id: script.hav2_export_set
 
 automation:
+  - id: hav2_battery_last_full
+    alias: HAv2 – baterie dosáhla 100 %
+    description: >
+      Zapíše čas plného nabití (SOC ≥ 99 %). Plánovač podle něj naplánuje nabití
+      na 100 % v NT, když baterie delší dobu (input_number.energy_battery_full_every_days)
+      plná nebyla – kvůli vyrovnání článků a kalibraci SOC v BMS.
+    mode: single
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.battery_state_of_charge
+        above: 98.9
+      # SOC už může být 100 % a nemusí se změnit – kontrola každou hodinu
+      - trigger: time_pattern
+        minutes: 0
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.battery_state_of_charge
+        above: 98.9
+    actions:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.energy_battery_last_full
+        data:
+          timestamp: "{{ now().timestamp() | int }}"
+
   - id: hav2_export_restore
     alias: HAv2 – obnovit limit přetoku po vypnutí řízení
     description: >

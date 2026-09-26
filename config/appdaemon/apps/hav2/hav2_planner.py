@@ -95,6 +95,7 @@ class Plan:
     hits_min_soc_in_vt: bool = False
     candidates: Dict[str, float] = field(default_factory=dict)
     defer_slots: int = 0
+    full_charge: bool = False
 
     @property
     def now(self) -> Action:
@@ -241,7 +242,9 @@ def _actions_for_charge(slots: Sequence[Slot], nt_idx: List[int], energy_kwh: Op
 
 
 def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
-                 step_kwh: float = 0.5, allow_defer: bool = True) -> Plan:
+                 step_kwh: float = 0.5, allow_defer: bool = True, force_full: bool = False) -> Plan:
+    """force_full: baterie dlouho nebyla na 100 % → v nejbližší NT ji nabít na 100 %,
+    pokud ji den po NT nenabije slunce (vyrovnání článků a kalibrace SOC v BMS)."""
     if not slots:
         raise ValueError("no slots")
     nt_idx = _first_nt_block(slots)
@@ -275,6 +278,19 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
     e_best, cost_best, acts, res = best
     e_best = e_best or 0.0
 
+    full_charge = False
+    if force_full and nt_idx and not _sun_fills_after_nt(res, slots, nt_idx):
+        # energie do 100 % podle SOC na začátku NT (simulace bez nabíjení), max. co zvládne síť
+        base, _ = simulate(slots, _actions_for_charge(slots, nt_idx, 0.0, batt), batt, prices)
+        soc_nt = base[nt_idx[0] - 1].soc_pct if nt_idx[0] > 0 else batt.soc_pct
+        need = max(0.0, (batt.max_soc_pct - soc_nt) / 100 * batt.capacity_kwh) / eta
+        e_full = round(min(grid_cap, need + 0.3), 3)
+        if e_full > e_best:
+            acts = _actions_for_charge(slots, nt_idx, e_full, batt)
+            res, cost_best = simulate(slots, acts, batt, prices)
+            e_best = e_full
+        full_charge = True
+
     # záporný výkup: nabíjení baterie z přetoku odložit do záporných hodin
     defer_slots = 0
     if allow_defer:
@@ -305,9 +321,17 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
     min_soc = batt.min_soc_pct + 0.05
     hits_min = any(r.soc_pct <= min_soc for r, s in zip(res, slots) if not s.is_nt)
     plan = Plan(acts, res, round(cost_best, 2), round(e_best, 2), sell_slots,
-                hits_min_soc_in_vt=hits_min, candidates=candidates, defer_slots=defer_slots)
+                hits_min_soc_in_vt=hits_min, candidates=candidates, defer_slots=defer_slots,
+                full_charge=full_charge)
     plan.reason = explain(plan, slots, batt, prices, worth)
     return plan
+
+
+def _sun_fills_after_nt(results: Sequence[SlotResult], slots: Sequence[Slot], nt_idx: List[int]) -> bool:
+    """Nabije slunce baterii na ≥ 99 % v den po NT bloku (do 18:00)?"""
+    day = slots[nt_idx[-1]].start.date()
+    return any(r.soc_pct >= 99.0 for r in results[nt_idx[-1] + 1:]
+               if r.start.date() == day and r.start.hour < 18)
 
 
 DEFER_PV_SAFETY = 0.8  # odložení musí vyjít i s FVE × 0,8
@@ -364,6 +388,9 @@ def explain(plan: Plan, slots: Sequence[Slot], batt: BatteryParams, prices: Pric
     now = plan.now
     s0 = slots[0]
     pv_tomorrow = sum(s.pv_kwh for s in slots if s.start.date() > s0.start.date())
+    if plan.full_charge and s0.is_nt:
+        return (f"nabití na 100 % (vyrovnání článků, dlouho nebyla plná), {plan.grid_charge_kwh:.1f} kWh "
+                f"na konci NT" + (f", teď {now.power_kw:.1f} kW" if now.mode == MODE_CHARGE else ""))
     if now.mode == MODE_CHARGE:
         return (f"NT nabíjení {now.power_kw:.1f} kW, celkem {plan.grid_charge_kwh:.1f} kWh "
                 f"(FVE zítra {pv_tomorrow:.1f} kWh nestačí)")
@@ -388,6 +415,8 @@ def explain(plan: Plan, slots: Sequence[Slot], batt: BatteryParams, prices: Pric
             parts.append(f"NT bez nabíjení, FVE zítra {pv_tomorrow:.1f} kWh baterii dobije")
     elif plan.grid_charge_kwh > 0:
         parts.append(f"v NT plánováno nabití {plan.grid_charge_kwh:.1f} kWh")
+    if plan.full_charge:
+        parts.append(f"v NT nabití na 100 % ({plan.grid_charge_kwh:.1f} kWh, vyrovnání článků)")
     if plan.defer_slots:
         parts.append(f"nabíjení z přetoku odloženo na záporné ceny ({plan.defer_slots}× 15 min)")
     if plan.sell_slots:

@@ -13,6 +13,7 @@ hav2:
     - input_number.energy_battery_max_grid_charge_w
     - input_number.energy_sell_min_spot
     - input_number.energy_export_block_below
+    - input_number.energy_battery_full_every_days
     - binary_sensor.cez_hdo_lowtariffactive_dum
     - binary_sensor.energy_forecast_valid
     - binary_sensor.spot_electricity_has_tomorrow_data_2
