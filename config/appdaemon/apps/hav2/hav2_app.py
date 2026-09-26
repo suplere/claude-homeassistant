@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 import appdaemon.plugins.hass.hassapi as hass
 
+import hav2_boiler as BO
 import hav2_planner as P
 from hav2_ev_ctl import EvControl
 from hav2_pool_ctl import PoolControl
@@ -56,6 +57,10 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         for ent in self.args.get("replan_on", []):
             self.listen_state(self.on_input_change, ent)
         self.ev_init(TZ)
+        # bojler a kontrola měření proti PND (data D+1, stahují se ráno)
+        self.run_in(self.pnd_check, 20)
+        self.run_daily(self.pnd_check, "07:30:00")
+        self.listen_state(lambda *a, **k: self.run_in(self.pnd_check, 120), "sensor.pnd_data")
         self.pool_init(TZ)
         self.log("HAv2 plánovač spuštěn")
 
@@ -163,6 +168,53 @@ class Hav2(EvControl, PoolControl, hass.Hass):
                            "source": self.profile_source,
                        })
         self.log(f"profil spotřeby obnoven: {self.profile_source}, bojler {sum(self.boiler_profile.values()):.2f} kWh/den")
+
+    # ------------------------------------------------ bojler a kontrola PND
+    def pnd_check(self, kwargs: Dict[str, Any]) -> None:
+        """Bojler za poslední den z PND (PND − GoodWe) a zbytková odchylka měření HA."""
+        if not (self.pnd_consumption and self.pnd_production):
+            return
+        try:
+            ids = [self.pnd_consumption, self.pnd_production, STAT_BUY, STAT_SELL]
+            stats = self._get_statistics(ids, 40)
+            pi, pe, hi, he = (self._hourly(stats.get(i, [])) for i in ids)
+            days = BO.boiler_days(pi, pe, hi, he, lambda ts: ts.hour >= 22 or ts.hour < 6,
+                                  self.fnum("input_number.energy_price_nt", 3.51),
+                                  self.fnum("input_number.energy_price_vt", 6.1))
+            full = [d for d in days if sum(1 for ts in pi if ts.date() == d.day and ts in hi) >= 23]
+            if not full:
+                raise ValueError("žádný úplný den v PND")
+            d = full[-1]
+            ri, re_ = d.residual_pct("import"), d.residual_pct("export")
+            self.set_state("sensor.energy_boiler_pnd_daily", state=round(d.boiler_kwh, 2), attributes={
+                "friendly_name": "Bojler podle PND (poslední den)", "icon": "mdi:water-boiler",
+                "unit_of_measurement": "kWh", "device_class": "energy", "state_class": "measurement",
+                "date": d.day.isoformat(),
+                "cost_kc": f"{d.cost_kc:.2f}",
+                "import_kwh": f"{d.import_kwh:.2f}",
+                "export_loss_kwh": f"{d.export_loss_kwh:.2f}",
+                "hours_json": json.dumps(d.hours),
+                "pnd_import_kwh": f"{d.pnd_import:.2f}",
+                "ha_import_kwh": f"{d.ha_import:.2f}",
+                "pnd_export_kwh": f"{d.pnd_export:.2f}",
+                "ha_export_kwh": f"{d.ha_export:.2f}",
+                "residual_import_kwh": f"{d.residual_import_kwh:.2f}",
+                "residual_export_kwh": f"{d.residual_export_kwh:.2f}",
+                # čísla jako text (AppDaemon zahazuje nuly); „–“ když nelze spočítat
+                "residual_import_pct": f"{ri}" if ri is not None else "–",
+                "residual_export_pct": f"{re_}" if re_ is not None else "–",
+                "days_json": json.dumps([[x.day.isoformat(), round(x.boiler_kwh, 2), round(x.cost_kc, 2)]
+                                         for x in full[-14:]]),
+                "month_kwh": f"{sum(x.boiler_kwh for x in full if x.day.month == d.day.month and x.day.year == d.day.year):.2f}",
+                "month_cost_kc": f"{sum(x.cost_kc for x in full if x.day.month == d.day.month and x.day.year == d.day.year):.2f}",
+                "month_days": str(sum(1 for x in full if x.day.month == d.day.month and x.day.year == d.day.year)),
+                "avg_kwh_14d": f"{sum(x.boiler_kwh for x in full[-14:]) / len(full[-14:]):.2f}",
+                "avg_cost_14d": f"{sum(x.cost_kc for x in full[-14:]) / len(full[-14:]):.2f}",
+                "updated": datetime.now(TZ).isoformat(),
+            })
+            self.log(f"bojler {d.day}: {d.boiler_kwh:.2f} kWh, {d.cost_kc:.1f} Kč; odchylka nákupu {ri} %, prodeje {re_} %")
+        except Exception as err:  # noqa: BLE001
+            self.log(f"kontrola PND selhala: {err}", level="WARNING")
 
     # --------------------------------------------------------------- vstupy
     def _pv_slots(self) -> List[Tuple[datetime, float]]:

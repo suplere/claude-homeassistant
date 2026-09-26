@@ -269,6 +269,28 @@ class ReferenceValidator:
         # Extract zone entities from configuration and storage
         entities.update(self._extract_zone_entities())
 
+        # Entities published by AppDaemon apps via set_state("domain.object_id")
+        entities.update(self._extract_appdaemon_entities())
+
+        return entities
+
+    def _extract_appdaemon_entities(self) -> Set[str]:
+        """Extract entity_ids created by AppDaemon apps with set_state("...").
+
+        AppDaemon entities live only in the state machine (never in the entity
+        registry), so YAML templates referencing them would otherwise fail.
+        """
+        entities: Set[str] = set()
+        apps_dir = self.config_dir / "appdaemon" / "apps"
+        if not apps_dir.is_dir():
+            return entities
+        pattern = re.compile(r"set_state\(\s*[\"']([a-z_]+\.[a-z0-9_]+)[\"']")
+        for py_file in apps_dir.rglob("*.py"):
+            try:
+                text = py_file.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            entities.update(pattern.findall(text))
         return entities
 
     def _extract_groups(self) -> Set[str]:

@@ -41,11 +41,12 @@ jinak jen zapíšou do logbooku „Nezapsáno“.
 | `hav2_planner.py` | plánovač baterie (čistý Python) + `hourly_table` pro dashboard |
 | `hav2_ev.py` / `hav2_ev_ctl.py` | EV plán + regulátor proudu (smyčka 5 s) / napojení na HA |
 | `hav2_pool.py` / `hav2_pool_ctl.py` | řízení filtrace (smyčka 60 s) / napojení na HA |
+| `hav2_boiler.py` | bojler a zbytková odchylka z PND (volá `Hav2.pnd_check` v 07:30 a po stažení PND) |
 
 Publikuje: `sensor.energy_plan`, `sensor.energy_load_forecast`, `sensor.ev_plan`, `sensor.ev_regulator`,
-`sensor.pool_plan`, `sensor.pool_controller`, `input_text.*_last_decision`, `input_datetime.hav2_heartbeat`.
+`sensor.pool_plan`, `sensor.pool_controller`, `sensor.energy_boiler_pnd_daily`, `input_text.*_last_decision`, `input_datetime.hav2_heartbeat`.
 
-Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (47 testů).
+Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (51 testů).
 
 ### Dashboard `energie-v2`
 Zdroj pravdy `dashboards/energie-v2.yaml`, nahrání:
@@ -58,7 +59,9 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 ## 3. Úskalí (důležité pro další práci)
 
 - **Fakturace po fázích** – nikdy součtový výkon/čítače; základ `energy_buy/sell` (Σ fází).
-- **Bojler (WATrouter, 2,2 kW, L3) je mimo měření GoodWe** – baterie ho nekryje; nucený ohřev denně od 16:09; model `grid_only`.
+- **Bojler (WATrouter, 2,2 kW, L3) je mimo měření GoodWe** – baterie ho nekryje; nucený ohřev denně od 16:09; model `grid_only`. Skutečnou denní spotřebu dává `sensor.energy_boiler_pnd_daily` (PND − GoodWe, D+1; průměr 4,2 kWh / 22 Kč/den). Detektor `binary_sensor.energy_boiler_heating` (napětí L3) je jen přibližný (denní součty ±1 kWh); prahy: 16–19 h od 1,0 V, jinak od 2,5 V, vypnout pod 0,5 V; při EV 1f index L2 − L3.
+- **Senzory `energy_pnd_deviation_*` jsou bez bojleru** (zbytek rozdílu HA↔PND, počítá AppDaemon). Odchylka prodeje v % je při malém prodeji zkreslená rozlišením GoodWe 0,1 kWh.
+- Validátor referencí zná i entity z AppDaemonu (hledá `set_state("…")` v `config/appdaemon/apps`). Testy validátoru: `PYTHONPATH=. pytest -o addopts="" tests/test_reference_validator.py` (ve venv chybí coverage).
 - **GoodWe EMS:** `conserve` nabíjí i ze sítě – nepoužívat; „drž SOC“ = `battery_standby`.
 - **AppDaemon `set_state` zahazuje falsy hodnoty** (0, False, i v seznamech) → čísla a logické hodnoty v atributech jako text, seznamy řádků s textovými hodnotami, nebo JSON řetězec.
 - AppDaemon: nová podsložka apps se načte až po restartu doplňku; `log:` jen s definicí v `appdaemon.yaml`; `logbook.log` bez `entity_id`.
@@ -75,7 +78,8 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 
 1. **Pozorování (pár dní):** stránky Plán a Nastavení → Log rozhodnutí; porovnat doporučení se skutečností
    (baterie přes noc, EV v NT, filtrace ze slunce). Zaznamenat odchylky.
-2. **26. 9.:** ověřit `sensor.energy_pnd_deviation_import/export_pct` (první den s PND daty za 25. 9.).
+2. ~~26. 9.: ověřit odchylku proti PND~~ – hotovo: bez bojleru nákup +1,3 % (0,10 kWh), prodej −0,13 kWh. Bojler 25. 9. = 6,36 kWh / 38 Kč.
+2b. **Bojler:** sledovat `sensor.energy_boiler_pnd_daily` pár týdnů → spočítat roční úsporu přepojení bojleru za měření GoodWe (elektrikář) proti předehřevu v poledne.
 3. **Slunečný den:** experiment předehřevu bojleru (`input_boolean.energy_boiler_preheat`, §5.6) – výsledek z PND 15 min.
 4. **Převzetí řízení po oblastech (každá se schválením):**
    1. záloha (HA backup) → smazat staré automatizace oblasti podle `archive/v1-2026-09-25/README.md`

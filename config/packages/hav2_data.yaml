@@ -44,13 +44,24 @@ template:
         device_class: voltage
         state_class: measurement
         icon: mdi:water-boiler
-        # (L1+L2)/2 − L3: bojler 2,25 kW na L3 (mimo GoodWe) prohne L3 o ~3 V
+        # (L1+L2)/2 − L3: bojler 2,25 kW na L3 (mimo GoodWe) prohne L3 o ~3 V.
+        # EV v 1f nabíjí na L1 a L1 prohne → index by ohřev zamaskoval, proto pak jen L2 − L3.
         availability: >
           {{ ['sensor.on_grid_l1_voltage', 'sensor.on_grid_l2_voltage', 'sensor.on_grid_l3_voltage']
              | select('has_value') | list | count == 3 }}
         state: >
-          {{ ((states('sensor.on_grid_l1_voltage') | float + states('sensor.on_grid_l2_voltage') | float) / 2
-              - states('sensor.on_grid_l3_voltage') | float) | round(2) }}
+          {% set l1 = states('sensor.on_grid_l1_voltage') | float %}
+          {% set l2 = states('sensor.on_grid_l2_voltage') | float %}
+          {% set l3 = states('sensor.on_grid_l3_voltage') | float %}
+          {% set ev_1f = states('sensor.ecovolter_revcr01c00002056_actual_power') | float(0) > 0.3
+                         and is_state('switch.ecovolter_revcr01c00002056_is_three_phase_mode_enable', 'off') %}
+          {{ ((l2 - l3) if ev_1f else ((l1 + l2) / 2 - l3)) | round(2) }}
+        attributes:
+          method: >
+            {{ 'L2 − L3 (EV nabíjí 1f na L1)'
+               if states('sensor.ecovolter_revcr01c00002056_actual_power') | float(0) > 0.3
+                  and is_state('switch.ecovolter_revcr01c00002056_is_three_phase_mode_enable', 'off')
+               else '(L1 + L2) / 2 − L3' }}
 
       # ------------------------------------------------------- přebytek a fáze
       - name: Přebytek pro řízené spotřebiče
@@ -332,15 +343,18 @@ template:
         default_entity_id: binary_sensor.energy_boiler_heating
         device_class: heat
         icon: mdi:water-boiler
-        # kalibrace 16.–24.9.: index > 1,5 V v okně 12–20 h zachytí 94 % ohřevu, 0,5 % falešně
-        # hystereze: vypne pod 0,8 V
+        # kalibrace proti hodinovým datům PND 16.–25. 9. (bojler = PND − GoodWe, 45 kWh / 10 dní):
+        # okno nuceného ohřevu 16–19 h zapnout od 1,0 V, jinak (polední ohřev z přetoků) od 2,5 V,
+        # vypnout pod 0,5 V; mimo 12–20 h nikdy. Chyba po hodinách 17 kWh / 10 dní (dříve 19,7),
+        # denní součty ±1 kWh. Přesnou denní spotřebu dává sensor.energy_boiler_pnd_daily (D+1).
         delay_off:
           minutes: 3
         availability: "{{ has_value('sensor.energy_boiler_voltage_index_5min') }}"
         state: >
           {% set idx = states('sensor.energy_boiler_voltage_index_5min') | float %}
           {% set in_window = 12 <= now().hour < 20 %}
-          {{ in_window and idx > (0.8 if is_state('binary_sensor.energy_boiler_heating', 'on') else 1.5) }}
+          {% set on_th = 1.0 if 16 <= now().hour < 19 else 2.5 %}
+          {{ in_window and idx > (0.5 if is_state('binary_sensor.energy_boiler_heating', 'on') else on_th) }}
 
       - name: Předpověď FVE platná
         unique_id: hav2_energy_forecast_valid

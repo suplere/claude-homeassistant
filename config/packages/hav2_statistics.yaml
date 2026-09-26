@@ -437,52 +437,29 @@ template:
             {{ (h + [[now().date() | string, states('sensor.energy_sell_daily') | float(0) | round(2)]])[-14:] }}
 
   - sensor:
+      # Odchylka měření HA (GoodWe, Σ fází) proti fakturačním datům PND za včerejšek,
+      # BEZ bojleru: bojler je mimo měření GoodWe, jeho podíl odečítá AppDaemon
+      # (sensor.energy_boiler_pnd_daily = hodiny, kdy PND ukazuje o > 0,25 kWh víc než GoodWe).
       - name: Odchylka nákupu proti PND
         unique_id: hav2_energy_pnd_deviation_import_pct
         default_entity_id: sensor.energy_pnd_deviation_import_pct
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:file-compare
-        # (PND − HA) / PND za poslední den, který je v obou zdrojích
-        availability: >
-          {{ (state_attr('sensor.energy_grid_import_day', 'history') or []) | map('first')
-             | select('in', state_attr('sensor.pnd_data', 'pnddate') or []) | list | count > 0 }}
-        state: >
-          {% set dates = state_attr('sensor.pnd_data', 'pnddate') or [] %}
-          {% set vals = state_attr('sensor.pnd_data', 'consumption') or [] %}
-          {% set ns = namespace(r=none) %}
-          {% for d, v in state_attr('sensor.energy_grid_import_day', 'history') or [] %}
-            {% if d in dates and vals[dates.index(d)] | float(0) > 0 %}
-              {% set p = vals[dates.index(d)] | float %}
-              {% set ns.r = ((p - v) / p * 100) | round(1) %}
-            {% endif %}
-          {% endfor %}
-          {{ ns.r if ns.r is not none else 0 }}
+        availability: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'residual_import_pct') | is_number }}"
+        state: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'residual_import_pct') | float }}"
         attributes:
-          compared_day: >
-            {% set dates = state_attr('sensor.pnd_data', 'pnddate') or [] %}
-            {% set ns = namespace(r=none) %}
-            {% for d, v in state_attr('sensor.energy_grid_import_day', 'history') or [] %}
-              {% if d in dates %}{% set ns.r = d %}{% endif %}
-            {% endfor %}
-            {{ ns.r }}
+          compared_day: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'date') }}"
+          residual_kwh: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'residual_import_kwh') }}"
       - name: Odchylka prodeje proti PND
         unique_id: hav2_energy_pnd_deviation_export_pct
         default_entity_id: sensor.energy_pnd_deviation_export_pct
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:file-compare
-        availability: >
-          {{ (state_attr('sensor.energy_grid_export_day', 'history') or []) | map('first')
-             | select('in', state_attr('sensor.pnd_data', 'pnddate') or []) | list | count > 0 }}
-        state: >
-          {% set dates = state_attr('sensor.pnd_data', 'pnddate') or [] %}
-          {% set vals = state_attr('sensor.pnd_data', 'production') or [] %}
-          {% set ns = namespace(r=none) %}
-          {% for d, v in state_attr('sensor.energy_grid_export_day', 'history') or [] %}
-            {% if d in dates and vals[dates.index(d)] | float(0) > 0 %}
-              {% set p = vals[dates.index(d)] | float %}
-              {% set ns.r = ((p - v) / p * 100) | round(1) %}
-            {% endif %}
-          {% endfor %}
-          {{ ns.r if ns.r is not none else 0 }}
+        # při malém prodeji (< 1 kWh) je % zkreslené rozlišením GoodWe 0,1 kWh – viz residual_kwh
+        availability: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'residual_export_pct') | is_number }}"
+        state: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'residual_export_pct') | float }}"
+        attributes:
+          compared_day: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'date') }}"
+          residual_kwh: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'residual_export_kwh') }}"

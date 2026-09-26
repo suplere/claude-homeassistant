@@ -1159,6 +1159,97 @@ views:
             name: Souběžný nákup+prodej
             grid_options:
               columns: 12
+          - type: markdown
+            text_only: true
+            content: |
+              <small>Odchylka je bez bojleru (ten je mimo měření GoodWe). Při malém prodeji
+              zkresluje % rozlišení GoodWe 0,1 kWh.</small>
+          - type: heading
+            heading: Bojler podle PND (D+1)
+            heading_style: subtitle
+            icon: mdi:water-boiler
+          - type: tile
+            entity: sensor.energy_boiler_pnd_daily
+            name: Bojler za poslední den
+            grid_options:
+              columns: 12
+          - type: entities
+            entities:
+              - type: attribute
+                entity: sensor.energy_boiler_pnd_daily
+                attribute: date
+                name: Den
+                icon: mdi:calendar
+              - type: attribute
+                entity: sensor.energy_boiler_pnd_daily
+                attribute: cost_kc
+                name: Náklady (nákup ze sítě)
+                icon: mdi:cash
+                suffix: Kč
+              - type: attribute
+                entity: sensor.energy_boiler_pnd_daily
+                attribute: export_loss_kwh
+                name: Z toho z přetoků
+                icon: mdi:solar-power
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_boiler_pnd_daily
+                attribute: month_cost_kc
+                name: Tento měsíc (do včerejška)
+                icon: mdi:calendar-month
+                suffix: Kč
+              - type: attribute
+                entity: sensor.energy_boiler_pnd_daily
+                attribute: month_kwh
+                name: Tento měsíc energie
+                icon: mdi:lightning-bolt
+                suffix: kWh
+              - type: attribute
+                entity: sensor.energy_boiler_pnd_daily
+                attribute: avg_kwh_14d
+                name: Průměr 14 dní
+                icon: mdi:chart-bell-curve
+                suffix: kWh/den
+              - type: attribute
+                entity: sensor.energy_boiler_pnd_daily
+                attribute: avg_cost_14d
+                name: Průměrné náklady 14 dní
+                icon: mdi:cash-multiple
+                suffix: Kč/den
+          - type: custom:apexcharts-card
+            graph_span: 14d
+            span:
+              end: day
+            header:
+              show: true
+              title: Bojler po dnech (PND)
+              show_states: false
+            apex_config:
+              chart:
+                height: 220
+            yaxis:
+              - id: kwh
+                min: 0
+                decimals: 1
+              - id: kc
+                opposite: true
+                min: 0
+                decimals: 0
+            series:
+              - entity: sensor.energy_boiler_pnd_daily
+                name: kWh
+                type: column
+                color: "#ef6c00"
+                yaxis_id: kwh
+                data_generator: |
+                  return JSON.parse(entity.attributes.days_json || '[]').map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[1]]);
+              - entity: sensor.energy_boiler_pnd_daily
+                name: Kč
+                type: line
+                color: "#e53935"
+                yaxis_id: kc
+                data_generator: |
+                  return JSON.parse(entity.attributes.days_json || '[]').map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[2]]);
       - type: grid
         column_span: 2
         cards:

@@ -29,7 +29,7 @@ Principy vycházejí z měření ve Fázi 1:
   - Wallbox občas vypadne na 20–70 s (`unavailable`).
 - **Kia:** SOC bývá staré i hodiny. Připojení a nabíjení se berou z EcoVolteru, SOC z Kia po `force_update` a dál se dopočítává.
 - **Čerpadlo filtrace:** L2, ~500 W. Shelly měří jen cívku stykače.
-- **Bojler (WATrouter ECO, 2,2 kW, 1f na L3) je mimo měření GoodWe.** Každý den od **16:09** 75–120 min nuceného ohřevu, 2,6–4,5 kWh, téměř vše VT. Baterie ho nepokryje.
+- **Bojler (WATrouter ECO, 2,2 kW, 1f na L3) je mimo měření GoodWe.** Každý den od **16:09** nucený ohřev (75–170 min), podle PND 12.–25. 9. **2,6–6,4 kWh/den, průměr 4,2 kWh a 22 Kč/den**, téměř vše VT. Baterie ho nepokryje. Pravděpodobná příčina zapojení: historický okruh na HDO odbočující před měřením GoodWe.
 - **Solcast:** časování sedí. Koeficienty: duben–září ×0,80, březen/říjen ×0,75, únor ×0,68, listopad–leden ×0,50. Odpoledne za jasna: 16 h ×0,70, 17 h ×0,55, 18 h ×0,40.
 
 ## 2. Architektura a tok dat
@@ -119,7 +119,8 @@ Z kroku A už existuje: ceny teď, fázová bilance, souběžný nákup+prodej, 
 | `sensor.ev_deadline_slack_h` | Rezerva do termínu: čas do deadlinu − čas potřebný při max. výkonu | 1 min |
 | `sensor.pool_hours_done_today` | Hodiny filtrace v „bazénovém dni“ 06:00–06:00 (history_stats) | 1 min |
 | `sensor.pool_hours_recommended` | Teplota vody / 2 (jen po 10 min běhu), +1 h při ORP < 650 mV, min/max z helperů | při změně |
-| `binary_sensor.energy_boiler_heating` | *(experimentální)* Bojler hřeje: skok napětí L3 ≥ −2 V proti L1/L2 (1min průměry), drží do skoku zpět. Jako záloha okno 16:09 + odhad délky z PND. Slouží k rezervě proudu na L3 a k započtení bojleru do bilance v reálném čase. | 5 s |
+| `binary_sensor.energy_boiler_heating` | Bojler hřeje (v reálném čase): napěťový index (L1+L2)/2 − L3 (při nabíjení EV v 1f jen L2 − L3), 5min průměr. Zapnout od 1,0 V v okně nuceného ohřevu 16–19 h, jinak od 2,5 V, vypnout pod 0,5 V, jen 12–20 h, delay_off 3 min. Kalibrováno proti hodinovým datům PND 16.–25. 9.: denní součty ±1 kWh, po hodinách chyba ~17 kWh / 10 dní (střídač s nesymetrickým výkonem napětí ruší). Slouží k rezervě proudu na L3 a k započtení bojleru do přebytku. | 5 s |
+| `sensor.energy_boiler_pnd_daily` | Bojler za poslední den z PND (hodiny, kdy PND − GoodWe > 0,25 kWh): kWh, Kč (nákup × NT/VT), část z přetoků, součet za aktuální měsíc (`month_kwh`, `month_cost_kc`), 14denní historie a průměr; `state_class: measurement` → dlouhodobé statistiky. Také **zbytková odchylka měření HA proti PND bez bojleru** (`residual_import/export_pct`, pro senzory `energy_pnd_deviation_*`). **Počítá AppDaemon** (`hav2_boiler.py`), 07:30 a po stažení PND. | D+1 |
 | `binary_sensor.energy_forecast_valid` | Solcast aktualizován < 6 h a API nevyčerpané | 1 min |
 
 ## 4. Ovládací vrstva (helpers)
@@ -266,7 +267,9 @@ stateDiagram-v2
 
 ### 5.6 Bojler (WATrouter) – experiment, výchozí stav vypnuto
 
-- WATrouter nelze řídit ani nastavit. V 16:15 hřeje ze sítě, protože voda není teplá.
+- WATrouter nelze řídit ani nastavit. V 16:09 hřeje ze sítě, protože voda není teplá. Teplá voda je potřeba 18–22 h, přesun nuceného ohřevu do NT proto **nepřichází v úvahu** (rozhodnutí uživatele 26. 9.).
+- **Skutečnost podle PND (12.–25. 9.):** průměr 4,2 kWh a 22 Kč/den, 25. 9. 6,36 kWh a 38 Kč (16:07–18:55 skoro nepřetržitě).
+- **Varianta s elektrikářem:** přepojit okruh bojleru za měřicí transformátory GoodWe → ohřev 16–19 h kryje baterie nabitá ze slunce (odhad 5–8 tis. Kč/rok, upřesnit z delší řady PND).
 - **Hypotéza:** když v poledne vznikne na síti přetok ~2,3 kW, WATrouter ho pošle do bojleru. Voda pak bude v 16:15 teplá a nucený ohřev bude krátký.
 - **Test (1 slunečný den, `energy_boiler_preheat` = on):**
   - 11:00–14:00, baterie ≥ 90 %, FVE_opr > 4 kW → `sell_power` 2300 W po dobu 90 min.
