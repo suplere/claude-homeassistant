@@ -249,6 +249,8 @@ stateDiagram-v2
 
 **Plná baterie domu:** EV má přednost před prodejem až do 11 A.
 
+**3f z plné baterie (doplněno 26. 9.):** když má baterie ≥ 90 %, výkup je < 1 Kč/kWh a opravená FVE ji do večera dobije (rezerva 2 kWh), nabíjí se 3f na minimum i při přebytku od ~3,2 kW. Rozdíl do 1 kW kryje baterie, a to bez limitu epizody 10 min / 1 kWh. Přepnutí na 1f až pod ~3,2 kW. Důvod: přetok za ~0 Kč je horší než kWh pro EV, která by se jinak v noci koupila za NT.
+
 ### 5.5 Filtrace bazénu
 
 - **Bazénový den je 06:00–06:00**, aby se zbývající hodiny daly doplnit v celém NT bloku 22–06 (jinak by do konce kalendářního dne zbyly jen 2 h NT). *K odsouhlasení.*

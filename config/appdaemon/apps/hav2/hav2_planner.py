@@ -117,7 +117,9 @@ def build_slots(
 
     pv_30min: [(začátek, průměrný výkon kW)] po 30 min (opravená předpověď).
     load_kwh_by_hour / boiler_kwh_by_hour: energie za hodinu začínající v daném čase.
-    spot_by_hour: {začátek hodiny: Kč/kWh}; chybějící hodina → poslední známá cena.
+    spot_by_hour: {začátek hodiny: Kč/kWh}; chybějící hodina (zítřek před vydáním cen ~13:00)
+    → stejná hodina o den (dva dny) dřív, teprve pak poslední známá cena. Jinak by se
+    večerní cena přenesla na zítřejší poledne a plán by počítal s vysokým výkupem.
     """
     start = floor_slot(now)
     if horizon_end is None:
@@ -131,7 +133,9 @@ def build_slots(
     t = start
     while t < horizon_end:
         hour = t.replace(minute=0)
-        spot = spot_by_hour.get(hour, last_spot)
+        spot = spot_by_hour.get(hour)
+        if spot is None:
+            spot = spot_by_hour.get(hour - timedelta(days=1), spot_by_hour.get(hour - timedelta(days=2), last_spot))
         last_spot = spot
         frac = 1.0
         if t == start:

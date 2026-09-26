@@ -229,3 +229,44 @@ def test_plan_slot_now_lookup():
     now = datetime(2026, 9, 25, 22, 7, tzinfo=TZ)
     plan = plan_ev(ev_slots(now.replace(minute=0), 10), EvPlanParams(needed_kwh=5, mode="Solár+NT"), now)
     assert plan.slot_now(now) == "NT"
+
+
+# ------------------------------------------------------- 3f z plné baterie
+
+
+def test_full_battery_cheap_export_keeps_3f_with_support_without_limit():
+    # 26. 9. 13:00: přebytek 3,5 kW, baterie 99 %, výkup 0,04 Kč → 3f 6 A, rozdíl z baterie
+    reg = Regulator(state=STATE_SOLAR)
+    inp = inputs(surplus_w=3500, battery_soc=99, sell_price=0.04, battery_refill=True)
+    cmd, _ = run(reg, inp, 30)  # 30 min – déle než limit epizody 10 min
+    assert (cmd.enable, cmd.amps, cmd.phases, cmd.state) == (True, 6, 3, STATE_SUPPORT)
+    assert "plné baterie" in cmd.reason
+
+
+def test_no_boost_when_export_is_valuable_switches_to_1f():
+    reg = Regulator(state=STATE_SOLAR)
+    inp = inputs(surplus_w=3500, battery_soc=99, sell_price=3.0, battery_refill=True)
+    cmd, _ = run(reg, inp, 6)
+    assert cmd.phases == 1 and cmd.enable
+
+
+def test_no_boost_when_battery_would_not_refill():
+    reg = Regulator(state=STATE_SOLAR)
+    inp = inputs(surplus_w=3500, battery_soc=99, sell_price=0.04, battery_refill=False)
+    cmd, _ = run(reg, inp, 6)
+    assert cmd.phases == 1
+
+
+def test_boost_deficit_too_large_falls_back():
+    # přebytek 2,5 kW → rozdíl 1,67 kW > 1 kW: ne 3f z baterie
+    reg = Regulator(state=STATE_SOLAR)
+    inp = inputs(surplus_w=2500, battery_soc=99, sell_price=0.04, battery_refill=True)
+    cmd, _ = run(reg, inp, 6)
+    assert cmd.phases == 1
+
+
+def test_boost_resume_starts_3f():
+    reg = Regulator(state=STATE_PAUSED)
+    inp = inputs(surplus_w=3400, cur_enabled=False, battery_soc=95, sell_price=0.1, battery_refill=True)
+    cmd, _ = run(reg, inp, 6)
+    assert cmd.enable and cmd.phases == 3 and cmd.amps == 6

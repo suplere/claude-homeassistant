@@ -195,3 +195,15 @@ def test_hourly_table_rows_are_text_and_aggregated():
     first_import = sum(r.grid_import_kwh for r in plan.results[:4])
     assert table[0]["nakup"] == f"{first_import:.2f}"
     assert any(row["rezim"] == "nabíjet ze sítě" for row in table)
+
+
+def test_missing_tomorrow_spot_uses_same_hour_yesterday():
+    # před vydáním zítřejších cen: zítřejší poledne = dnešní poledne, ne dnešní večer
+    now = datetime(2026, 9, 26, 12, 0, tzinfo=TZ)
+    today = {now.replace(hour=h): (0.05 if 10 <= h <= 15 else 4.5) for h in range(24)}
+    pv = pv_curve(now, 5.0) + pv_curve(now + timedelta(days=1), 5.0)
+    slots = build_slots(now, pv, lambda h: 0.4, lambda h: 0.0, today, nt)
+    noon_tomorrow = next(s for s in slots if s.start == datetime(2026, 9, 27, 12, 0, tzinfo=TZ))
+    evening_tomorrow = next(s for s in slots if s.start == datetime(2026, 9, 27, 20, 0, tzinfo=TZ))
+    assert noon_tomorrow.spot == 0.05
+    assert evening_tomorrow.spot == 4.5

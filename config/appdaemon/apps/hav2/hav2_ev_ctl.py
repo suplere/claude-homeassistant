@@ -37,6 +37,7 @@ class EvControl:
         self.ev_reg = E.Regulator()
         self.ev_plan: Optional[E.EvPlan] = None
         self.ev_reserve_w = 0.0
+        self.ev_battery_refill = False
         self.ev_virtual: Optional[E.Command] = None
         self.ev_written: Optional[Tuple[E.Command, datetime]] = None
         self.ev_override_until: Optional[datetime] = None
@@ -121,6 +122,10 @@ class EvControl:
         fills = soc >= 95 or any(r.soc_pct >= 95 for r in plan.results if now <= r.start < end)
         deadline_danger = ev_plan.shortfall_kwh > 0.05
         hours = max(1.0, (end - now).total_seconds() / 3600)
+        # „3f z plné baterie“: plán ji do 17:00 dobije a opravená FVE na zbytek dne pokryje
+        # doplnění baterie s rezervou 2 kWh (EV dotované z baterie pak nechybí večer)
+        pv_rest = self.fnum("sensor.energy_pv_forecast_corrected", 0)
+        self.ev_battery_refill = fills and pv_rest >= (100 - soc) / 100 * cap + 2.0 and now < end
         self.ev_reserve_w = 0.0 if (fills or deadline_danger or now >= end) else \
             round(min(5000.0, (100 - soc) / 100 * cap / hours * 1000), 0)
 
@@ -181,6 +186,8 @@ class EvControl:
             worst_phase_a=25 - self.fnum("sensor.energy_breaker_headroom_a", 25),
             boiler_heating=self.get_state("binary_sensor.energy_boiler_heating") == "on",
             cur_enabled=enabled, cur_amps=amps, cur_phases=phases,
+            sell_price=self.fnum("sensor.energy_price_sell_now", 99.0),
+            battery_refill=getattr(self, "ev_battery_refill", False),
         )
 
     # ------------------------------------------------------------ smyčka

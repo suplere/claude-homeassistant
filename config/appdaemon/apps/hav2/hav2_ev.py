@@ -177,6 +177,12 @@ class RegParams:
     breaker_limit_a: float = 23.0
     breaker_hold_s: float = 10.0
     boiler_3f_max_a: int = 8
+    # 3f z plné baterie: když je baterie skoro plná, výkup skoro nulový a slunce ji do večera
+    # dobije, je lepší nabíjet 3f na minimum a malý rozdíl krýt z baterie, než posílat
+    # přebytek do sítě (kWh pro EV by se jinak v noci koupila za NT)
+    boost_soc: float = 90.0
+    boost_max_sell: float = 1.0  # Kč/kWh (spot × koeficient)
+    boost_max_deficit_w: float = 1000.0
 
 
 @dataclass
@@ -198,6 +204,8 @@ class RegInputs:
     cur_enabled: bool
     cur_amps: int
     cur_phases: int
+    sell_price: float = 99.0  # výkupní cena teď (Kč/kWh); výchozí = „drahý“ → bez 3f z baterie
+    battery_refill: bool = False  # předpověď FVE do večera baterii dobije
 
 
 @dataclass
@@ -303,7 +311,10 @@ class Regulator:
         avail_kw = i.surplus_w / 1000
         min_1f = ev_power_kw(1, p.amin)
         min_3f = ev_power_kw(3, p.amin)
-        lowest = min_1f if p.allow_1f else min_3f
+        boost = (i.battery_soc >= p.boost_soc and i.sell_price < p.boost_max_sell and i.battery_refill)
+        # s „3f z baterie“ stačí na 3f minimum o boost_max_deficit méně
+        min_3f_eff = min_3f - (p.boost_max_deficit_w / 1000 if boost else 0.0)
+        lowest = min(min_1f if p.allow_1f else min_3f, min_3f_eff)
 
         # --- nabíjení neběží: čekáme na stabilní přebytek
         if not i.cur_enabled:
@@ -311,7 +322,7 @@ class Regulator:
                 self.resume_since = self.resume_since or i.now
                 waited = (i.now - self.resume_since).total_seconds() / 60
                 if waited >= p.resume_after_min:
-                    ph = 3 if (avail_kw >= min_3f or not p.allow_1f) else 1
+                    ph = 3 if (avail_kw >= min_3f_eff or not p.allow_1f) else 1
                     amps = max_amps_for(ph, avail_kw, p.amin, p.amax) or p.amin
                     self.resume_since = None
                     self._reset_episode()
@@ -326,8 +337,8 @@ class Regulator:
         ph, amps = i.cur_phases, i.cur_amps
         if self.state not in (STATE_SOLAR, STATE_SUPPORT):
             # návrat z plánu / Rychle / ručního režimu: rovnou na proud podle přebytku
-            ph = 3 if (avail_kw >= min_3f or not p.allow_1f) else ph
-            fit = max_amps_for(ph, avail_kw, p.amin, p.amax)
+            ph = 3 if (avail_kw >= min_3f_eff or not p.allow_1f) else ph
+            fit = max_amps_for(ph, avail_kw, p.amin, p.amax) or (p.amin if ph == 3 and boost else None)
             if fit is not None:
                 self._reset_episode()
                 return self._cmd(True, self._cap(i, ph, fit), ph, STATE_SOLAR,
@@ -336,9 +347,11 @@ class Regulator:
 
         # --- volba fází s hysterezí (max. 1× za 10 min)
         want = 0
-        if ph == 1 and avail_kw * 1000 > p.to3f_w:
+        to3f_w = min(p.to3f_w, min_3f_eff * 1000 + p.up_margin_w) if boost else p.to3f_w
+        to1f_w = min(p.to1f_w, min_3f_eff * 1000) if boost else p.to1f_w
+        if ph == 1 and avail_kw * 1000 > to3f_w:
             want = 3
-        elif ph == 3 and p.allow_1f and avail_kw * 1000 < p.to1f_w:
+        elif ph == 3 and p.allow_1f and avail_kw * 1000 < to1f_w:
             want = 1
         if want:
             if self.phase_cond_dir != want:
@@ -371,6 +384,12 @@ class Regulator:
 
         # --- na minimu a přebytek nestačí → dotování z baterie, nebo pauza
         deficit_kw = max(0.0, now_kw - avail_kw)
+        if boost and ph == 3 and deficit_kw * 1000 <= p.boost_max_deficit_w:
+            # plná baterie, výkup ~0, slunce ji dobije → bez limitu epizody
+            self._reset_episode()
+            return self._cmd(True, amps, ph, STATE_SUPPORT,
+                             f"3f z plné baterie: dotuje {deficit_kw * 1000:.0f} W (SOC {i.battery_soc:.0f} %, "
+                             f"výkup {i.sell_price:.2f} Kč)")
         if self.support_since is None:
             self.support_since = i.now
         else:
