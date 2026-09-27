@@ -269,7 +269,7 @@ stateDiagram-v2
 ### 5.5 Filtrace bazénu
 
 - **Bazénový den je 06:00–06:00**, aby se zbývající hodiny daly doplnit v celém NT bloku 22–06 (jinak by do konce kalendářního dne zbyly jen 2 h NT). *K odsouhlasení.*
-- **Cíl hodin:** `pool_hours_required`, nebo při zapnutém doporučení `pool_hours_recommended` (teplota / 2, +1 h při ORP < 650 mV).
+- **Cíl hodin:** `pool_hours_required`, nebo při zapnutém doporučení `pool_hours_recommended` (< 12 °C minimum, do 18 °C teplota / 3, od 22 °C teplota / 2, mezi tím plynule; +1 h při ORP < 650 mV; omezeno `pool_hours_min`/`max`).
 - **Přednostně z FVE:**
   - Zapnout, když vyhlazený přebytek ≥ 600 W po dobu 5 min (čerpadlo 500 W na L2; asymetrie střídače fázi pokryje).
   - Běží **min. 60 min**, pak vypnout, když přebytek < 200 W po dobu 10 min.

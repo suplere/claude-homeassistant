@@ -234,11 +234,14 @@ template:
         unit_of_measurement: h
         device_class: duration
         icon: mdi:pool-thermometer
-        # teplota vody / 2, +1 h při ORP < 650 mV, omezeno min/max
+        # < 12 °C minimum, do 18 °C teplota / 3, od 22 °C teplota / 2, mezi tím plynule;
+        # +1 h při ORP < 650 mV; omezeno min/max
         availability: "{{ has_value('sensor.pool_water_temperature') }}"
         state: >
-          {% set h = states('sensor.pool_water_temperature') | float / 2
-                     + (1 if states('sensor.davkovac_orp') | float(700) < 650 else 0) %}
+          {% set t = states('sensor.pool_water_temperature') | float %}
+          {% set k = ([[(t - 18) / 4, 0] | max, 1] | min) %}
+          {% set base = 0 if t < 12 else t / 3 + (t / 2 - t / 3) * k %}
+          {% set h = base + (1 if states('sensor.davkovac_orp') | float(700) < 650 else 0) %}
           {% set h = [[h, states('input_number.pool_hours_min') | float(2)] | max,
                       states('input_number.pool_hours_max') | float(12)] | min %}
           {{ (h * 2) | round(0) / 2 }}

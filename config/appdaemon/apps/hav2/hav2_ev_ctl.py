@@ -135,7 +135,10 @@ class EvControl:
         # doplnění baterie s rezervou 2 kWh (EV dotované z baterie pak nechybí večer)
         pv_rest = self.fnum("sensor.energy_pv_forecast_corrected", 0)
         self.ev_battery_refill = fills and pv_rest >= (100 - soc) / 100 * cap + 2.0 and now < end
-        self.ev_reserve_w = 0.0 if (fills or deadline_danger or now >= end) else \
+        # rezerva podle skutečného SOC, ne podle plánu baterie: ten spotřebu EV nezná, takže
+        # „nabije se do poledne“ platí jen bez auta – s rezervou 0 by EV sebralo celý přebytek
+        # a baterie by večer chyběla ve VT (kWh pro EV má hodnotu jen NT)
+        self.ev_reserve_w = 0.0 if (soc >= 95 or deadline_danger or now >= end) else \
             round(min(5000.0, (100 - soc) / 100 * cap / hours * 1000), 0)
 
         self.set_state("sensor.ev_plan", state=ev_plan.reason[:250], attributes={
