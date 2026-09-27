@@ -85,6 +85,8 @@ DATA_ATTRS = {
     "ev_reason": ("sensor.ev_regulator", "reason"),
     "ev_plan": ("sensor.ev_plan", "state"),
     "ev_reserve_w": ("sensor.ev_plan", "battery_reserve_w"),
+    "boiler_reserve_w": ("sensor.ev_regulator", "boiler_reserve_w"),
+    "boiler_gate": ("sensor.ev_regulator", "boiler_gate"),
     "pool_reason": ("sensor.pool_controller", "reason"),
     "export_reason": ("sensor.energy_export_control", "reason"),
 }
@@ -385,7 +387,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         cost_today = sum(r.cost for r in plan.results if r.start.date() == today)
         cost_tomorrow = sum(r.cost for r in plan.results if r.start.date() > today)
 
-        self.set_state("sensor.energy_plan", state=act.mode, attributes={
+        # replace=True: atributy se nahradí celé (jinak AppDaemon slučuje se starými)
+        self.set_state("sensor.energy_plan", state=act.mode, replace=True, attributes={
             "friendly_name": "HAv2 plán baterie", "icon": "mdi:calendar-clock",
             "power_kw": f"{act.power_kw:.2f}",
             "reason": plan.reason,
@@ -539,7 +542,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             prefix = "" if execute else "[doporučení] "
             self.call_service("logbook/log", name="HAv2 přetok", message=f"{prefix}{reason}"[:500])
             self.log(f"{prefix}{reason}")
-        self.set_state("sensor.energy_export_control", state="omezeno" if block else "povoleno", attributes={
+        self.set_state("sensor.energy_export_control", state="omezeno" if block else "povoleno", replace=True, attributes={
             "friendly_name": "HAv2 omezení přetoku", "icon": "mdi:transmission-tower-export",
             "limit_w": str(limit), "reason": reason, "executing": "ano" if execute else "ne",
             "updated": now.isoformat(),

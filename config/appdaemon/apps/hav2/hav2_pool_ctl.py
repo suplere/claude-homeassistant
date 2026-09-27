@@ -113,7 +113,7 @@ class PoolControl:
         nt_h = B.expected_nt_hours(inp.target_h, inp.hours_done, self.pool_solar_hours_left)
         plan_text = (f"{inp.hours_done:.1f}/{inp.target_h:.1f} h, slunce ~{self.pool_solar_hours_left:.1f} h, "
                      f"NT ~{nt_h:.1f} h")
-        self.set_state("sensor.pool_plan", state=plan_text, attributes={
+        self.set_state("sensor.pool_plan", state=plan_text, replace=True, attributes={
             "friendly_name": "HAv2 plán filtrace", "icon": "mdi:calendar-clock",
             "target_h": f"{inp.target_h:.1f}",
             "done_h": f"{inp.hours_done:.2f}",
@@ -124,7 +124,7 @@ class PoolControl:
         key = (cmd.on, cmd.state, cmd.reason, execute, overridden)
         if key != self.pool_published:
             self.pool_published = key
-            self.set_state("sensor.pool_controller", state=cmd.state, attributes={
+            self.set_state("sensor.pool_controller", state=cmd.state, replace=True, attributes={
                 "friendly_name": "HAv2 řízení filtrace", "icon": "mdi:pool",
                 "pump_on": "ano" if cmd.on else "ne",
                 "reason": cmd.reason,

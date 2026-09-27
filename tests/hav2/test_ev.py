@@ -8,6 +8,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "config/appdaemon/apps/hav2"))
 
 from hav2_ev import (  # noqa: E402
+    BoilerGate,
+    BoilerInputs,
     STATE_DONE,
     STATE_MANUAL,
     STATE_PAUSED,
@@ -293,3 +295,79 @@ def test_plan_defers_nt_beyond_forecast_horizon():
     assert plan.grid_slots == {}
     assert plan.nt_kwh > 0 and plan.shortfall_kwh == 0
     assert "později" in plan.reason
+
+
+# ------------------------------------------------------- prostor pro bojler
+
+T_NOON = datetime(2026, 9, 28, 11, 0, tzinfo=TZ)
+
+
+def binp(**kw):
+    base = dict(now=T_NOON, eligible=True, surplus_w=3500, battery_soc=100, heating=False, grid_export_w=0)
+    base.update(kw)
+    return BoilerInputs(**base)
+
+
+def brun(gate, inp, steps, dt=5, **changes):
+    r = 0.0
+    for _ in range(steps):
+        inp = replace(inp, now=inp.now + timedelta(seconds=dt), **changes)
+        r = gate.step(inp)
+    return r, inp
+
+
+def test_boiler_reserve_after_hold_and_off_below_threshold():
+    g = BoilerGate()
+    r, inp = brun(g, binp(), 30)  # 150 s < 180 s
+    assert r == 0
+    r, inp = brun(g, inp, 10)
+    assert r == 2500
+    r, inp = brun(g, inp, 1, surplus_w=2400)  # hystereze: nad off_w drží
+    assert r == 2500
+    r, inp = brun(g, inp, 1, surplus_w=2200)
+    assert r == 0
+
+
+def test_boiler_reserve_blocked_outside_window_low_soc_or_not_eligible():
+    for kw in (dict(now=T_NOON.replace(hour=9)), dict(now=T_NOON.replace(hour=15, minute=40)),
+               dict(battery_soc=95), dict(eligible=False)):
+        g = BoilerGate()
+        r, _ = brun(g, binp(**kw), 60)
+        assert r == 0, kw
+
+
+def test_boiler_heating_means_no_double_reserve():
+    g = BoilerGate()
+    r, inp = brun(g, binp(), 40)
+    assert r == 2500
+    r, inp = brun(g, inp, 1, heating=True)
+    assert r == 0 and g.reason == "bojler hřeje"
+
+
+def test_boiler_done_after_export_without_heating():
+    g = BoilerGate()
+    r, inp = brun(g, binp(), 40)
+    r, inp = brun(g, inp, 170, grid_export_w=2500)  # 850 s < 900 s
+    assert r == 2500
+    r, inp = brun(g, inp, 12)
+    assert r == 0 and g.done
+    r, inp = brun(g, inp, 60, grid_export_w=0)  # do konce dne už ne
+    assert r == 0
+    r, _ = brun(g, replace(inp, now=inp.now + timedelta(days=1)), 40)  # další den znovu
+    assert r == 2500
+
+
+def test_boiler_done_timer_ignores_minutes_without_export():
+    g = BoilerGate()
+    r, inp = brun(g, binp(), 40)
+    for _ in range(4):  # trouba / nabíjení baterie: přetok jen občas
+        r, inp = brun(g, inp, 24, grid_export_w=2500)
+        r, inp = brun(g, inp, 24, grid_export_w=500)
+    assert r == 2500 and not g.done
+
+
+def test_boiler_disabled_switch():
+    g = BoilerGate()
+    g.p.enabled = False
+    r, _ = brun(g, binp(), 60)
+    assert r == 0

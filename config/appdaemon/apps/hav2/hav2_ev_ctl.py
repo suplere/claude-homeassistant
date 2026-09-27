@@ -38,6 +38,9 @@ class EvControl:
         self.ev_plan: Optional[E.EvPlan] = None
         self.ev_reserve_w = 0.0
         self.ev_battery_refill = False
+        self.ev_boiler = E.BoilerGate()
+        self.ev_boiler_reserve_w = 0.0
+        self.ev_boiler_logged: Optional[tuple] = None
         self.ev_virtual: Optional[E.Command] = None
         self.ev_written: Optional[Tuple[E.Command, datetime]] = None
         self.ev_override_until: Optional[datetime] = None
@@ -141,7 +144,7 @@ class EvControl:
         self.ev_reserve_w = 0.0 if (soc >= 95 or deadline_danger or now >= end) else \
             round(min(5000.0, (100 - soc) / 100 * cap / hours * 1000), 0)
 
-        self.set_state("sensor.ev_plan", state=ev_plan.reason[:250], attributes={
+        self.set_state("sensor.ev_plan", state=ev_plan.reason[:250], replace=True, attributes={
             "friendly_name": "HAv2 plán nabíjení EV", "icon": "mdi:calendar-clock",
             "needed_kwh": f"{ev_plan.needed_kwh:.2f}",
             "solar_kwh": f"{ev_plan.solar_kwh:.2f}",
@@ -175,26 +178,41 @@ class EvControl:
         virtual_pool = getattr(self, "pool_virtual", None)
         pool_w = (self.fnum("input_number.filtrace_vykon_w", 500) if virtual_pool else 0.0) \
             if virtual_pool is not None else self.fnum("sensor.bazenova_filtrace_vykon", 0)
-        surplus = self.fnum("sensor.energy_surplus_smoothed_w", 0) - pool_w - self.ev_reserve_w
         needed = self.get_state("sensor.ev_energy_needed_kwh")
         try:
             target_reached = float(needed) <= 0.05
         except (TypeError, ValueError):
             target_reached = False
+        connected = self.get_state(EV_CONNECTED) == "on"
+        mode = self.get_state("input_select.ev_mode") or "Solár+NT"
+        manual = self.get_state("input_select.ev_manual") or "Auto"
+        plan_slot = self.ev_plan.slot_now(now) if self.ev_plan else None
+        surplus_pool = self.fnum("sensor.energy_surplus_smoothed_w", 0) - pool_w
+        # prostor pro bojler (WATrouter): jen když EV nabíjí ze slunce a termín nehrozí
+        self.ev_boiler.p.enabled = self.get_state("input_boolean.ev_boiler_priority") == "on"
+        eligible = (connected and not target_reached and mode in ("Solár", "Solár+NT") and manual == "Auto"
+                    and not plan_slot and not (self.ev_plan and self.ev_plan.shortfall_kwh > 0.05))
+        self.ev_boiler_reserve_w = self.ev_boiler.step(E.BoilerInputs(
+            now=now, eligible=eligible, surplus_w=surplus_pool,
+            battery_soc=self.fnum("sensor.battery_state_of_charge", 0),
+            heating=self.get_state("binary_sensor.energy_boiler_heating") == "on",
+            grid_export_w=self.fnum("sensor.meter_active_power_total", 0)))
+        self._ev_log_boiler(now)
+        surplus = surplus_pool - self.ev_reserve_w - self.ev_boiler_reserve_w
         lowest = E.ev_power_kw(1 if self.ev_reg.p.allow_1f else 3, self.ev_reg.p.amin)
         return E.RegInputs(
             now=now,
-            connected=self.get_state(EV_CONNECTED) == "on",
+            connected=connected,
             available=available,
-            mode=self.get_state("input_select.ev_mode") or "Solár+NT",
-            manual=self.get_state("input_select.ev_manual") or "Auto",
+            mode=mode,
+            manual=manual,
             manual_current=int(self.fnum("input_number.ev_manual_current", 11)),
             manual_phases=self.get_state("input_select.ev_manual_phases") or "Auto",
             target_reached=target_reached,
             surplus_w=surplus,
             battery_soc=self.fnum("sensor.battery_state_of_charge", 0),
             sun_returns=self.ev_sun_returns(now, lowest),
-            plan_slot=self.ev_plan.slot_now(now) if self.ev_plan else None,
+            plan_slot=plan_slot,
             worst_phase_a=25 - self.fnum("sensor.energy_breaker_headroom_a", 25),
             boiler_heating=self.get_state("binary_sensor.energy_boiler_heating") == "on",
             cur_enabled=enabled, cur_amps=amps, cur_phases=phases,
@@ -236,10 +254,10 @@ class EvControl:
             self.ev_written = (cmd, now)
 
     def _ev_publish(self, now: datetime, cmd: E.Command, inp: E.RegInputs, execute: bool, overridden: bool) -> None:
-        key = (cmd.enable, cmd.amps, cmd.phases, cmd.state, cmd.reason, execute, overridden)
+        key = (cmd.enable, cmd.amps, cmd.phases, cmd.state, cmd.reason, execute, overridden, self.ev_boiler.reason)
         if key != self.ev_published:
             self.ev_published = key
-            self.set_state("sensor.ev_regulator", state=cmd.state, attributes={
+            self.set_state("sensor.ev_regulator", state=cmd.state, replace=True, attributes={
                 "friendly_name": "HAv2 regulátor EV", "icon": "mdi:ev-station",
                 "enable": "ano" if cmd.enable else "ne",
                 "current_a": str(cmd.amps),
@@ -248,6 +266,8 @@ class EvControl:
                 "reason": cmd.reason,
                 "surplus_for_ev_w": f"{inp.surplus_w:.0f}",
                 "battery_reserve_w": f"{self.ev_reserve_w:.0f}",
+                "boiler_reserve_w": f"{self.ev_boiler_reserve_w:.0f}",
+                "boiler_gate": self.ev_boiler.reason,
                 "worst_phase_a": f"{inp.worst_phase_a:.1f}",
                 "sun_returns": "ano" if inp.sun_returns else "ne",
                 "plan_slot": inp.plan_slot or "",
@@ -265,6 +285,17 @@ class EvControl:
             self.call_service("input_text/set_value", entity_id="input_text.ev_last_decision", value=text[:255])
             self.call_service("logbook/log", name="HAv2 EV", message=text[:500])
             self.log(text)
+
+    def _ev_log_boiler(self, now: datetime) -> None:
+        """Do logbooku jen začátek/konec rezervy pro bojler a „nahřátý“."""
+        state = (self.ev_boiler_reserve_w > 0, self.ev_boiler.done)
+        if self.ev_boiler_logged is None or state == self.ev_boiler_logged:
+            self.ev_boiler_logged = state
+            return
+        self.ev_boiler_logged = state
+        text = f"{now:%H:%M} bojler: {self.ev_boiler.reason}"
+        self.call_service("logbook/log", name="HAv2 EV", message=text)
+        self.log(text)
 
     # ------------------------------------------------ ruční zásah / override
     def _ev_detect_override(self, now: datetime, available: bool, enabled: bool, amps: int, phases: int) -> None:

@@ -211,6 +211,9 @@ input_boolean:
   ev_allow_1f:
     name: EV povolit 1f (L1)
     icon: mdi:numeric-1-circle
+  ev_boiler_priority:
+    name: EV nechá přebytek bojleru
+    icon: mdi:water-boiler-auto
   pool_season:
     name: Sezóna bazénu
     icon: mdi:pool

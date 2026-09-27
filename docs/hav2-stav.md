@@ -91,6 +91,12 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
   > ~2,5 kW má mít přednost bojler. **Otevřené:** pravidlo v regulaci EV („nechat prostor bojleru“) – nejdřív
   ověřit chování WATrouteru na dalších slunečných dnech (27.–28. 9.) z PND `sensor.energy_boiler_pnd_daily`
   (atributy `hours_json`, `export_loss_kwh`) a detektoru `binary_sensor.energy_boiler_heating`.
+- **Nasazeno 27. 9. 09:45: prostor pro bojler v regulaci EV** (architektura §5.4, `input_boolean.ev_boiler_priority` on).
+  Ověřit na prvním slunečném dni: `boiler_gate` v minutovém záznamu, detektor bojleru a PND `hours_json` / `export_loss_kwh`.
+  Detektor zachytil polední ohřevy 26. 9. (12:13–12:47, 13:44–14:08) se zpožděním ~5 min – shoda s PND.
+  Přehrání dat 26. 9. odpoledne: rezerva by nesepnula (přebytek nevydržel 3 min nad 2,6 kW).
+- Zjištění 26.–27. 9.: baterie přes noc 100 → 37 % bez NT nabíjení (správně); EV 1f jen ~0,8 kWh, proud kmitá ±1 A/min
+  kvůli troubě (spotřeba skáče ~2,1 kW/min); filtrace dobíhá z baterie (NT doplnění i po 16:58 – drobnost).
 - PND v HA jen **hodinově** (integrace stahuje 15 min, ale externí statistiky HA jsou hodinové).
 - Opraveno během testu: plán EV nabíjel v první NT místo poslední před termínem; rezerva baterie před EV
   se řídila plánem baterie, který nezná EV (EV by sebralo celé dopoledne); plné nabití baterie 1× za 30 dní

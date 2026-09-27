@@ -421,3 +421,92 @@ class Regulator:
         self._reset_episode()
         self.resume_since = None
         return self._cmd(False, amps, ph, STATE_PAUSED, f"pozastaveno: {why}")
+
+
+# ------------------------------------------------------- prostor pro bojler
+# WATrouter (bojler 2,2 kW mimo měření GoodWe) spíná celým výkonem, až když přetok zřetelně
+# převýší ~2,2 kW. kWh v bojleru ušetří VT (nucený ohřev od 16:09), kWh v EV jen NT →
+# při plné baterii a velkém přebytku EV nechá bojleru 2,5 kW (docs/hav2-architektura.md §5.4).
+
+
+@dataclass
+class BoilerParams:
+    enabled: bool = True
+    start_h: float = 10.0  # okno (místní čas); začátek jde později posunout třeba na 12:00
+    end_h: float = 15.5
+    min_soc: float = 97.0  # baterie plná → přebytek jde do sítě, WATrouter ho uvidí
+    on_w: float = 2600.0  # zapnout, když přebytek (bez filtrace) ≥ on_w po dobu on_hold_s
+    off_w: float = 2300.0  # vypnout pod off_w (pod tím by bojler stejně nesepnul)
+    on_hold_s: float = 180.0
+    reserve_w: float = 2500.0
+    done_export_w: float = 2300.0  # přetok GoodWe, při kterém by WATrouter musel sepnout
+    done_after_s: float = 900.0  # tolik přetoku bez ohřevu → bojler nahřátý, do konce dne konec
+
+
+@dataclass
+class BoilerInputs:
+    now: datetime
+    eligible: bool  # EV připojené, chce nabíjet ze slunce, termín nehrozí
+    surplus_w: float  # vyhlazený přebytek bez filtrace (před rezervou)
+    battery_soc: float
+    heating: bool  # binary_sensor.energy_boiler_heating
+    grid_export_w: float  # GoodWe přetok teď (+ = do sítě)
+
+
+@dataclass
+class BoilerGate:
+    """Rezerva přebytku pro bojler, kterou EV nechá ležet. Volat v každé smyčce (5 s)."""
+    p: BoilerParams = field(default_factory=BoilerParams)
+    active: bool = False
+    on_since: Optional[datetime] = None
+    day: Optional[str] = None
+    done: bool = False
+    idle_s: float = 0.0  # přetok bez ohřevu při aktivní rezervě
+    last: Optional[datetime] = None
+    reason: str = ""
+
+    def step(self, i: BoilerInputs) -> float:
+        p = self.p
+        dt = (i.now - self.last).total_seconds() if self.last else 0.0
+        self.last = i.now
+        day = i.now.date().isoformat()
+        if day != self.day:
+            self.day, self.done, self.idle_s = day, False, 0.0
+        hour = i.now.hour + i.now.minute / 60
+        blocked = (
+            "vypnuto" if not p.enabled
+            else "bojler dnes nahřátý" if self.done
+            else "mimo okno" if not (p.start_h <= hour < p.end_h)
+            else "EV nenabíjí ze slunce" if not i.eligible
+            else f"baterie {i.battery_soc:.0f} % < {p.min_soc:.0f} %" if i.battery_soc < p.min_soc
+            else ""
+        )
+        if blocked:
+            self.active, self.on_since = False, None
+            self.reason = blocked
+            return 0.0
+        if i.heating:
+            # přebytek už bojler odečítá (−2 250 W) → rezerva by se počítala dvakrát
+            self.idle_s = 0.0
+            self.reason = "bojler hřeje"
+            return 0.0
+        if self.active and i.surplus_w < p.off_w:
+            self.active, self.on_since = False, None
+        elif not self.active:
+            if i.surplus_w >= p.on_w:
+                self.on_since = self.on_since or i.now
+                if (i.now - self.on_since).total_seconds() >= p.on_hold_s:
+                    self.active = True
+            else:
+                self.on_since = None
+        if not self.active:
+            self.reason = f"přebytek < {p.on_w:.0f} W – EV bere vše"
+            return 0.0
+        if i.grid_export_w >= p.done_export_w:
+            self.idle_s += dt
+            if self.idle_s >= p.done_after_s:
+                self.done, self.active = True, False
+                self.reason = "bojler dnes nahřátý"
+                return 0.0
+        self.reason = f"nechává {p.reserve_w:.0f} W bojleru"
+        return p.reserve_w
