@@ -53,7 +53,7 @@ jinak jen zapíšou do logbooku „Nezapsáno“.
 Publikuje: `sensor.energy_plan`, `sensor.energy_export_control`, `sensor.energy_load_forecast`, `sensor.ev_plan`, `sensor.ev_regulator`,
 `sensor.pool_plan`, `sensor.pool_controller`, `sensor.energy_boiler_pnd_daily`, `input_text.*_last_decision`, `input_datetime.hav2_heartbeat`.
 
-Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (63 testů).
+Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (65 testů).
 
 ### Dashboard `energie-v2`
 Zdroj pravdy `dashboards/energie-v2.yaml`, nahrání:
@@ -80,6 +80,23 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - Štítky: nové HAv2 entity vždy `hav2` + oblast (`hav2_system` / `hav2_baterie` / `hav2_ev` / `hav2_bazen`) – výjimka v CLAUDE.md. Senzory z AppDaemonu štítek mít nemůžou.
 - **cez_pnd (HACS) má lokální patch** v HA `/config/custom_components/cez_pnd/http_client.py` (záloha `.orig-1.1.1`) – update z HACS ho přepíše, pak znovu aplikovat nebo počkat na opravu (issue igracek/HACS_CEZD_PND#2).
 - Citlivé: `.env` (HA_TOKEN), `config/appdaemon/apps/apps.yaml` (PND heslo) – nikdy nevypisovat ani necommitovat. (Testovací údaje v Keychain `cez_pnd_test` smazány 25. 9. 2026.)
+
+## 3b. Zjištění z testu Auto (26.–27. 9. 2026)
+
+- **WATrouter spíná bojler celým výkonem (relé), až když přetok zřetelně převýší ~2,2 kW** (test 26. 9.:
+  2,2 kW → nic, 3,3 kW → zapnul 13:44, vypnul ~14:00 po zapnutí trouby). PND 26. 9.: bojler 3,67 kWh / 11,42 Kč,
+  z toho **1,79 kWh ze slunce**; polední ohřev zkrátil nucený ohřev v 16:09 na ~35 min (obvykle 75–170).
+  Bojler je mezi elektroměrem distributora a měřením GoodWe → GoodWe vidí přetok i s bojlerem.
+- **Hodnota kWh:** bojler v poledni ušetří VT 6,10 Kč, EV jen NT 3,51 Kč → při plné baterii a přetoku
+  > ~2,5 kW má mít přednost bojler. **Otevřené:** pravidlo v regulaci EV („nechat prostor bojleru“) – nejdřív
+  ověřit chování WATrouteru na dalších slunečných dnech (27.–28. 9.) z PND `sensor.energy_boiler_pnd_daily`
+  (atributy `hours_json`, `export_loss_kwh`) a detektoru `binary_sensor.energy_boiler_heating`.
+- PND v HA jen **hodinově** (integrace stahuje 15 min, ale externí statistiky HA jsou hodinové).
+- Opraveno během testu: plán EV nabíjel v první NT místo poslední před termínem; rezerva baterie před EV
+  se řídila plánem baterie, který nezná EV (EV by sebralo celé dopoledne); plné nabití baterie 1× za 30 dní
+  (Pylontech Force H2 × 3 vyžaduje vyrovnání 1× za 3 měsíce, BMS si ho vyžádá sám); doporučení hodin filtrace
+  (do 18 °C teplota/3, od 22 °C teplota/2) a filtrace se jím řídí (`pool_use_recommendation` on).
+- EV: termín 29. 9. 06:00, cíl 80 %; plán slunce 27.–28. 9. + NT v noci 28./29. 9.
 
 ## 4. Další kroky
 
