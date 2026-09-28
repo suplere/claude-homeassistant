@@ -121,7 +121,12 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.run_every(self.heartbeat, "now", 60)
         self.run_daily(self.refresh_profile, "00:05:00")
         self.run_in(self.refresh_profile, 5)
-        self.run_every(self.tick, "now+30", 15 * 60)
+        # přepočet na hranicích 15min slotů (+10 s), aby povel slotu (např. prodej) začal a skončil včas;
+        # hned po startu jeden přepočet navíc
+        self.run_in(self.tick, 30)
+        now = datetime.now(TZ)
+        first = now.replace(second=10, microsecond=0) + timedelta(minutes=15 - now.minute % 15)
+        self.run_every(self.tick, first, 15 * 60)
         for ent in self.args.get("replan_on", []):
             self.listen_state(self.on_input_change, ent)
         self.ev_init(TZ)
