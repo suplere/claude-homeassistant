@@ -150,3 +150,7 @@ coverage.xml
 
 # HAv2 minutový záznam dat (stahuje make pull, do gitu nepatří)
 config/appdaemon/hav2_data/
+
+# runtime výstupy z HA (make pull): PND app (snímky portálu, CSV, debug) a log/lock HA-MCP
+config/appdaemon/apps/pnd/
+config/.ha_mcp/
