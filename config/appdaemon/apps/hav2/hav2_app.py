@@ -354,8 +354,11 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         for s in sched:
             try:
                 if s.get("tariff") == "NT":
-                    intervals.append((datetime.fromisoformat(s["start"]).astimezone(TZ),
-                                      datetime.fromisoformat(s["end"]).astimezone(TZ) + timedelta(seconds=1)))
+                    end = datetime.fromisoformat(s["end"]).astimezone(TZ)
+                    # „23:59:59“ = do půlnoci; „06:00:00“ = do 06:00 (slot 06:00 už je VT)
+                    if end.second == 59:
+                        end += timedelta(seconds=1)
+                    intervals.append((datetime.fromisoformat(s["start"]).astimezone(TZ), end))
             except (KeyError, TypeError, ValueError):
                 continue
         horizon = datetime.now(TZ) + timedelta(days=2)
