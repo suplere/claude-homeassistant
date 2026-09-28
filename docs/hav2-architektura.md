@@ -273,7 +273,8 @@ až když přetok převýší ~2,2 kW. kWh v bojleru ušetří VT 6,10 Kč (krat
 termín EV nehrozí a vyhlazený přebytek bez filtrace ≥ 2,6 kW po 3 min (vypnutí pod 2,3 kW). Když `binary_sensor.energy_boiler_heating`
 hlásí ohřev, rezerva je 0 (přebytek už bojler odečítá). **Bojler nahřátý:** 15 min přetoku GoodWe ≥ 2,3 kW při aktivní rezervě
 bez ohřevu (minuty bez přetoku se nepočítají) → rezerva do konce dne vypnutá. Stav: atributy `boiler_reserve_w` a `boiler_gate`
-v `sensor.ev_regulator`, logbook „HAv2 EV“, minutový záznam. Parametry v `BoilerParams` (začátek okna jde posunout např. na 12:00).
+v `sensor.ev_regulator`, logbook „HAv2 EV“, minutový záznam. „Nahřátý“ se zapíše do `input_datetime.energy_boiler_last_full`
+(přežije restart; ruční změna na jiné datum = rezervu dnes zkusit znovu). Když EV na minimu chybí jen kvůli rezervě, regulátor nedotuje z baterie, ale pozastaví. Parametry v `BoilerParams` (začátek okna jde posunout např. na 12:00).
 
 ### 5.5 Filtrace bazénu
 
@@ -281,7 +282,8 @@ v `sensor.ev_regulator`, logbook „HAv2 EV“, minutový záznam. Parametry v `
 - **Cíl hodin:** `pool_hours_required`, nebo při zapnutém doporučení `pool_hours_recommended` (< 12 °C minimum, do 18 °C teplota / 3, od 22 °C teplota / 2, mezi tím plynule; +1 h při ORP < 650 mV; omezeno `pool_hours_min`/`max`).
 - **Přednostně z FVE:**
   - Zapnout, když vyhlazený přebytek ≥ 600 W po dobu 5 min (čerpadlo 500 W na L2; asymetrie střídače fázi pokryje).
-  - Běží **min. 60 min**, pak vypnout, když přebytek < 200 W po dobu 10 min.
+  - Běží **min. 60 min**, pak vypnout, když přebytek < 200 W po dobu 10 min. Když do cíle chybělo méně než 60 min,
+    běží jen do splnění, nejméně 15 min (doplněno 28. 9.). Po restartu se doba běhu počítá od `last_changed` čerpadla.
   - Max. 4 starty denně.
 - **Doplnění:**
   - Ve 21:30 plánovač spočítá chybějící hodiny a naplánuje je do NT (od 22:00 v jednom bloku).

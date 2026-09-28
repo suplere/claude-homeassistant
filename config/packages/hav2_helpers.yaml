@@ -227,6 +227,11 @@ input_datetime:
     icon: mdi:battery-check
     has_date: true
     has_time: true
+  energy_boiler_last_full:
+    name: Bojler naposledy nahřátý (přetok bez ohřevu)
+    icon: mdi:water-boiler
+    has_date: true
+    has_time: true
   ev_deadline:
     name: EV nabito do
     icon: mdi:calendar-clock

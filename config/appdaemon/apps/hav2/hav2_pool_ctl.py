@@ -99,6 +99,7 @@ class PoolControl:
             surplus_w=self.fnum("sensor.energy_surplus_smoothed_w", 0),
             is_nt=self.pool_is_nt(now),
             running=running,
+            running_since=self._pool_running_since() if execute and running else None,
         )
         cmd = self.pool_ctl.step(inp)
         self.pool_virtual = cmd.on
@@ -107,6 +108,13 @@ class PoolControl:
         if execute and available and not overridden and cmd.on != (state == "on"):
             self.call_service("script/hav2_pool_set", on=cmd.on, reason=cmd.reason[:200])
             self.pool_written = (cmd.on, now)
+
+    def _pool_running_since(self) -> Optional[datetime]:
+        raw = (self.get_state(PUMP, attribute="all") or {}).get("last_changed")
+        try:
+            return datetime.fromisoformat(str(raw)).astimezone(self.pool_tz)
+        except (TypeError, ValueError):
+            return None
 
     def _pool_publish(self, now: datetime, cmd: B.PoolCommand, inp: B.PoolInputs,
                       execute: bool, overridden: bool) -> None:

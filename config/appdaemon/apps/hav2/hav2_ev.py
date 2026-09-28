@@ -221,6 +221,7 @@ class RegInputs:
     cur_phases: int
     sell_price: float = 99.0  # výkupní cena teď (Kč/kWh); výchozí = „drahý“ → bez 3f z baterie
     battery_refill: bool = False  # předpověď FVE do večera baterii dobije
+    boiler_reserve_w: float = 0.0  # přebytek nechaný bojleru (už odečtený ze surplus_w)
 
 
 @dataclass
@@ -399,6 +400,12 @@ class Regulator:
 
         # --- na minimu a přebytek nestačí → dotování z baterie, nebo pauza
         deficit_kw = max(0.0, now_kw - avail_kw)
+        if i.boiler_reserve_w > 0 and deficit_kw * 1000 <= i.boiler_reserve_w:
+            # chybí jen kvůli rezervě pro bojler → nedotovat z baterie, přetok nechat bojleru
+            self._reset_episode()
+            self.resume_since = None
+            return self._cmd(False, amps, ph, STATE_PAUSED,
+                             f"pozastaveno: přebytek nechán bojleru ({i.boiler_reserve_w:.0f} W)")
         if boost and ph == 3 and deficit_kw * 1000 <= p.boost_max_deficit_w:
             # plná baterie, výkup ~0, slunce ji dobije → bez limitu epizody
             self._reset_episode()

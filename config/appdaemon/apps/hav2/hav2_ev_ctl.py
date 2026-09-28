@@ -27,6 +27,8 @@ EV_CONNECTED = f"binary_sensor.{EV}_is_vehicle_connected"
 OVERRIDE_AFTER_S = 90  # rozdíl proti vlastnímu povelu starší než tohle = ruční zásah
 OVERRIDE_FOR = timedelta(hours=2)
 FORCE_UPDATE_PER_DAY = 2
+# „bojler dnes nahřátý“ – pomocník v HA: přežije restart, je vidět v UI a jde ručně změnit
+BOILER_LAST_FULL = "input_datetime.energy_boiler_last_full"
 
 
 class EvControl:
@@ -39,6 +41,7 @@ class EvControl:
         self.ev_reserve_w = 0.0
         self.ev_battery_refill = False
         self.ev_boiler = E.BoilerGate()
+        self._ev_boiler_sync(self.get_state(BOILER_LAST_FULL))
         self.ev_boiler_reserve_w = 0.0
         self.ev_boiler_logged: Optional[tuple] = None
         self.ev_virtual: Optional[E.Command] = None
@@ -54,6 +57,7 @@ class EvControl:
         self.run_every(self.ev_loop, "now+40", 5)
         self.listen_state(self.ev_on_connect, EV_CONNECTED)
         self.listen_state(self.ev_on_manual, "input_select.ev_manual")
+        self.listen_state(self.ev_on_boiler_full, BOILER_LAST_FULL)
 
     # ----------------------------------------------------------- pomocné
     def ev_executing(self) -> bool:
@@ -218,6 +222,7 @@ class EvControl:
             cur_enabled=enabled, cur_amps=amps, cur_phases=phases,
             sell_price=self.fnum("sensor.energy_price_sell_now", 99.0),
             battery_refill=getattr(self, "ev_battery_refill", False),
+            boiler_reserve_w=self.ev_boiler_reserve_w,
         )
 
     # ------------------------------------------------------------ smyčka
@@ -293,9 +298,24 @@ class EvControl:
             self.ev_boiler_logged = state
             return
         self.ev_boiler_logged = state
+        if self.ev_boiler.done:
+            self.call_service("input_datetime/set_datetime", entity_id=BOILER_LAST_FULL,
+                              timestamp=int(now.timestamp()))
         text = f"{now:%H:%M} bojler: {self.ev_boiler.reason}"
         self.call_service("logbook/log", name="HAv2 EV", message=text)
         self.log(text)
+
+    def ev_on_boiler_full(self, entity, attribute, old, new, kwargs) -> None:
+        self._ev_boiler_sync(new)
+
+    def _ev_boiler_sync(self, value: Any) -> None:
+        """Pomocník s dnešním datem = bojler dnes nahřátý; jiné datum (ruční změna) = zkusit znovu."""
+        today = datetime.now(self.ev_tz).date().isoformat()
+        g = self.ev_boiler
+        if str(value or "")[:10] == today:
+            g.day, g.done, g.reason = today, True, "bojler dnes nahřátý"
+        elif g.done and g.day == today:
+            g.done = False
 
     # ------------------------------------------------ ruční zásah / override
     def _ev_detect_override(self, now: datetime, available: bool, enabled: bool, amps: int, phases: int) -> None:

@@ -2,7 +2,8 @@
 
 Návrh: docs/hav2-architektura.md §5.5.
 - bazénový den 06:00–06:00, cíl hodin = požadované nebo doporučené (teplota / ORP)
-- přednostně z přetoků FVE: start při přebytku ≥ 600 W po 5 min, min. běh 60 min,
+- přednostně z přetoků FVE: start při přebytku ≥ 600 W po 5 min, min. běh 60 min
+  (když do cíle chybělo méně, jen do splnění, nejméně 15 min),
   stop při přebytku < 200 W po 10 min, max. 4 solární starty za den
 - zbytek hodin v NT od 22:00 v jednom bloku (do splnění nebo do 06:00)
 Přebytek (sensor.energy_surplus_smoothed_w) nezahrnuje čerpadlo ani EV, takže se
@@ -43,6 +44,7 @@ class PoolParams:
     stop_surplus_w: float = 200.0
     stop_hold_min: float = 10.0
     min_run_min: float = 60.0
+    short_run_min: float = 15.0  # nejkratší běh, když do cíle chybí méně než min_run_min
     max_solar_starts: int = 4
 
 
@@ -56,6 +58,7 @@ class PoolInputs:
     surplus_w: float
     is_nt: bool
     running: bool
+    running_since: Optional[datetime] = None  # od kdy čerpadlo běží (last_changed), po restartu
 
 
 @dataclass
@@ -97,7 +100,7 @@ class PoolController:
         if self.day != day:
             self.day, self.solar_starts = day, 0
         if i.running and self.on_since is None:
-            self.on_since = i.now  # běží od dřív (restart, ruční zapnutí)
+            self.on_since = i.running_since or i.now  # běží od dřív (restart, ruční zapnutí)
 
         if i.manual == "Zapnout":
             return self._cmd(i, True, STATE_MANUAL, "ručně zapnuto")
@@ -109,9 +112,12 @@ class PoolController:
         missing = max(0.0, i.target_h - i.hours_done)
         ran_min = (i.now - self.on_since).total_seconds() / 60 if (i.running and self.on_since) else 0.0
         done_txt = f"{i.hours_done:.1f}/{i.target_h:.1f} h"
+        # min. běh jen na to, co chybělo při startu (teď chybí + už odběhlo), aspoň short_run_min;
+        # bez uloženého stavu → platí i po restartu
+        min_run = min(p.min_run_min, max(p.short_run_min, missing * 60 + ran_min))
 
         if missing <= 0.01:
-            if i.running and ran_min < p.min_run_min and not i.is_nt:
+            if i.running and ran_min < min_run and not i.is_nt:
                 return self._cmd(i, True, STATE_MIN_RUN, f"splněno {done_txt}, dobíhá min. běh")
             return self._cmd(i, False, STATE_DONE, f"splněno {done_txt}")
 
@@ -131,9 +137,9 @@ class PoolController:
             self.below_since = None
 
         if i.running:
-            if ran_min < p.min_run_min:
+            if ran_min < min_run:
                 return self._cmd(i, True, STATE_MIN_RUN if i.surplus_w < p.stop_surplus_w else STATE_SOLAR,
-                                 f"běží {ran_min:.0f}/{p.min_run_min:.0f} min, přebytek {i.surplus_w:.0f} W")
+                                 f"běží {ran_min:.0f}/{min_run:.0f} min, přebytek {i.surplus_w:.0f} W")
             if self.below_since and (i.now - self.below_since).total_seconds() / 60 >= p.stop_hold_min:
                 return self._cmd(i, False, STATE_WAIT,
                                  f"přebytek {i.surplus_w:.0f} W < {p.stop_surplus_w:.0f} W {p.stop_hold_min:.0f} min → stop ({done_txt})")

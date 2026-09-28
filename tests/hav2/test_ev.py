@@ -371,3 +371,16 @@ def test_boiler_disabled_switch():
     g.p.enabled = False
     r, _ = brun(g, binp(), 60)
     assert r == 0
+
+
+def test_no_battery_support_when_deficit_is_only_boiler_reserve():
+    reg = Regulator()
+    # přebytek po rezervě 500 W (bez rezervy 3 000 W), EV na minimu 1f
+    inp = inputs(surplus_w=500, boiler_reserve_w=2500, battery_soc=98, cur_amps=6, cur_phases=1,
+                 sell_price=0.5, battery_refill=True)
+    cmd, _ = run(reg, inp, 1)
+    assert not cmd.enable and cmd.state == STATE_PAUSED and "bojler" in cmd.reason
+    # skutečný mrak (chybí víc než rezerva) → dotování jako dřív
+    reg = Regulator()
+    cmd, _ = run(reg, replace(inp, surplus_w=500, boiler_reserve_w=300), 1)
+    assert cmd.state == STATE_SUPPORT

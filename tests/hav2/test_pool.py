@@ -132,3 +132,29 @@ def test_solar_start_counter_resets_next_day():
 def test_expected_nt_hours():
     assert expected_nt_hours(6, 1, 3) == 2
     assert expected_nt_hours(6, 5, 3) == 0
+
+
+def test_short_final_run_stops_after_target_and_15_min():
+    ctl = PoolController()
+    cmd, inp = run(ctl, inputs(hours_done=5.9), 6)  # chybí 6 min
+    assert cmd.on
+    cmd, inp = run(ctl, inp, 12)  # cíl splněn po 6 min, běží < 15 min
+    assert cmd.on
+    cmd, inp = run(ctl, inp, 4)
+    assert not cmd.on and cmd.state == STATE_DONE
+
+
+def test_min_run_scales_with_missing_hours():
+    ctl = PoolController()
+    cmd, inp = run(ctl, inputs(hours_done=5.5), 6)  # chybí 30 min
+    cmd, inp = run(ctl, inp, 20, surplus_w=0)
+    assert cmd.on  # min. běh ~30 min
+    cmd, inp = run(ctl, inp, 15, surplus_w=0)
+    assert not cmd.on
+
+
+def test_restart_uses_running_since_and_stops_when_done():
+    ctl = PoolController()
+    inp = inputs(hours_done=6.2, running=True, running_since=T0 - timedelta(minutes=20))
+    cmd = ctl.step(inp)
+    assert not cmd.on and cmd.state == STATE_DONE
