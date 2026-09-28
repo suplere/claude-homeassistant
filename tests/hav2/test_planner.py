@@ -126,13 +126,36 @@ def test_sell_at_spot_peak_when_sun_refills():
     assert sells and all(h == 7 for h in sells)
 
 
-def test_no_evening_sell_when_sun_cannot_refill_same_day():
-    # 25.9. 18:00, špička v 19 h: baterii už dnes slunce nedobije → neprodávat
+def test_no_evening_sell_when_sun_cannot_refill_next_day():
+    # 25.9. 18:00, špička v 19 h, zítra zataženo: baterii slunce nedobije → neprodávat
     now = datetime(2026, 9, 25, 18, 0, tzinfo=TZ)
     batt = BatteryParams(capacity_kwh=10.0, soc_pct=82.0, min_soc_pct=20.0)
-    slots = make_slots(now, 5.0, 5.0, spot={19: 7.3})
+    slots = make_slots(now, 5.0, 0.8, spot={19: 8.3})
     plan = plan_battery(slots, batt, Prices())
     assert all(a.mode != MODE_DISCHARGE for a in plan.actions)
+
+
+def test_evening_sell_uses_most_expensive_hour_when_sun_refills_next_day():
+    # 28.9. 17:00: špička 18 h 7,53 / 19 h 8,33, zítra slunečno → prodat nejdřív v 19 h, plným výkonem
+    now = datetime(2026, 9, 28, 17, 0, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=100.0, min_soc_pct=20.0)
+    slots = make_slots(now, 1.0, 6.0, spot={17: 5.76, 18: 7.53, 19: 8.33, 20: 6.75})
+    plan = plan_battery(slots, batt, Prices())
+    sells = [(s.start.hour, a.power_kw) for a, s in zip(plan.actions, slots) if a.mode == MODE_DISCHARGE]
+    assert sum(1 for h, _ in sells if h == 19) == 4  # celá nejdražší hodina
+    assert all(h in (18, 19) for h, _ in sells)  # 18 h jen navíc (dům pak dokoupí v NT)
+    assert all(kw == batt.max_discharge_kw for _, kw in sells)
+    assert min(r.soc_pct for r in plan.results) >= 20.0 - 1e-6
+
+
+def test_no_sell_when_gain_is_below_margin():
+    # výkup 7,2 × 0,85 = 6,12 a zpětný nákup ve VT 6,10 → zisk pod 0,5 Kč/kWh → neprodat
+    now = datetime(2026, 9, 28, 19, 0, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=40.0, min_soc_pct=20.0)
+    slots = make_slots(now, 0.0, 6.0, load_kw=1.0, spot={19: 7.2})
+    plan = plan_battery(slots, batt, Prices())
+    assert all(a.mode != MODE_DISCHARGE for a in plan.actions)
+    assert min(r.soc_pct for r in plan.results) >= 20.0 - 1e-6
 
 
 def test_no_sell_below_threshold():

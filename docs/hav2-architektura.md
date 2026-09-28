@@ -186,6 +186,11 @@ Ceny a parametry baterie jsou už z kroku A (`energy_price_vt/nt`, `energy_sell_
 | SOC ≤ min SOC | kdykoli | `auto` + DoD drží rezervu (ochrana i při výpadku HA) |
 | Výpadek předpovědi | `energy_forecast_valid` = off | konzervativní: FVE = poslední platná × 0,5, jinak 0 |
 
+**Prodej ve špičce (upraveno 28. 9.):** kandidáti jsou VT sloty se spotem ≥ `energy_sell_min_spot` (7,2 Kč),
+od nejdražšího, každý plným výkonem (5 kW). Slot se přijme, když simulace po prodeji dosáhne ≥ 95 % SOC před 18:00
+(ranní špička týž den, **večerní špička od 17 h následující den**) a sníží náklady aspoň o 0,5 Kč na prodanou kWh.
+Energie, která zbyde v baterii na konci horizontu, se oceňuje cenou NT.
+
 **Plné nabití (doplněno 26. 9.):** baterie Pylontech Force H2 × 3 (LiFePO4). Výrobce předepisuje vyrovnání
 článků nabitím na 100 % aspoň jednou za 3 měsíce; BMS si ho při delší době bez plného nabití vyžádá sám přes
 komunikaci se střídačem. HAv2 navíc hlídá `input_datetime.energy_battery_last_full` (automatizace při SOC ≥ 99 %)

@@ -307,14 +307,18 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
         trial = list(acts)
         trial[i] = Action(MODE_DISCHARGE, batt.max_discharge_kw)
         tres, tcost = simulate(slots, trial, batt, prices)
-        # zadání: prodávat jen když baterii týž den prokazatelně dobije slunce
-        # (simulace po prodeji dosáhne ≥ 95 % SOC ještě před 18:00 téhož dne)
+        # prodávat jen když baterii prokazatelně dobije slunce (simulace po prodeji dosáhne ≥ 95 % SOC
+        # před 18:00): ranní špička téhož dne, večerní špička (od 17 h) následujícího dne
         day = slots[i].start.date()
+        if slots[i].start.hour >= EVENING_SELL_FROM_H:
+            day += timedelta(days=1)
         refilled = any(
             r.soc_pct >= 95.0 and r.start.date() == day and r.start.hour < 18
             for r in tres[i + 1:]
         )
-        if refilled and tcost < cost_best - 0.05:
+        # min. zisk na kWh: prodej a zpětný nákup ve VT za skoro stejnou cenu je pod přesností modelu
+        sold = max(0.0, sum(r.grid_export_kwh for r in tres) - sum(r.grid_export_kwh for r in res))
+        if refilled and tcost < cost_best - max(0.05, SELL_MIN_GAIN_KC_KWH * sold):
             acts, res, cost_best = trial, tres, tcost
             sell_slots += 1
 
@@ -334,6 +338,8 @@ def _sun_fills_after_nt(results: Sequence[SlotResult], slots: Sequence[Slot], nt
                if r.start.date() == day and r.start.hour < 18)
 
 
+EVENING_SELL_FROM_H = 17  # prodej od této hodiny: stačí dobití slunce následující den
+SELL_MIN_GAIN_KC_KWH = 0.5  # prodej z baterie jen se ziskem aspoň 0,5 Kč na prodanou kWh
 DEFER_PV_SAFETY = 0.8  # odložení musí vyjít i s FVE × 0,8
 DEFER_FULL_SOC = 95.0
 DEFER_FULL_BY_HOUR = 17
