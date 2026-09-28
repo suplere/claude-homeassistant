@@ -384,3 +384,19 @@ def test_no_battery_support_when_deficit_is_only_boiler_reserve():
     reg = Regulator()
     cmd, _ = run(reg, replace(inp, surplus_w=500, boiler_reserve_w=300), 1)
     assert cmd.state == STATE_SUPPORT
+
+
+# ------------------------------------------------ vyúčtování EV v NT
+
+
+def test_billing_rows_six_months_sum_v1_and_hav2():
+    from hav2_ev import billing_rows, month_starts
+    now = datetime(2026, 9, 28, 16, 0, tzinfo=TZ)
+    assert month_starts(now, 6) == [(2026, 9), (2026, 8), (2026, 7), (2026, 6), (2026, 5), (2026, 4)]
+    assert month_starts(datetime(2026, 2, 1, tzinfo=TZ), 3) == [(2026, 2), (2026, 1), (2025, 12)]
+    changes = {"v1_kwh": {(2026, 8): 45.56, (2026, 9): 55.06}, "v1_kc": {(2026, 8): 159.9, (2026, 9): 193.26},
+               "kwh": {(2026, 9): 15.5}, "kc": {(2026, 9): 54.4}}
+    rows = billing_rows(changes, now)
+    assert rows[0] == ("září 2026", 70.56, 247.66)
+    assert rows[1] == ("srpen 2026", 45.56, 159.9)
+    assert rows[5] == ("duben 2026", 0.0, 0.0)

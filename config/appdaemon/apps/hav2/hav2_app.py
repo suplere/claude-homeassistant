@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 import appdaemon.plugins.hass.hassapi as hass
 
 import hav2_boiler as BO
+import hav2_ev as E
 import hav2_planner as P
 from hav2_ev_ctl import EV_CONNECTED, EvControl
 from hav2_pool_ctl import PUMP, PoolControl
@@ -44,6 +45,14 @@ EXPORT_NORMAL_W = 10000  # běžný limit přetoku (jako v1 „Disable Overflow�
 # minutový záznam dat pro ladění (config/appdaemon/hav2_data/RRRR-MM-DD.jsonl, stahuje make pull)
 DATA_DIR = Path(__file__).resolve().parents[2] / "hav2_data"
 DATA_KEEP_DAYS = 60
+# vyúčtování EV ze sítě v NT: HAv2 čítače + ruční NT z v1 (do 25. 9. 2026)
+BILLING_MONTHS = 6
+BILLING_STATS = {
+    "kwh": "sensor.ev_energy_grid_nt_total",
+    "kc": "sensor.ev_charging_cost_grid_nt_total",
+    "v1_kwh": "sensor.ev_nt_energie_celkem",
+    "v1_kc": "sensor.ev_nt_naklady_celkem",
+}
 DATA_STATES = {
     "pv_w": "sensor.pv_power",
     "house_w": "sensor.house_consumption",
@@ -123,6 +132,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.pool_init(TZ)
         # odložené nabíjení (pojistka proti nákupu) a omezení přetoku při záporném výkupu
         self.run_every(self.live_loop, "now+45", 60)
+        # vyúčtování: EV ze sítě v NT po měsících (tabulka na dashboardu EV náklady)
+        self.run_every(self.ev_billing, "now+90", 3600)
         self.log("HAv2 plánovač spuštěn")
 
     # --------------------------------------------------------------- utility
@@ -146,10 +157,49 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             self.cancel_timer(self._pending)
         self._pending = self.run_in(self.tick, 30, reason=f"změna {entity}")
 
+    # ------------------------------------------------ vyúčtování EV v NT
+    def ev_billing(self, kwargs: Dict[str, Any]) -> None:
+        try:
+            self._ev_billing()
+        except Exception as err:  # noqa: BLE001
+            self.log(f"vyúčtování EV NT selhalo: {err}", level="WARNING")
+
+    def _ev_billing(self) -> None:
+        now = datetime.now(TZ)
+        oldest = E.month_starts(now, BILLING_MONTHS)[-1]
+        start = datetime(oldest[0], oldest[1], 1, tzinfo=TZ)
+        stats = self._get_statistics(list(BILLING_STATS.values()), 0, period="month", start=start)
+        changes: Dict[str, Dict[Tuple[int, int], float]] = {}
+        for key, sid in BILLING_STATS.items():
+            for row in stats.get(sid, []) or []:
+                t = self._ts(row.get("start"))
+                changes.setdefault(key, {})[(t.year, t.month)] = float(row.get("change") or 0)
+        rows = E.billing_rows(changes, now, BILLING_MONTHS)
+        def fmt(x: float, d: int) -> str:
+            return f"{x:,.{d}f}".replace(",", " ").replace(".", ",") if x > 0.005 else "–"
+
+        def row(label: str, kwh: float, kc: float) -> Dict[str, str]:
+            # hodnoty jako text: AppDaemon set_state zahazuje falsy hodnoty (0) v seznamech
+            return {"mesic": label, "kwh": fmt(kwh, 1), "kc": fmt(kc, 0),
+                    "cena": fmt(kc / kwh, 2) if kwh > 0.05 else "–"}
+
+        total_kwh, total_kc = sum(r[1] for r in rows), sum(r[2] for r in rows)
+        table = [row(m, k, c) for m, k, c in rows] + [row(f"Celkem {BILLING_MONTHS} měsíců", total_kwh, total_kc)]
+        self.set_state("sensor.ev_nt_billing", state=f"{rows[0][2]:.2f}", replace=True, attributes={
+            "friendly_name": "EV nabíjení ze sítě v NT – tento měsíc", "icon": "mdi:file-document-outline",
+            "unit_of_measurement": "Kč", "device_class": "monetary",
+            "table": table,
+            "total_kwh": fmt(total_kwh, 1),
+            "total_kc": fmt(total_kc, 0),
+            "updated": now.isoformat(),
+        })
+
     # ------------------------------------------------------ profil spotřeby
-    def _get_statistics(self, ids: List[str], days: int) -> Dict[str, List[dict]]:
-        start = (datetime.now(TZ) - timedelta(days=days)).replace(minute=0, second=0, microsecond=0)
-        kwargs = dict(start_time=start.isoformat(), statistic_ids=ids, period="hour",
+    def _get_statistics(self, ids: List[str], days: int, period: str = "hour",
+                        start: Optional[datetime] = None) -> Dict[str, List[dict]]:
+        if start is None:
+            start = (datetime.now(TZ) - timedelta(days=days)).replace(minute=0, second=0, microsecond=0)
+        kwargs = dict(start_time=start.isoformat(), statistic_ids=ids, period=period,
                       types=["change"], units={"energy": "kWh"})
         resp = None
         for flag in ({"return_response": True}, {"return_result": True}):

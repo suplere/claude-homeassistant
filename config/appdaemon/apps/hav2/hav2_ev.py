@@ -517,3 +517,29 @@ class BoilerGate:
                 return 0.0
         self.reason = f"nechává {p.reserve_w:.0f} W bojleru"
         return p.reserve_w
+
+
+# ------------------------------------------------ vyúčtování: EV ze sítě v NT po měsících
+MONTHS_CS = ["leden", "únor", "březen", "duben", "květen", "červen",
+             "červenec", "srpen", "září", "říjen", "listopad", "prosinec"]
+
+
+def month_starts(now: datetime, months: int) -> List[Tuple[int, int]]:
+    """(rok, měsíc) od aktuálního měsíce zpět."""
+    y, m = now.year, now.month
+    out = []
+    for _ in range(months):
+        out.append((y, m))
+        y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+    return out
+
+
+def billing_rows(changes: Dict[str, Dict[Tuple[int, int], float]], now: datetime,
+                 months: int = 6) -> List[Tuple[str, float, float]]:
+    """Řádky (měsíc, kWh, Kč) – součet HAv2 (kwh/kc) a ručního NT z v1 (v1_kwh/v1_kc)."""
+    rows = []
+    for ym in month_starts(now, months):
+        kwh = sum(changes.get(k, {}).get(ym, 0.0) for k in ("kwh", "v1_kwh"))
+        kc = sum(changes.get(k, {}).get(ym, 0.0) for k in ("kc", "v1_kc"))
+        rows.append((f"{MONTHS_CS[ym[1] - 1]} {ym[0]}", round(kwh, 2), round(kc, 2)))
+    return rows

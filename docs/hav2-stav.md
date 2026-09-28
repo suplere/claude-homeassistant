@@ -78,7 +78,8 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - Markdown karty: obsah jako `|` (literal), ne `>` – jinak se rozbijí tabulky.
 - Dashboard dlaždice: vždy explicitní `grid_options`, jinak se v sekcích „rozsypou“.
 - Štítky: nové HAv2 entity vždy `hav2` + oblast (`hav2_system` / `hav2_baterie` / `hav2_ev` / `hav2_bazen`) – výjimka v CLAUDE.md. Senzory z AppDaemonu štítek mít nemůžou.
-- **cez_pnd (HACS) má lokální patch** v HA `/config/custom_components/cez_pnd/http_client.py` (záloha `.orig-1.1.1`) – update z HACS ho přepíše, pak znovu aplikovat nebo počkat na opravu (issue igracek/HACS_CEZD_PND#2).
+- **cez_pnd (HACS) v1.1.2** (nainstalováno 27. 9. 22:26) funguje **bez lokálního patche** – opravuje účty bez `idDeviceSet`;
+  ověřeno 28. 9.: stav OK, 96 záznamů/den, denní spotřeba i výroba sedí s AppDaemon PND app. Starý patch pro 1.1.1 už neplatí.
 - Citlivé: `.env` (HA_TOKEN), `config/appdaemon/apps/apps.yaml` (PND heslo) – nikdy nevypisovat ani necommitovat. (Testovací údaje v Keychain `cez_pnd_test` smazány 25. 9. 2026.)
 
 ## 3b. Zjištění z testu Auto (26.–27. 9. 2026)

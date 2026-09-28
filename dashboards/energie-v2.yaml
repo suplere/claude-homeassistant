@@ -720,6 +720,40 @@ views:
       - type: grid
         cards:
           - type: heading
+            heading: Vyúčtování – EV ze sítě v NT
+            icon: mdi:file-document-outline
+          - type: custom:flex-table-card
+            grid_options:
+              columns: full
+            entities:
+              include: sensor.ev_nt_billing
+            columns:
+              - name: Měsíc
+                data: table.mesic
+              - name: kWh
+                data: table.kwh
+                align: right
+              - name: Kč
+                data: table.kc
+                align: right
+              - name: Kč/kWh
+                data: table.cena
+                align: right
+            css:
+              table+: "width: 100%; border-collapse: collapse;"
+              tbody tr:nth-child(odd): "background-color: rgba(127, 127, 127, 0.07);"
+              tbody tr:first-child: "font-weight: 500;"
+              tbody tr:last-child: "font-weight: 700; border-top: 2px solid var(--divider-color);"
+          - type: markdown
+            content: |
+              <small>EV odebrané ze sítě v NT × cena NT ({{ states('input_number.energy_price_nt') }} Kč/kWh).
+              Do 25. 9. 2026 ruční NT nabíjení (v1), potom HAv2. Ze sítě ve VT navíc
+              {{ states('sensor.ev_energy_grid_vt_total') | float(0) | round(1) }} kWh /
+              {{ states('sensor.ev_charging_cost_grid_vt_total') | float(0) | round(0) | int }} Kč (od 25. 9.).
+              Aktualizace 1× za hodinu.</small>
+      - type: grid
+        cards:
+          - type: heading
             heading: Souhrn
             icon: mdi:cash
           - type: tile
