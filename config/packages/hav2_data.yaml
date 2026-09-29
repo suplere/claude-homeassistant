@@ -63,6 +63,23 @@ template:
                   and is_state('switch.ecovolter_revcr01c00002056_is_three_phase_mode_enable', 'off')
                else '(L1 + L2) / 2 − L3' }}
 
+      - name: Bojler odhad příkonu
+        unique_id: hav2_energy_boiler_power_w
+        default_entity_id: sensor.energy_boiler_power_w
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        icon: mdi:water-boiler
+        # WATTrouter reguluje SSR3 plynule (0–2,2 kW) podle přetoku na L3 u elektroměru; bojler je
+        # před měřením GoodWe → když hřeje z přetoku, jeho příkon GoodWe vidí jako přetok L3.
+        # Nucený ohřev v noci (22–06) = plný výkon. Nahradit měřením (Shelly), až bude.
+        availability: "{{ has_value('binary_sensor.energy_boiler_heating') and has_value('sensor.meter_active_power_l3') }}"
+        state: >
+          {% if is_state('binary_sensor.energy_boiler_heating', 'on') %}
+            {% if now().hour >= 22 or now().hour < 6 %}2250
+            {% else %}{{ [[states('sensor.meter_active_power_l3') | float, 0] | max, 2250] | min | round(0) }}{% endif %}
+          {% else %}0{% endif %}
+
       # ------------------------------------------------------- přebytek a fáze
       - name: Přebytek pro řízené spotřebiče
         unique_id: hav2_energy_surplus_w
@@ -71,11 +88,13 @@ template:
         device_class: power
         state_class: measurement
         icon: mdi:solar-power-variant
-        # FVE − dům bez EV a filtrace − bojler (když hřeje); kladné = k dispozici
+        # FVE − dům bez EV a filtrace; kladné = k dispozici. Bojler (plynulá regulace WATTrouteru)
+        # bere jen zbytek přetoku na L3 → odečíst jen s prioritou bojleru nebo při nuceném ohřevu.
         availability: "{{ has_value('sensor.pv_power') and has_value('sensor.base_house_consumption') }}"
         state: >
-          {{ (states('sensor.pv_power') | float - states('sensor.base_house_consumption') | float
-              - (2250 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0)) | round(0) }}
+          {% set boiler = states('sensor.energy_boiler_power_w') | float(0)
+             if is_state('input_boolean.ev_boiler_priority', 'on') or now().hour >= 22 or now().hour < 6 else 0 %}
+          {{ (states('sensor.pv_power') | float - states('sensor.base_house_consumption') | float - boiler) | round(0) }}
 
       - name: Rezerva fáze L1
         unique_id: hav2_energy_phase_headroom_l1_w
@@ -111,12 +130,13 @@ template:
         device_class: power
         state_class: measurement
         icon: mdi:sine-wave
-        # na L3 navíc bojler mimo GoodWe
+        # na L3 navíc bojler mimo GoodWe (stejné pravidlo jako u přebytku)
         availability: "{{ has_value('sensor.energy_surplus_smoothed_w') and has_value('sensor.meter_active_power_l3') }}"
         state: >
           {% set soc = states('sensor.battery_state_of_charge') | float(0) %}
           {% set minsoc = states('input_number.energy_battery_min_soc') | float(20) %}
-          {% set boiler = 2250 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0 %}
+          {% set boiler = states('sensor.energy_boiler_power_w') | float(0)
+             if is_state('input_boolean.ev_boiler_priority', 'on') or now().hour >= 22 or now().hour < 6 else 0 %}
           {% if minsoc + 2 < soc < 97 %}{{ states('sensor.energy_surplus_smoothed_w') | float | round(0) }}
           {% else %}{{ (states('sensor.meter_active_power_l3') | float - boiler) | round(0) }}{% endif %}
 
@@ -127,22 +147,22 @@ template:
         device_class: current
         state_class: measurement
         icon: mdi:electric-switch
-        # 25 A − nejvíc zatížená fáze ze sítě; L3 + bojler 9,8 A (mimo GoodWe)
+        # 25 A − nejvíc zatížená fáze ze sítě; L3 ze sítě = bojler (mimo GoodWe) − přetok GoodWe na L3
         availability: >
           {{ ['sensor.meter_active_power_l1', 'sensor.meter_active_power_l2', 'sensor.meter_active_power_l3']
              | select('has_value') | list | count == 3 }}
         state: >
-          {% set boiler_a = 9.8 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0 %}
+          {% set boiler = states('sensor.energy_boiler_power_w') | float(0) %}
           {% set i1 = [0 - states('sensor.meter_active_power_l1') | float, 0] | max / 230 %}
           {% set i2 = [0 - states('sensor.meter_active_power_l2') | float, 0] | max / 230 %}
-          {% set i3 = [0 - states('sensor.meter_active_power_l3') | float, 0] | max / 230 + boiler_a %}
+          {% set i3 = [boiler - states('sensor.meter_active_power_l3') | float, 0] | max / 230 %}
           {{ (25 - [i1, i2, i3] | max) | round(1) }}
         attributes:
           worst_phase: >
-            {% set boiler_a = 9.8 if is_state('binary_sensor.energy_boiler_heating', 'on') else 0 %}
+            {% set boiler = states('sensor.energy_boiler_power_w') | float(0) %}
             {% set i = [[0 - states('sensor.meter_active_power_l1') | float(0), 0] | max / 230,
                         [0 - states('sensor.meter_active_power_l2') | float(0), 0] | max / 230,
-                        [0 - states('sensor.meter_active_power_l3') | float(0), 0] | max / 230 + boiler_a] %}
+                        [boiler - states('sensor.meter_active_power_l3') | float(0), 0] | max / 230] %}
             L{{ i.index(i | max) + 1 }}
 
       # ---------------------------------------------------------- hodnota kWh
@@ -347,16 +367,19 @@ template:
         device_class: heat
         icon: mdi:water-boiler
         # kalibrace proti hodinovým datům PND 16.–25. 9. (bojler = PND − GoodWe, 45 kWh / 10 dní):
-        # okno nuceného ohřevu 16–19 h zapnout od 1,0 V, jinak (polední ohřev z přetoků) od 2,5 V,
-        # vypnout pod 0,5 V; mimo 12–20 h nikdy. Chyba po hodinách 17 kWh / 10 dní (dříve 19,7),
-        # denní součty ±1 kWh. Přesnou denní spotřebu dává sensor.energy_boiler_pnd_daily (D+1).
+        # nucený ohřev zapnout od 1,0 V, polední ohřev z přetoků od 2,5 V, vypnout pod 0,5 V.
+        # Nucený ohřev = časový plán WATTrouteru SSR3 „vynutit“ 22:00–06:00 (od 29. 9. 2026, dříve
+        # 16–19 h); při změně plánu ve WATTconfigu upravit i zde. Polední okno 12–20 h; jinak nikdy.
+        # Chyba po hodinách 17 kWh / 10 dní, denní součty ±1 kWh. Přesnou denní spotřebu dává
+        # sensor.energy_boiler_pnd_daily (D+1).
         delay_off:
           minutes: 3
         availability: "{{ has_value('sensor.energy_boiler_voltage_index_5min') }}"
         state: >
           {% set idx = states('sensor.energy_boiler_voltage_index_5min') | float %}
-          {% set in_window = 12 <= now().hour < 20 %}
-          {% set on_th = 1.0 if 16 <= now().hour < 19 else 2.5 %}
+          {% set forced = now().hour >= 22 or now().hour < 6 %}
+          {% set in_window = forced or 12 <= now().hour < 20 %}
+          {% set on_th = 1.0 if forced else 2.5 %}
           {{ in_window and idx > (0.5 if is_state('binary_sensor.energy_boiler_heating', 'on') else on_th) }}
 
       - name: Předpověď FVE platná

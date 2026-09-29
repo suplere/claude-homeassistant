@@ -295,3 +295,14 @@ def test_force_full_skipped_when_sun_fills_next_day():
     batt = BatteryParams(capacity_kwh=10.0, soc_pct=60.0, min_soc_pct=20.0)
     plan = plan_battery(make_slots(now, 0, 6.0), batt, Prices(), force_full=True)
     assert not plan.full_charge and plan.grid_charge_kwh == 0
+
+
+def test_nt_charge_needs_minimum_gain_per_kwh():
+    # ranní výkup mírně nad NT: arbitráž NT → ráno vyjde jen o desetníky → nenabíjet;
+    # při výrazně dražším ránu se nabití vyplatí
+    now = datetime(2026, 9, 28, 21, 0, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=60.0, min_soc_pct=20.0)
+    marginal = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 4.4, 8: 4.4, 9: 4.4}), batt, Prices())
+    assert marginal.grid_charge_kwh == 0
+    clear = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 5.0, 8: 5.0, 9: 5.0}), batt, Prices())
+    assert clear.grid_charge_kwh > 3

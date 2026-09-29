@@ -272,7 +272,11 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
         acts = _actions_for_charge(slots, nt_idx, e, batt)
         res, cost = simulate(slots, acts, batt, prices)
         candidates["auto" if e is None else f"{e:g}"] = round(cost, 2)
-        if best is None or cost < best[1] - 0.05:
+        # nabíjení ze sítě jen se ziskem aspoň NT_CHARGE_MIN_GAIN na každou kWh navíc
+        # (rozdíl v řádu desetníků je pod přesností modelu – předpověď FVE, ceny zítřka)
+        extra = (e or 0.0) - ((best[0] or 0.0) if best else 0.0)
+        margin = max(0.05, NT_CHARGE_MIN_GAIN_KC_KWH * extra)
+        if best is None or cost < best[1] - margin:
             best = (e, cost, acts, res)
     assert best is not None
     e_best, cost_best, acts, res = best
@@ -338,6 +342,7 @@ def _sun_fills_after_nt(results: Sequence[SlotResult], slots: Sequence[Slot], nt
                if r.start.date() == day and r.start.hour < 18)
 
 
+NT_CHARGE_MIN_GAIN_KC_KWH = 0.3  # nabití ze sítě v NT jen se ziskem ≥ 0,3 Kč na nabitou kWh navíc
 EVENING_SELL_FROM_H = 17  # prodej od této hodiny: stačí dobití slunce následující den
 SELL_MIN_GAIN_KC_KWH = 0.5  # prodej z baterie jen se ziskem aspoň 0,5 Kč na prodanou kWh
 DEFER_PV_SAFETY = 0.8  # odložení musí vyjít i s FVE × 0,8

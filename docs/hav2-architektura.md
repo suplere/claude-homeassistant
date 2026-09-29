@@ -29,8 +29,11 @@ Principy vycházejí z měření ve Fázi 1:
   - Wallbox občas vypadne na 20–70 s (`unavailable`).
 - **Kia:** SOC bývá staré i hodiny. Připojení a nabíjení se berou z EcoVolteru, SOC z Kia po `force_update` a dál se dopočítává.
 - **Čerpadlo filtrace:** L2, ~500 W. Shelly měří jen cívku stykače.
-- **Bojler (WATrouter ECO, 2,2 kW, 1f na L3) je mimo měření GoodWe.** Každý den od **16:09** nucený ohřev (75–170 min), podle PND 12.–25. 9. **2,6–6,4 kWh/den, průměr 4,2 kWh a 22 Kč/den**, téměř vše VT. Baterie ho nepokryje. Pravděpodobná příčina zapojení: historický okruh na HDO odbočující před měřením GoodWe.
+- **Bojler (WATrouter ECO, 2,2 kW, 1f na L3) je mimo měření GoodWe.** Do 29. 9. 2026 každý den od **16:09** nucený ohřev (75–170 min), podle PND 12.–25. 9. **2,6–6,4 kWh/den, průměr 4,2 kWh a 22 Kč/den**, téměř vše VT (časový plán WATTrouteru ze starého HDO s odpoledním NT). **Od 29. 9. nucený ohřev 22:00–06:00 (NT).** WATTrouter reguluje SSR3 **plynule** (0–2,2 kW) podle přetoku **na L3** (režim „každá fáze samostatně“); GoodWe při plné baterii exportuje do fází zhruba rovnoměrně → bojler dostane ~⅓ přetoku. Baterie ho nepokryje. Pravděpodobná příčina zapojení: historický okruh na HDO odbočující před měřením GoodWe.
 - **Solcast:** časování sedí. Koeficienty: duben–září ×0,80, březen/říjen ×0,75, únor ×0,68, listopad–leden ×0,50. Odpoledne za jasna: 16 h ×0,70, 17 h ×0,55, 18 h ×0,40.
+  **Ranní stín (doplněno 29. 9.):** komín před FVE, při nízkém slunci ráno 7–9 h jen ~50 % Solcastu. Pro září–říjen tvar dne
+  = naměřený poměr skutečnost/p50 po hodinách (19.–28. 9.): 7 h 0,49, 8 h 0,54, 9 h 0,94, 10–15 h 0,79–0,92, 16 h 0,60, 17 h 0,40,
+  18 h 0,31 (`custom_templates/hav2.jinja`, `pv_hour_shape`). Listopad–březen doplnit z dat (slunce níž → stín pravděpodobně větší).
 
 ## 2. Architektura a tok dat
 
@@ -207,7 +210,8 @@ a watchdog baterie vrací 10 000 W.
 1. Sloty po 15 min od teď do zítřka 24:00.
 2. Na každý slot se spočítá bilance: FVE_opr − spotřeba domu − bojler − plánované EV a bazén.
 3. Simulace SOC. Hledá se **nejmenší NT nabití**, při kterém SOC nikdy nespadne pod min SOC dřív, než ho dobije FVE (nebo do 22:00).
-4. Při dvou řešeních se stejnou cenou vyhrává menší nabití, aby zbylo místo pro slunce.
+4. Při dvou řešeních se stejnou cenou vyhrává menší nabití, aby zbylo místo pro slunce. Větší nabití ze sítě se vybere jen
+   se ziskem ≥ 0,3 Kč na každou kWh navíc (doplněno 29. 9.; rozdíly v desetnících jsou pod přesností předpovědi a cen zítřka).
 
 ### 5.3 EV – plánovač (termín a energie)
 
@@ -270,6 +274,8 @@ stateDiagram-v2
 **Plná baterie domu:** EV má přednost před prodejem až do 11 A.
 
 **3f z plné baterie (doplněno 26. 9.):** když má baterie ≥ 90 %, výkup je < 1 Kč/kWh a opravená FVE ji do večera dobije (rezerva 2 kWh), nabíjí se 3f na minimum i při přebytku od ~3,2 kW. Rozdíl do 1 kW kryje baterie, a to bez limitu epizody 10 min / 1 kWh. Přepnutí na 1f až pod ~3,2 kW. Důvod: přetok za ~0 Kč je horší než kWh pro EV, která by se jinak v noci koupila za NT.
+
+**Prostor pro bojler – od 29. 9. vypnuto (`input_boolean.ev_boiler_priority` off):** nucený ohřev je teď v NT, kWh v bojleru tedy ušetří jen NT 3,51 Kč jako kWh v EV; a protože bojler bere jen přetok L3, rezerva 2,5 kW by poslala ~⅔ do sítě za výkup. EV má přednost, bojler dostane zbytek přetoku automaticky. Přebytek a rezerva fáze L3 odečítají `sensor.energy_boiler_power_w` jen při zapnuté prioritě nebo v nočním okně; jistič počítá L3 ze sítě = odhad bojleru − přetok GoodWe na L3. Původní popis:
 
 **Prostor pro bojler (doplněno 27. 9.):** WATrouter spíná bojler (2,2 kW, mimo měření GoodWe) celým výkonem,
 až když přetok převýší ~2,2 kW. kWh v bojleru ušetří VT 6,10 Kč (kratší nucený ohřev od 16:09), kWh v EV jen NT 3,51 Kč.
