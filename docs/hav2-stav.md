@@ -46,6 +46,7 @@ Test Auto běží dál (volno do 30. 9.). Kontroly: `make pull` → `config/appd
    okno 24 h (EV → Parametry regulace). Zatím neověřeno v reálu: při prvním použití (např. cíl 100 % s termínem) sledovat
    `sensor.ev_target_status`, logbook „HAv2 EV“ (zápis limitu), že se `number.ev6_ac_charging_limit` v HA opravdu změní
    (Kia cloud, jinak 3 pokusy → notifikace) a že se po nabití vrátí limit na 90 % a cíl na 80 %.
+   Test: cíl 100 %, termín pá 2. 10. 6:00, okno 8 h (od čt 22:00), čt ~17 h krátká jízda (odpojení cíl neruší).
 4. **Filtrace:** oprava posledního krátkého běhu (min. 15 min, jen do splnění) a doby běhu po restartu – ověřeno 28. 9.
 4b. **Předpověď FVE – ranní stín (29. 9.):** komín před FVE; září–říjen má naměřený hodinový tvar (7–8 h ~0,5 Solcastu).
    Ověřit, že ranní SOC teď sedí s plánem (dashboard Plán). Pro listopad+ tvar přepočítat z dat: poměr hodinového průměru

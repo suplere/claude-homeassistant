@@ -203,7 +203,7 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
 # ------------------------------------------------- limit nabíjení v autě (Kia AC)
 # Cíl nad standardním limitem auta = jednorázový požadavek (např. 100 % na cestu). Energie
 # nad limit se nabíjí až v okně před termínem (dlouho stát na 100 % baterii škodí); na začátku
-# okna HAv2 zvedne limit v autě, po nabití / odjezdu / termínu ho vrátí a cíl vrátí na standard.
+# okna HAv2 zvedne limit v autě, po nabití nebo v termínu ho vrátí a cíl vrátí na standard.
 
 
 def limit_step(soc: float) -> int:

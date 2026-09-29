@@ -525,15 +525,7 @@ class EvControl:
                 self.call_service("kia_uvo/force_update")
             self.run_in(self.tick, 60, reason="připojeno EV")
         elif new == "off" and old == "on":
-            now = datetime.now(self.ev_tz)
-            lp = self.ev_limit_plan(now)
-            if lp.over and lp.in_window:
-                # odjezd v okně jednorázového cíle = cesta začala
-                target, soc = self.fnum(EV_TARGET, 80), self.ev_soc()
-                if soc is not None and soc < target - 1 and self.ev_executing():
-                    self.call_service(NOTIFY, title="HAv2 – EV odpojeno pod cílem",
-                                      message=f"Auto odpojeno s SOC {soc:.0f} % (cíl {target:.0f} %).")
-                self._ev_oneoff_done(now, "auto odpojeno")
+            # jednorázový cíl odpojení neruší (krátká jízda před cestou) – končí nabitím nebo termínem
             self.run_in(self.tick, 5, reason="odpojeno EV")
 
     def _ev_availability(self, now: datetime, available: bool, execute: bool) -> None:
