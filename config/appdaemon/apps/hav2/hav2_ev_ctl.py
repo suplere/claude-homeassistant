@@ -200,7 +200,9 @@ class EvControl:
             now=now, eligible=eligible, surplus_w=surplus_pool,
             battery_soc=self.fnum("sensor.battery_state_of_charge", 0),
             heating=self.get_state("binary_sensor.energy_boiler_heating") == "on",
-            grid_export_w=self.fnum("sensor.meter_active_power_total", 0)))
+            grid_export_w=self.fnum("sensor.meter_active_power_total", 0),
+            boiler_avg_kwh=self.fnum_attr("sensor.energy_boiler_pnd_daily", "avg_kwh_14d"),
+            sell_price=self.fnum("sensor.energy_price_sell_now", 99.0)))
         self._ev_log_boiler(now)
         surplus = surplus_pool - self.ev_reserve_w - self.ev_boiler_reserve_w
         lowest = E.ev_power_kw(1 if self.ev_reg.p.allow_1f else 3, self.ev_reg.p.amin)
@@ -304,6 +306,12 @@ class EvControl:
         text = f"{now:%H:%M} bojler: {self.ev_boiler.reason}"
         self.call_service("logbook/log", name="HAv2 EV", message=text)
         self.log(text)
+
+    def fnum_attr(self, entity: str, attr: str) -> Optional[float]:
+        try:
+            return float(self.get_state(entity, attribute=attr))
+        except (TypeError, ValueError):
+            return None
 
     def ev_on_boiler_full(self, entity, attribute, old, new, kwargs) -> None:
         self._ev_boiler_sync(new)

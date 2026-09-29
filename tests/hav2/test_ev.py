@@ -1,6 +1,8 @@
 """Unit testy EV plánovače a regulátoru HAv2 (config/appdaemon/apps/hav2/hav2_ev.py)."""
 
 import sys
+
+import pytest
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -341,15 +343,17 @@ def test_boiler_heating_means_no_double_reserve():
     r, inp = brun(g, binp(), 40)
     assert r == 2500
     r, inp = brun(g, inp, 1, heating=True)
-    assert r == 0 and g.reason == "bojler hřeje"
+    assert r == 0 and g.reason.startswith("bojler hřeje")
 
 
-def test_boiler_done_after_export_without_heating():
+def test_boiler_done_when_energy_budget_delivered():
+    # dávka = 60 % z průměru 4,25 kWh = 2,55 kWh ≈ 70 min při 2,2 kW a přetoku ≥ 2,3 kW
     g = BoilerGate()
-    r, inp = brun(g, binp(), 40)
-    r, inp = brun(g, inp, 170, grid_export_w=2500)  # 850 s < 900 s
+    r, inp = brun(g, binp(boiler_avg_kwh=4.25, sell_price=1.5), 40)
     assert r == 2500
-    r, inp = brun(g, inp, 12)
+    r, inp = brun(g, inp, 60 * 12 * 1, grid_export_w=2500)  # 60 min → 2,2 kWh
+    assert r == 2500 and not g.done
+    r, inp = brun(g, inp, 12 * 12)  # +12 min → 2,64 kWh
     assert r == 0 and g.done
     r, inp = brun(g, inp, 60, grid_export_w=0)  # do konce dne už ne
     assert r == 0
@@ -357,13 +361,23 @@ def test_boiler_done_after_export_without_heating():
     assert r == 2500
 
 
-def test_boiler_done_timer_ignores_minutes_without_export():
+def test_boiler_budget_counts_only_minutes_with_export_and_heating():
     g = BoilerGate()
-    r, inp = brun(g, binp(), 40)
-    for _ in range(4):  # trouba / nabíjení baterie: přetok jen občas
-        r, inp = brun(g, inp, 24, grid_export_w=2500)
-        r, inp = brun(g, inp, 24, grid_export_w=500)
+    r, inp = brun(g, binp(boiler_avg_kwh=4.25, sell_price=1.5), 40)
+    for _ in range(6):  # trouba / nabíjení baterie: přetok jen polovinu času → 60 min = 1,1 kWh
+        r, inp = brun(g, inp, 60, grid_export_w=2500)
+        r, inp = brun(g, inp, 60, grid_export_w=500)
     assert r == 2500 and not g.done
+    # detektor hlásí ohřev: rezerva 0 (přebytek bojler už odečítá), energie se počítá dál
+    r, inp = brun(g, inp, 12 * 45, heating=True, grid_export_w=2500)
+    assert r == 0 and g.done
+
+
+def test_boiler_budget_halved_at_low_or_negative_price():
+    g = BoilerGate()
+    assert g.budget_kwh(binp(boiler_avg_kwh=4.0, sell_price=1.5)) == pytest.approx(2.4)
+    assert g.budget_kwh(binp(boiler_avg_kwh=4.0, sell_price=-0.2)) == pytest.approx(1.2)
+    assert g.budget_kwh(binp(boiler_avg_kwh=None, sell_price=1.5)) == pytest.approx(2.5)
 
 
 def test_boiler_disabled_switch():

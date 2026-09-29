@@ -446,8 +446,15 @@ class BoilerParams:
     off_w: float = 2300.0  # vypnout pod off_w (pod tím by bojler stejně nesepnul)
     on_hold_s: float = 180.0
     reserve_w: float = 2500.0
-    done_export_w: float = 2300.0  # přetok GoodWe, při kterém by WATrouter musel sepnout
-    done_after_s: float = 900.0  # tolik přetoku bez ohřevu → bojler nahřátý, do konce dne konec
+    done_export_w: float = 2300.0  # přetok GoodWe, při kterém WATrouter (relé 2,2 kW) může hřát
+    boiler_kw: float = 2.2
+    # Kdy je bojler „nahřátý“: napěťový detektor v poledne spolehlivě nefunguje (28. 9.), proto
+    # energetický rozpočet – odhad dodané energie (2,2 kW, kdykoli rezerva platí a GoodWe exportuje
+    # ≥ done_export_w) proti dávce = podíl průměrné denní spotřeby bojleru z PND
+    budget_share: float = 0.6
+    budget_default_kwh: float = 2.5  # když PND průměr chybí
+    low_sell_kc: float = 0.5  # výkup pod tímto (i záporný) → plný bojler by stál víc → poloviční dávka
+    low_sell_factor: float = 0.5
 
 
 @dataclass
@@ -458,6 +465,8 @@ class BoilerInputs:
     battery_soc: float
     heating: bool  # binary_sensor.energy_boiler_heating
     grid_export_w: float  # GoodWe přetok teď (+ = do sítě)
+    boiler_avg_kwh: Optional[float] = None  # průměr denní spotřeby bojleru z PND
+    sell_price: float = 99.0  # výkup teď (Kč/kWh)
 
 
 @dataclass
@@ -468,7 +477,7 @@ class BoilerGate:
     on_since: Optional[datetime] = None
     day: Optional[str] = None
     done: bool = False
-    idle_s: float = 0.0  # přetok bez ohřevu při aktivní rezervě
+    delivered_kwh: float = 0.0  # odhad energie dodané do bojleru dnes (z přetoku při rezervě)
     last: Optional[datetime] = None
     reason: str = ""
 
@@ -478,7 +487,7 @@ class BoilerGate:
         self.last = i.now
         day = i.now.date().isoformat()
         if day != self.day:
-            self.day, self.done, self.idle_s = day, False, 0.0
+            self.day, self.done, self.delivered_kwh = day, False, 0.0
         hour = i.now.hour + i.now.minute / 60
         blocked = (
             "vypnuto" if not p.enabled
@@ -492,10 +501,12 @@ class BoilerGate:
             self.active, self.on_since = False, None
             self.reason = blocked
             return 0.0
+        budget = self.budget_kwh(i)
         if i.heating:
             # přebytek už bojler odečítá (−2 250 W) → rezerva by se počítala dvakrát
-            self.idle_s = 0.0
-            self.reason = "bojler hřeje"
+            if self._account(i, dt, budget):
+                return 0.0
+            self.reason = f"bojler hřeje ({self.delivered_kwh:.1f}/{budget:.1f} kWh)"
             return 0.0
         if self.active and i.surplus_w < p.off_w:
             self.active, self.on_since = False, None
@@ -509,14 +520,28 @@ class BoilerGate:
         if not self.active:
             self.reason = f"přebytek < {p.on_w:.0f} W – EV bere vše"
             return 0.0
-        if i.grid_export_w >= p.done_export_w:
-            self.idle_s += dt
-            if self.idle_s >= p.done_after_s:
-                self.done, self.active = True, False
-                self.reason = "bojler dnes nahřátý"
-                return 0.0
-        self.reason = f"nechává {p.reserve_w:.0f} W bojleru"
+        if self._account(i, dt, budget):
+            return 0.0
+        self.reason = f"nechává {p.reserve_w:.0f} W bojleru ({self.delivered_kwh:.1f}/{budget:.1f} kWh)"
         return p.reserve_w
+
+    def budget_kwh(self, i: BoilerInputs) -> float:
+        p = self.p
+        avg = i.boiler_avg_kwh if i.boiler_avg_kwh and i.boiler_avg_kwh > 0 else None
+        budget = avg * p.budget_share if avg else p.budget_default_kwh
+        if i.sell_price < p.low_sell_kc:
+            budget *= p.low_sell_factor
+        return budget
+
+    def _account(self, i: BoilerInputs, dt: float, budget: float) -> bool:
+        """Připočte odhad energie do bojleru; True = dávka splněna (bojler dnes „nahřátý“)."""
+        if i.grid_export_w >= self.p.done_export_w:
+            self.delivered_kwh += self.p.boiler_kw * dt / 3600
+        if self.delivered_kwh >= budget:
+            self.done, self.active = True, False
+            self.reason = "bojler dnes nahřátý"
+            return True
+        return False
 
 
 # ------------------------------------------------ vyúčtování: EV ze sítě v NT po měsících

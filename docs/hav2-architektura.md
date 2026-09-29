@@ -276,8 +276,11 @@ až když přetok převýší ~2,2 kW. kWh v bojleru ušetří VT 6,10 Kč (krat
 `hav2_ev.BoilerGate` proto odečte od přebytku pro EV rezervu **2 500 W**, když platí vše: `input_boolean.ev_boiler_priority` on,
 10:00–15:30, baterie ≥ 97 %, EV připojené a nabíjí ze slunce (Solár / Solár+NT, bez ručního režimu a plánovaného slotu),
 termín EV nehrozí a vyhlazený přebytek bez filtrace ≥ 2,6 kW po 3 min (vypnutí pod 2,3 kW). Když `binary_sensor.energy_boiler_heating`
-hlásí ohřev, rezerva je 0 (přebytek už bojler odečítá). **Bojler nahřátý:** 15 min přetoku GoodWe ≥ 2,3 kW při aktivní rezervě
-bez ohřevu (minuty bez přetoku se nepočítají) → rezerva do konce dne vypnutá. Stav: atributy `boiler_reserve_w` a `boiler_gate`
+hlásí ohřev, rezerva je 0 (přebytek už bojler odečítá). **Bojler nahřátý (upraveno 29. 9.):** napěťový detektor v poledne spolehlivě nefunguje (28. 9. ohřev 14:11–14:33 nezachytil,
+13:17–13:49 hlásil falešně). Proto energetická dávka: odhad dodané energie = 2,2 kW po dobu, kdy rezerva platí (nebo detektor hlásí
+ohřev) a GoodWe exportuje ≥ 2,3 kW; po dosažení dávky (60 % průměru bojleru z PND za 14 dní, ~2,5 kWh; při výkupu < 0,5 Kč
+poloviční) je rezerva do konce dne vypnutá. Pozor: WATTrouter hřeje jen, dokud na elektroměru trvá přetok – jakýkoli další spotřebič
+(i EV) ho vypne. Spolehlivé řešení = měření okruhu bojleru (Shelly, klešťový snímač). Stav: atributy `boiler_reserve_w` a `boiler_gate`
 v `sensor.ev_regulator`, logbook „HAv2 EV“, minutový záznam. „Nahřátý“ se zapíše do `input_datetime.energy_boiler_last_full`
 (přežije restart; ruční změna na jiné datum = rezervu dnes zkusit znovu). Když EV na minimu chybí jen kvůli rezervě, regulátor nedotuje z baterie, ale pozastaví. Parametry v `BoilerParams` (začátek okna jde posunout např. na 12:00).
 
