@@ -370,10 +370,13 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             except (KeyError, TypeError, ValueError):
                 continue
         horizon = datetime.now(TZ) + timedelta(days=2)
-        covered = bool(intervals) and max(e for _, e in intervals) >= horizon.replace(hour=0, minute=0)
+        last_end = max(e for _, e in intervals) if intervals else None
+        covered = bool(intervals) and last_end >= horizon.replace(hour=0, minute=0)
 
         def is_nt(ts: datetime) -> bool:
-            if covered:
+            # rozpis HDO sahá jen pár dní dopředu; za jeho koncem (NT před vzdáleným termínem EV)
+            # záloha 22–06, jinak by plán EV „NT později“ neviděl žádnou noc
+            if covered and ts < last_end:
                 return any(a <= ts < b for a, b in intervals)
             return ts.hour >= 22 or ts.hour < 6  # záloha: NT 22–06
 

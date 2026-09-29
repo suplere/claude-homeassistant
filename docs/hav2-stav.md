@@ -41,7 +41,8 @@ Test Auto běží dál (volno do 30. 9.). Kontroly: `make pull` → `config/appd
    PND export sedí, tržba ~34,8 Kč, čistě ~18,6 Kč. Při další špičce ≥ 7,2 Kč ověřit start/konec přesně na čtvrthodině
    (přepočet plánu v :00:10/:15:10/…) a že ráno ve VT nechybí baterie.
 3. **EV:** cíl 80 %, termín 31. 10. 12:00 → nabíjí jen ze slunce, NT až poslední noc 30./31. 10. (zkontrolovat, že
-   plán „NT později“ drží). Kmitání proudu ±1 A/min (trouba) – zatím neřešeno.
+   plán „NT později“ drží – **opraveno 29. 9.**: za koncem rozpisu HDO (pár dní) `_nt_fn` vracel „ne NT“, takže vzdálené
+   noci chyběly; teď záloha 22–06). Kmitání proudu ±1 A/min (trouba) – zatím neřešeno.
 3b. **EV – jednorázový cíl nad limitem auta (nasazeno 29. 9. 16:33):** standardní cíl 80 %, standardní limit v autě 90 %,
    okno 24 h (EV → Parametry regulace). Zatím neověřeno v reálu: při prvním použití (např. cíl 100 % s termínem) sledovat
    `sensor.ev_target_status`, logbook „HAv2 EV“ (zápis limitu), že se `number.ev6_ac_charging_limit` v HA opravdu změní
