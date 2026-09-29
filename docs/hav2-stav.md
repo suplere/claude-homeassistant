@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 25. 9. 2026)
+# HAv2 – stav a předávka (k 29. 9. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -23,6 +23,31 @@ Po testu rozhodnout: smazat v1 (podle archivu) nebo vrátit.
 
 **Data z testu:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní,
 stáhne `make pull`, mimo git) + historie HA + PND D+1.
+
+## 1b. Sledovat v příští session (stav 29. 9. 2026)
+
+Test Auto běží dál (volno do 30. 9.). Kontroly: `make pull` → `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl`
+(minutový záznam, klíče viz `DATA_STATES`/`DATA_ATTRS` v `hav2_app.py`), PND D+1 v `sensor.energy_boiler_pnd_daily`
+(`hours_json`, `export_loss_kwh`; hodinově, PND export/import po hodinách = statistiky `cez_pnd:859182400703740246_production/consumption`).
+
+1. **Bojler – energetická dávka (nasazeno 29. 9. 08:47, commit a3e2b2d):** na prvním slunečném dni s plnou baterií
+   a připojeným EV sledovat `boiler_gate` / `boiler_reserve_w` (jsonl, `sensor.ev_regulator`) a druhý den PND:
+   dostal bojler v poledne víc než 0,74 kWh (28. 9.)? Zkrátil se ohřev ze sítě 16–19 h? Nešel přetok do sítě
+   zbytečně (bojler plný, rezerva drží)? Doladit `BoilerParams.budget_share` (0,6), případně okno 10:00–15:30.
+2. **Večerní prodej z baterie (od 28. 9., commit 75fb3b3 + 7d07dce):** 28. 9. prodáno 5,2 kWh (18:01–18:16, 19:04–20:03),
+   PND export sedí, tržba ~34,8 Kč, čistě ~18,6 Kč. Při další špičce ≥ 7,2 Kč ověřit start/konec přesně na čtvrthodině
+   (přepočet plánu v :00:10/:15:10/…) a že ráno ve VT nechybí baterie.
+3. **EV:** cíl 80 %, termín 31. 10. 12:00 → nabíjí jen ze slunce, NT až poslední noc 30./31. 10. (zkontrolovat, že
+   plán „NT později“ drží). Kmitání proudu ±1 A/min (trouba) – zatím neřešeno.
+4. **Filtrace:** oprava posledního krátkého běhu (min. 15 min, jen do splnění) a doby běhu po restartu – ověřeno 28. 9.
+5. **Nenastalo, počkat:** záporné ceny bez zájmu EV (odložení nabíjení, limit přetoku 0 W), 3f z plné baterie,
+   NT nabíjení baterie před zataženým dnem, test watchdogu (zastavit AppDaemon ~4 min – jen se souhlasem).
+6. **Rozhodnutí po testu (uživatel):** převzít řízení natrvalo (záloha → smazat 16 vypnutých automatizací v1 podle
+   `archive/v1-2026-09-25/README.md`, statistiky `sensor.ev_nt_*` ponechat – tabulka vyúčtování je používá), nebo návrat.
+7. **Hardware (návrh uživateli):** měření okruhu bojleru – Shelly EM Gen3 / Pro EM-50 s klešťovým snímačem (+ druhý
+   snímač na L3 za elektroměrem = skutečný přetok, podle kterého spíná WATTrouter). Uživatel zvažuje; do té doby dávka (C).
+   Dále: přes USB a WATTconfig ECO opsat nastavení WATTrouteru (režim regulace součet/fáze, relé bojleru, časové plány,
+   CombiWATT) – nucený ohřev 16:09 je nejspíš časový plán „Vynutit“.
 
 ## 2. Mapa systému
 
@@ -82,43 +107,38 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
   ověřeno 28. 9.: stav OK, 96 záznamů/den, denní spotřeba i výroba sedí s AppDaemon PND app. Starý patch pro 1.1.1 už neplatí.
 - Citlivé: `.env` (HA_TOKEN), `config/appdaemon/apps/apps.yaml` (PND heslo) – nikdy nevypisovat ani necommitovat. (Testovací údaje v Keychain `cez_pnd_test` smazány 25. 9. 2026.)
 
-## 3b. Zjištění z testu Auto (26.–27. 9. 2026)
+## 3b. Zjištění z testu Auto (26.–29. 9. 2026)
 
-- **WATrouter spíná bojler celým výkonem (relé), až když přetok zřetelně převýší ~2,2 kW** (test 26. 9.:
-  2,2 kW → nic, 3,3 kW → zapnul 13:44, vypnul ~14:00 po zapnutí trouby). PND 26. 9.: bojler 3,67 kWh / 11,42 Kč,
-  z toho **1,79 kWh ze slunce**; polední ohřev zkrátil nucený ohřev v 16:09 na ~35 min (obvykle 75–170).
-  Bojler je mezi elektroměrem distributora a měřením GoodWe → GoodWe vidí přetok i s bojlerem.
-- **Hodnota kWh:** bojler v poledni ušetří VT 6,10 Kč, EV jen NT 3,51 Kč → při plné baterii a přetoku
-  > ~2,5 kW má mít přednost bojler. **Otevřené:** pravidlo v regulaci EV („nechat prostor bojleru“) – nejdřív
-  ověřit chování WATrouteru na dalších slunečných dnech (27.–28. 9.) z PND `sensor.energy_boiler_pnd_daily`
-  (atributy `hours_json`, `export_loss_kwh`) a detektoru `binary_sensor.energy_boiler_heating`.
-- **Nasazeno 27. 9. 09:45: prostor pro bojler v regulaci EV** (architektura §5.4, `input_boolean.ev_boiler_priority` on).
-  Ověřit na prvním slunečném dni: `boiler_gate` v minutovém záznamu, detektor bojleru a PND `hours_json` / `export_loss_kwh`.
-  Detektor zachytil polední ohřevy 26. 9. (12:13–12:47, 13:44–14:08) se zpožděním ~5 min – shoda s PND.
-  Přehrání dat 26. 9. odpoledne: rezerva by nesepnula (přebytek nevydržel 3 min nad 2,6 kW).
-- Zjištění 26.–27. 9.: baterie přes noc 100 → 37 % bez NT nabíjení (správně); EV 1f jen ~0,8 kWh, proud kmitá ±1 A/min
-  kvůli troubě (spotřeba skáče ~2,1 kW/min); filtrace dobíhá z baterie (NT doplnění i po 16:58 – drobnost).
-- PND v HA jen **hodinově** (integrace stahuje 15 min, ale externí statistiky HA jsou hodinové).
-- Opraveno během testu: plán EV nabíjel v první NT místo poslední před termínem; rezerva baterie před EV
-  se řídila plánem baterie, který nezná EV (EV by sebralo celé dopoledne); plné nabití baterie 1× za 30 dní
-  (Pylontech Force H2 × 3 vyžaduje vyrovnání 1× za 3 měsíce, BMS si ho vyžádá sám); doporučení hodin filtrace
-  (do 18 °C teplota/3, od 22 °C teplota/2) a filtrace se jím řídí (`pool_use_recommendation` on).
-- EV: termín 29. 9. 06:00, cíl 80 %; plán slunce 27.–28. 9. + NT v noci 28./29. 9.
+- **WATTrouter ECO** (manuál: WATTrouter ECO WRE 01/06/14): bojler na **reléovém výstupu** – sepne, až přebytek na jeho
+  měřicím modulu (za elektroměrem distributora, před bojlerem) převýší příkon ~2,2 kW, a **vypne, když se zapne jiný
+  spotřebič** (28. 9. 14:33 ho vypnul start EV). Bojler je mezi elektroměrem a měřením GoodWe → GoodWe vidí přetok i s bojlerem.
+  Prodej z baterie večer WATTrouter nespustil (bojler nechtěl hřát); PND export ≈ GoodWe export.
+- **Napěťový detektor bojleru** (`binary_sensor.energy_boiler_heating`) je v poledne a při exportu nespolehlivý (skoky napětí
+  ±1,3–3,7 V z okolní sítě jsou stejně velké jako sepnutí bojleru); spolehlivý jen večer bez exportu. Proto „nahřátý“
+  podle energetické dávky (architektura §5.4).
+- **Hodnota kWh:** bojler v poledne ušetří VT 6,10 Kč, EV jen NT 3,51 Kč; plný bojler + rezerva = ztráta NT − výkup
+  (při záporném výkupu ještě víc) → rezerva se vyplatí jen s rozumnou jistotou, že bojler bere.
+- **Baterie:** přes noc bez NT nabíjení, správně (FVE další den dobije). Večerní prodej ve špičce od 28. 9.
+- **EV:** NT nabíjení 28./29. 9. 22:00–00:18, 3f 11 A ~6,8 kW, 15,45 kWh / 54 Kč, baterie domu v `battery_standby`,
+  jistič min. rezerva 13,2 A. Tabulka vyúčtování NT (`sensor.ev_nt_billing`, stránka EV náklady) sčítá HAv2 + v1.
+- **Opraveno během testu (26.–29. 9.):** NT plán EV v poslední NT před termínem; rezerva baterie před EV; plné nabití
+  baterie 1× za 30 dní; doporučení hodin filtrace; příznak bojleru v `input_datetime.energy_boiler_last_full`
+  (přežije restart); EV při rezervě bojleru nedotuje z baterie; krátký poslední běh filtrace; NT končí v 06:00 (ne 06:00:01);
+  přepočet plánu na hranicích čtvrthodin; atributy AppDaemon senzorů `replace=True`; přesnost `energy_buy_sum`/`sell_sum`
+  na 3 desetinná místa (uživatel v GUI 28. 9.).
+- PND v HA jen **hodinově** (15min data integrace hned agreguje). cez_pnd v1.1.2 funguje bez lokálního patche.
 
 ## 4. Další kroky
 
-1. **Pozorování (pár dní):** stránky Plán a Nastavení → Log rozhodnutí; porovnat doporučení se skutečností
-   (baterie přes noc, EV v NT, filtrace ze slunce). Zaznamenat odchylky.
-2. ~~26. 9.: ověřit odchylku proti PND~~ – hotovo: bez bojleru nákup +1,3 % (0,10 kWh), prodej −0,13 kWh. Bojler 25. 9. = 6,36 kWh / 38 Kč.
-2b. **Bojler:** sledovat `sensor.energy_boiler_pnd_daily` pár týdnů → spočítat roční úsporu přepojení bojleru za měření GoodWe (elektrikář) proti předehřevu v poledne.
-3. **Slunečný den:** experiment předehřevu bojleru (`input_boolean.energy_boiler_preheat`, §5.6) – výsledek z PND 15 min.
-4. **Převzetí řízení po oblastech (každá se schválením):**
-   1. záloha (HA backup) → smazat staré automatizace oblasti podle `archive/v1-2026-09-25/README.md`
-      (jako první `ev_blokovat_vybijeni_baterie` a `predictive_overflow_negative_price`),
-   2. baterie: `number.goodwe_maximum_vybiti_v_siti` = 80 % (DoD pro min SOC 20 %),
-   3. `energy_system_mode` = Auto + přepínač oblasti on; sledovat první den.
-5. **Po převzetí:** smazat helpery „nepotřebujeme“ (archiv README), vypnout AppDaemon PND app po ověření dat z HACS integrace (denní, 15 min, VT/NT).
-6. Volitelně: sankey graf na stránce Úspory, Solcast auto-dampening, duplicitní `input_number.battery_capacity` (YAML + storage).
+Aktuální seznam sledování a rozhodnutí je v **§1b**. Dlouhodobě:
+1. **Bojler:** řada `sensor.energy_boiler_pnd_daily` (denně, z toho z přetoku) → roční přínos měření (Shelly) nebo přepojení
+   bojleru za měření GoodWe (elektrikář, odhad 5–8 tis. Kč/rok).
+2. **Převzetí řízení** (se schválením): záloha HA → smazat automatizace v1 (jako první `ev_blokovat_vybijeni_baterie`,
+   `predictive_overflow_negative_price`) → baterie DoD 80 % → Auto zůstává.
+3. **Po převzetí:** smazat helpery „nepotřebujeme“ (archiv README). AppDaemon PND app vypnout až po přepojení
+   `hav2_boiler.py` na data HACS integrace a ověření VT/NT.
+4. Volitelně: rozvržení stránky EV (sekce „Aktuální session“ k ručnímu ovládání), sankey na Úsporách, Solcast
+   auto-dampening, duplicitní `input_number.battery_capacity`, zbytečná zpráva „bojler: mimo okno“ o půlnoci.
 
 ## 5. Známé drobnosti
 - `sensor.pool_water_temperature` a `sensor.pool_hours_recommended` mají hodnotu až po ≥ 10 min běhu filtrace.
