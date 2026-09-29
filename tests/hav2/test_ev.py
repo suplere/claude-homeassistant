@@ -20,6 +20,9 @@ from hav2_ev import (  # noqa: E402
     STATE_SUPPORT,
     EvPlanParams,
     EvSlot,
+    LimitInputs,
+    limit_plan,
+    limit_step,
     RegInputs,
     Regulator,
     ev_power_kw,
@@ -414,3 +417,109 @@ def test_billing_rows_six_months_sum_v1_and_hav2():
     assert rows[0] == ("září 2026", 70.56, 247.66)
     assert rows[1] == ("srpen 2026", 45.56, 159.9)
     assert rows[5] == ("duben 2026", 0.0, 0.0)
+
+
+# ------------------------------------------- jednorázový cíl nad limitem auta
+
+
+def test_plan_high_part_only_in_window_before_deadline():
+    # po 14:00, termín čt 12:00, okno 24 h → nad limit jen od st 12:00 (NT st/čt noc)
+    now = datetime(2026, 9, 28, 14, 0, tzinfo=TZ)
+    deadline = datetime(2026, 10, 1, 12, 0, tzinfo=TZ)
+    high_from = deadline - timedelta(hours=24)
+    slots = ev_slots(now, 82, 0.0)  # bez slunce, sloty až do čt 24:00
+    plan = plan_ev(slots, EvPlanParams(needed_kwh=20, mode="Solár+NT", deadline=deadline,
+                                       high_kwh=9, high_from=high_from), now)
+    assert plan.shortfall_kwh == 0 and abs(plan.nt_kwh - 20) < 0.01
+    # vše v poslední noci (st/čt), protože NT se plánuje v posledním bloku
+    assert min(plan.grid_slots) >= high_from
+    assert "nad limit auta 9.0" in plan.reason
+
+
+def test_plan_high_part_not_in_earlier_night():
+    # poslední NT blok nestačí na obojí → normální část do dřívější noci, nad limit nikdy před oknem
+    now = datetime(2026, 9, 28, 14, 0, tzinfo=TZ)
+    deadline = datetime(2026, 10, 1, 12, 0, tzinfo=TZ)
+    high_from = deadline - timedelta(hours=24)
+    slots = ev_slots(now, 82, 0.0)
+    plan = plan_ev(slots, EvPlanParams(needed_kwh=70, mode="Solár+NT", deadline=deadline,
+                                       high_kwh=10, high_from=high_from), now)
+    early = [t for t in plan.grid_slots if t < high_from]
+    late = [t for t in plan.grid_slots if t >= high_from]
+    assert early and len(late) == 32  # poslední noc celá (8 h), zbytek dřív
+    assert plan.shortfall_kwh == 0
+
+
+def test_plan_high_part_solar_only_from_window():
+    # slunce jen před oknem → nad limit ze slunce nic, jde do NT v okně
+    now = datetime(2026, 9, 28, 8, 0, tzinfo=TZ)
+    deadline = datetime(2026, 9, 29, 12, 0, tzinfo=TZ)
+    high_from = datetime(2026, 9, 28, 20, 0, tzinfo=TZ)
+    slots = ev_slots(now, 28, 4.0)  # 9–16 h slunce 4 kW (28. 9.) + 29. 9. 9–12 h
+    plan = plan_ev(slots, EvPlanParams(needed_kwh=15, mode="Solár+NT", deadline=deadline,
+                                       high_kwh=15, high_from=high_from), now)
+    # v okně je slunce jen 29. 9. 9–12 h: 3 h × 4 kW × 0,7 = 8,4 kWh
+    assert abs(plan.solar_kwh - 8.4) < 0.01
+    assert abs(plan.nt_kwh - 6.6) < 0.01
+
+
+def test_plan_without_high_unchanged():
+    now = datetime(2026, 9, 25, 20, 0, tzinfo=TZ)
+    a = plan_ev(ev_slots(now, 28, 1.0), EvPlanParams(needed_kwh=20, mode="Solár+NT"), now)
+    b = plan_ev(ev_slots(now, 28, 1.0), EvPlanParams(needed_kwh=20, mode="Solár+NT", high_kwh=0,
+                                                   high_from=now), now)
+    assert a.grid_slots == b.grid_slots and a.nt_kwh == b.nt_kwh
+
+
+def test_limit_step():
+    assert limit_step(95) == 100 and limit_step(90) == 90 and limit_step(81) == 90 and limit_step(30) == 50
+
+
+def lim(**kw):
+    base = dict(now=datetime(2026, 9, 28, 10, 0, tzinfo=TZ), target_soc=80, std_limit=90, car_limit=90,
+                deadline=None, window_h=24, connected=True)
+    base.update(kw)
+    return limit_plan(LimitInputs(**base))
+
+
+def test_limit_normal_target_nothing_to_do():
+    lp = lim()
+    assert (lp.level, lp.want_limit, lp.top_now, lp.over) == ("OK", None, 80, False)
+
+
+def test_limit_over_before_window_waits():
+    dl = datetime(2026, 10, 2, 12, 0, tzinfo=TZ)
+    lp = lim(target_soc=100, deadline=dl)
+    assert lp.over and not lp.in_window and lp.want_limit is None
+    assert lp.high_from == dl - timedelta(hours=24) and lp.normal_top == 90 and lp.top_now == 90
+    assert lp.level == "Info" and "01.10. 12:00" in lp.message
+
+
+def test_limit_over_in_window_raises_when_connected():
+    dl = datetime(2026, 9, 29, 8, 0, tzinfo=TZ)
+    assert lim(target_soc=100, deadline=dl).want_limit == 100
+    assert lim(target_soc=95, deadline=dl).want_limit == 100
+    assert lim(target_soc=100, deadline=dl, connected=False).want_limit is None
+    assert lim(target_soc=100, deadline=dl, car_limit=100).want_limit is None  # už zvednuto
+
+
+def test_limit_over_without_deadline_raises_now():
+    assert lim(target_soc=100).want_limit == 100
+
+
+def test_limit_restored_after_oneoff():
+    # cíl zpět na standard, v autě zůstalo 100 → vrátit na 90
+    assert lim(car_limit=100).want_limit == 90
+    # jednorázový cíl ještě před oknem, limit zvednutý ručně dřív → vrátit (100 % až v okně)
+    dl = datetime(2026, 10, 2, 12, 0, tzinfo=TZ)
+    assert lim(target_soc=100, deadline=dl, car_limit=100).want_limit == 90
+
+
+def test_limit_car_below_target_warns_only():
+    lp = lim(target_soc=85, car_limit=80)
+    assert lp.level == "Varování" and lp.want_limit is None and lp.top_now == 80 and lp.capped
+
+
+def test_limit_unknown_car_limit_never_writes():
+    assert lim(car_limit=None).want_limit is None
+    assert lim(target_soc=100, car_limit=None).want_limit is None

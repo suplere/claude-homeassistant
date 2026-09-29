@@ -42,6 +42,10 @@ Test Auto běží dál (volno do 30. 9.). Kontroly: `make pull` → `config/appd
    (přepočet plánu v :00:10/:15:10/…) a že ráno ve VT nechybí baterie.
 3. **EV:** cíl 80 %, termín 31. 10. 12:00 → nabíjí jen ze slunce, NT až poslední noc 30./31. 10. (zkontrolovat, že
    plán „NT později“ drží). Kmitání proudu ±1 A/min (trouba) – zatím neřešeno.
+3b. **EV – jednorázový cíl nad limitem auta (nasazeno 29. 9. 16:33):** standardní cíl 80 %, standardní limit v autě 90 %,
+   okno 24 h (EV → Parametry regulace). Zatím neověřeno v reálu: při prvním použití (např. cíl 100 % s termínem) sledovat
+   `sensor.ev_target_status`, logbook „HAv2 EV“ (zápis limitu), že se `number.ev6_ac_charging_limit` v HA opravdu změní
+   (Kia cloud, jinak 3 pokusy → notifikace) a že se po nabití vrátí limit na 90 % a cíl na 80 %.
 4. **Filtrace:** oprava posledního krátkého běhu (min. 15 min, jen do splnění) a doby běhu po restartu – ověřeno 28. 9.
 4b. **Předpověď FVE – ranní stín (29. 9.):** komín před FVE; září–říjen má naměřený hodinový tvar (7–8 h ~0,5 Solcastu).
    Ověřit, že ranní SOC teď sedí s plánem (dashboard Plán). Pro listopad+ tvar přepočítat z dat: poměr hodinového průměru
@@ -99,7 +103,7 @@ jinak jen zapíšou do logbooku „Nezapsáno“.
 Publikuje: `sensor.energy_plan`, `sensor.energy_export_control`, `sensor.energy_load_forecast`, `sensor.ev_plan`, `sensor.ev_regulator`,
 `sensor.pool_plan`, `sensor.pool_controller`, `sensor.energy_boiler_pnd_daily`, `input_text.*_last_decision`, `input_datetime.hav2_heartbeat`.
 
-Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (65 testů).
+Testy: `source venv/bin/activate && pytest tests/hav2 -q --no-cov` (92 testů).
 
 ### Dashboard `energie-v2`
 Zdroj pravdy `dashboards/energie-v2.yaml`, nahrání:

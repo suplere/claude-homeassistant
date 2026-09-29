@@ -80,6 +80,9 @@ DATA_STATES = {
     "ev_w": "sensor.eco_volter_vykon",
     "ev_soc": "sensor.ev_soc_estimate",
     "ev_need_kwh": "sensor.ev_energy_needed_kwh",
+    "ev_target": "input_number.ev_target_soc",
+    "ev_car_limit": "number.ev6_ac_charging_limit",
+    "ev_target_status": "sensor.ev_target_status",
     "pool_on": "switch.filtrace_switch",
     "pool_done_h": "sensor.pool_hours_done_today",
     "system_mode": "input_select.energy_system_mode",
@@ -517,10 +520,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
     def ev_wants_energy(self) -> bool:
         if self.get_state(EV_CONNECTED) != "on" or self.get_state("input_select.ev_mode") == "Vypnuto":
             return False
-        try:
-            return float(self.get_state("sensor.ev_energy_needed_kwh")) > 0.05
-        except (TypeError, ValueError):
-            return True  # SOC auta neznámý → počítat s tím, že nabíjí
+        need = self.ev_needed_now()  # omezeno limitem nabíjení v autě
+        return True if need is None else need > 0.05  # SOC auta neznámý → počítat s tím, že nabíjí
 
     def live_loop(self, kwargs: Dict[str, Any]) -> None:
         try:

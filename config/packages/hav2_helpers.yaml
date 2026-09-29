@@ -92,6 +92,29 @@ input_number:
     max: 100
     step: 5
     unit_of_measurement: "%"
+  # cíl nad standardem = jednorázový: po nabití / odjezdu / termínu se vrátí na standard
+  ev_target_soc_default:
+    name: EV standardní cílový SOC
+    icon: mdi:battery-charging-80
+    min: 20
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+  # limit AC nabíjení v autě, na který HAv2 vrací number.ev6_ac_charging_limit
+  ev_car_limit_default:
+    name: EV standardní limit nabíjení v autě
+    icon: mdi:car-battery
+    min: 50
+    max: 100
+    step: 10
+    unit_of_measurement: "%"
+  ev_high_soc_window_h:
+    name: EV nad limit auta nejdřív před termínem
+    icon: mdi:clock-start
+    min: 6
+    max: 72
+    step: 1
+    unit_of_measurement: h
   ev_current_min:
     name: EV minimální proud
     icon: mdi:current-ac

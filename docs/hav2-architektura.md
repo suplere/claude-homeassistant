@@ -226,7 +226,19 @@ a watchdog baterie vrací 10 000 W.
 3. **Termín:**
    - Když FVE + NT do termínu nestačí a `ev_deadline_hard` = on → doplní VT sloty (nejlevnější, nejpozději).
    - Když `ev_deadline_hard` = off → notifikace „nestihne se, chybí X kWh“ s volbou doplnit.
-4. **Regulace podle přebytku běží jen tehdy, když je termín bezpečně splnitelný** (`ev_deadline_slack_h` > 1 h). Jinak plánovač vynutí pevný proud.
+4. **Cíl nad limitem nabíjení v autě (jednorázově, doplněno 29. 9.):**
+   - Standard: `input_number.ev_target_soc_default` (80 %) a limit AC v autě `input_number.ev_car_limit_default` (90 %).
+     Cíl `ev_target_soc` nad standardem je **jednorázový** – po dosažení, odjezdu v okně nebo v termínu se vrátí na standard.
+   - Cíl nad standardním limitem auta (např. 100 %): energie do limitu se plánuje kdykoli, **energie nad limit jen
+     v okně `ev_high_soc_window_h` (24 h) před termínem** (bez termínu hned). Na začátku okna (s připojeným autem)
+     HAv2 nastaví `number.ev6_ac_charging_limit` na cíl zaokrouhlený nahoru na 10 %; mimo okno vrací limit na standard
+     (i po ruční změně v autě). Zápis max. 3× po 10 min, pak notifikace. Neznámý limit (Kia nedostupná) = nic nezapisovat.
+   - Regulátor i „EV chce energii“ počítají s cílem omezeným skutečným limitem v autě (tolerance 1 % – auto na limitu
+     přestane brát samo), takže před oknem nečeká na nedosažitelný cíl.
+   - `sensor.ev_target_status` (OK / Info / Varování + `message`): cíl nad limitem a kdy se limit zvedne, limit v autě pod
+     cílem (jen varování, nic nezapisuje), zápis limitu selhal, nestihne se do termínu, řízení EV neběží.
+     Notifikace: v termínu auto doma pod cílem; odpojení v okně jednorázového cíle pod cílem.
+5. **Regulace podle přebytku běží jen tehdy, když je termín bezpečně splnitelný** (`ev_deadline_slack_h` > 1 h). Jinak plánovač vynutí pevný proud.
 
 ### 5.4 EV – regulační smyčka proudu (solární nabíjení)
 

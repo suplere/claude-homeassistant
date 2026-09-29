@@ -72,6 +72,11 @@ class EvPlanParams:
     # NT energie dostupná až za koncem slotů (předpověď FVE sahá do zítřka 24:00), ale před
     # termínem – ta se naplánuje, až bude vidět; mezitím může nabíjet slunce dalších dní
     later_nt_kwh: float = 0.0
+    # část needed_kwh nad standardním limitem auta: jen ve slotech od high_from (okno před
+    # termínem, kdy HAv2 zvedne limit v autě); later_nt_high_kwh = NT za koncem slotů v okně
+    high_kwh: float = 0.0
+    high_from: Optional[datetime] = None
+    later_nt_high_kwh: float = 0.0
 
 
 @dataclass
@@ -116,14 +121,36 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
     else:
         horizon = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
     window = [s for s in slots if s.start < horizon]
+    high = min(need, max(0.0, p.high_kwh))
 
-    solar = min(need, sum(s.solar_kwh for s in window) * p.solar_confidence)
-    rest = need - solar
+    def late(s: EvSlot) -> bool:
+        return p.high_from is None or s.start >= p.high_from
+
+    # slunce: část nad limitem jen ze slotů v okně, zbytek z čehokoli
+    sun_all = sum(s.solar_kwh for s in window) * p.solar_confidence
+    sun_high = min(high, sum(s.solar_kwh for s in window if late(s)) * p.solar_confidence)
+    sun_normal = min(need - high, sun_all - sun_high)
+    solar = sun_high + sun_normal
+    rest_high, rest_normal = high - sun_high, need - high - sun_normal
     grid: Dict[datetime, str] = {}
     nt_kwh = vt_kwh = later_kwh = 0.0
-    if p.mode == "Solár+NT" and rest > 0.05:
-        later_kwh = min(rest, max(0.0, p.later_nt_kwh))
-        rest -= later_kwh
+
+    def fill(s: EvSlot) -> float:
+        """Přidělí slotu energii (nejdřív část nad limitem, je-li slot v okně)."""
+        nonlocal rest_high, rest_normal
+        cap = p.grid_kw * 0.25 * s.fraction
+        e_high = min(rest_high, cap) if late(s) and rest_high > 0.05 else 0.0
+        e_normal = min(rest_normal, cap - e_high) if rest_normal > 0.05 else 0.0
+        rest_high -= e_high
+        rest_normal -= e_normal
+        return e_high + e_normal
+
+    if p.mode == "Solár+NT" and rest_high + rest_normal > 0.05:
+        later_high = min(rest_high, max(0.0, p.later_nt_high_kwh))
+        later_normal = min(rest_normal, max(0.0, p.later_nt_kwh - later_high))
+        rest_high -= later_high
+        rest_normal -= later_normal
+        later_kwh = later_high + later_normal
         blocks: List[List[EvSlot]] = []
         for s in window:
             if s.is_nt:
@@ -133,24 +160,27 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
                     blocks.append([s])
         for block in reversed(blocks):
             for s in block:
-                if rest <= 0.05:
+                if rest_high + rest_normal <= 0.05:
                     break
-                e = min(rest, p.grid_kw * 0.25 * s.fraction)
-                grid[s.start] = "NT"
-                nt_kwh += e
-                rest -= e
-    if rest > 0.05 and p.deadline_hard and p.deadline and p.deadline > now:
+                e = fill(s)
+                if e > 0:
+                    grid[s.start] = "NT"
+                    nt_kwh += e
+    if rest_high + rest_normal > 0.05 and p.deadline_hard and p.deadline and p.deadline > now:
         for s in reversed(window):
-            if rest <= 0.05:
+            if rest_high + rest_normal <= 0.05:
                 break
             if not s.is_nt and s.start not in grid:
-                e = min(rest, p.grid_kw * 0.25 * s.fraction)
-                grid[s.start] = "VT"
-                vt_kwh += e
-                rest -= e
+                e = fill(s)
+                if e > 0:
+                    grid[s.start] = "VT"
+                    vt_kwh += e
+    rest = rest_high + rest_normal
     shortfall = max(0.0, rest) if (p.deadline and p.deadline > now) else 0.0
 
     parts = [f"potřeba {need:.1f} kWh", f"slunce ~{solar:.1f}"]
+    if high > 0.05 and p.high_from:
+        parts.append(f"z toho nad limit auta {high:.1f} až od {p.high_from:%d.%m. %H:%M}")
     if nt_kwh:
         parts.append(f"NT {nt_kwh:.1f}")
     if later_kwh:
@@ -168,6 +198,81 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
     cost = (nt_kwh + later_kwh) * p.nt_price + vt_kwh * p.vt_price
     return EvPlan(need, round(solar, 2), round(nt_kwh + later_kwh, 2), round(vt_kwh, 2), round(shortfall, 2),
                   dict(sorted(grid.items())), horizon, ", ".join(parts), round(cost, 2))
+
+
+# ------------------------------------------------- limit nabíjení v autě (Kia AC)
+# Cíl nad standardním limitem auta = jednorázový požadavek (např. 100 % na cestu). Energie
+# nad limit se nabíjí až v okně před termínem (dlouho stát na 100 % baterii škodí); na začátku
+# okna HAv2 zvedne limit v autě, po nabití / odjezdu / termínu ho vrátí a cíl vrátí na standard.
+
+
+def limit_step(soc: float) -> int:
+    """Limit auta jde nastavit jen po 10 % (50–100)."""
+    return int(min(100, max(50, -(-soc // 10) * 10)))
+
+
+@dataclass
+class LimitInputs:
+    now: datetime
+    target_soc: float  # input_number.ev_target_soc
+    std_limit: float  # standardní limit auta (input_number.ev_car_limit_default)
+    car_limit: Optional[float]  # skutečný limit v autě (number.ev6_ac_charging_limit)
+    deadline: Optional[datetime]  # budoucí termín, jinak None
+    window_h: float = 24.0
+    connected: bool = False
+
+
+@dataclass
+class LimitPlan:
+    over: bool  # cíl nad standardním limitem
+    normal_top: float  # SOC, do kterého se plánuje kdykoli
+    high_from: Optional[datetime]  # od kdy se smí nabíjet nad standardní limit
+    in_window: bool
+    top_now: float  # SOC, do kterého auto nabije teď (cíl omezený skutečným limitem)
+    capped: bool  # top_now < cíl kvůli limitu v autě
+    want_limit: Optional[int]  # limit, který má HAv2 v autě nastavit (None = nechat)
+    level: str  # OK / Info / Varování
+    message: str
+
+
+def limit_plan(i: LimitInputs) -> LimitPlan:
+    t, std = i.target_soc, i.std_limit
+    car = i.car_limit if i.car_limit is not None else 100.0
+    over = t > std + 1e-6
+    high_from = (i.deadline - timedelta(hours=i.window_h) if i.deadline else i.now) if over else None
+    in_window = over and i.now >= high_from
+    top_now = min(t, car)
+    capped = top_now < t - 1e-6
+    want: Optional[int] = None
+    if i.car_limit is None:
+        pass  # limit v autě neznámý (Kia nedostupná) → nic nezapisovat
+    elif in_window and i.connected and capped:
+        want = limit_step(t)  # zvednout (jen s připojeným autem, jinak se nenabíjí tak jako tak)
+    elif not in_window and car > std + 1e-6:
+        want = limit_step(std)  # vrátit standard (po jednorázovém nabití nebo ruční změně v autě)
+
+    if over:
+        normal_top = std
+        lim = limit_step(t)
+        if in_window:
+            level = "Info"
+            msg = (f"Cíl {t:.0f} % je nad standardním limitem auta {std:.0f} %: limit se zvedá na {lim} %, "
+                   f"po nabití se vrátí na {std:.0f} % a cíl na standard.")
+            if not i.connected and capped:
+                msg += " Zvedne se po připojení auta."
+        else:
+            level = "Info"
+            msg = (f"Cíl {t:.0f} % je nad standardním limitem auta {std:.0f} %: do {std:.0f} % nabíjí kdykoli, "
+                   f"nad {std:.0f} % až od {high_from:%d.%m. %H:%M} ({i.window_h:.0f} h před termínem) – "
+                   f"limit auta se tehdy zvedne na {lim} %.")
+    else:
+        normal_top = top_now
+        level, msg = "OK", ""
+        if capped:
+            level = "Varování"
+            msg = (f"Limit nabíjení v autě {car:.0f} % je pod cílem {t:.0f} % – nabije se jen do {car:.0f} %. "
+                   f"Zvyš limit v autě nebo standardní limit v HAv2.")
+    return LimitPlan(over, normal_top, high_from, in_window, top_now, capped, want, level, msg)
 
 
 # ----------------------------------------------------------------- regulátor
