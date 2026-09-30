@@ -132,6 +132,9 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - Štítky: nové HAv2 entity vždy `hav2` + oblast (`hav2_system` / `hav2_baterie` / `hav2_ev` / `hav2_bazen`) – výjimka v CLAUDE.md. Senzory z AppDaemonu štítek mít nemůžou.
 - **cez_pnd (HACS) v1.1.2** (nainstalováno 27. 9. 22:26) funguje **bez lokálního patche** – opravuje účty bez `idDeviceSet`;
   ověřeno 28. 9.: stav OK, 96 záznamů/den, denní spotřeba i výroba sedí s AppDaemon PND app. Starý patch pro 1.1.1 už neplatí.
+  **30. 9. aktualizováno na v1.1.8** (nové: nákladové statistiky – u nás vypnuté, kontrola EAN/ELM jen v config flow/reauth –
+  při novém přihlášení může chtít potvrzení vazby). Po restartu ověřeno: entry `loaded`, status OK, 96 záznamů, ID statistik
+  `cez_pnd:…_consumption/production` beze změny, VT+NT = celková spotřeba.
 - Citlivé: `.env` (HA_TOKEN), `config/appdaemon/apps/apps.yaml` (PND heslo) – nikdy nevypisovat ani necommitovat. (Testovací údaje v Keychain `cez_pnd_test` smazány 25. 9. 2026.)
 
 ## 3b. Zjištění z testu Auto (26.–29. 9. 2026)
@@ -153,7 +156,7 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
   (přežije restart); EV při rezervě bojleru nedotuje z baterie; krátký poslední běh filtrace; NT končí v 06:00 (ne 06:00:01);
   přepočet plánu na hranicích čtvrthodin; atributy AppDaemon senzorů `replace=True`; přesnost `energy_buy_sum`/`sell_sum`
   na 3 desetinná místa (uživatel v GUI 28. 9.).
-- PND v HA jen **hodinově** (15min data integrace hned agreguje). cez_pnd v1.1.2 funguje bez lokálního patche.
+- PND v HA jen **hodinově** (15min data integrace hned agreguje). cez_pnd v1.1.8 (od 30. 9.) funguje bez lokálního patche.
 
 ## 4. Další kroky
 
