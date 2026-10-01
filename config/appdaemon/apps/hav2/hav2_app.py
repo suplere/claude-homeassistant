@@ -39,6 +39,8 @@ STAT_EV = "sensor.ecovolter_revcr01c00002056_total_charged_energy"
 STAT_POOL = "sensor.filtrace_sum"
 STAT_BUY = "sensor.energy_buy_sum"
 STAT_SELL = "sensor.energy_sell_sum"
+STAT_BOILER = "sensor.shellyproem50_ece334fd2370_energy_meter_0_energie"  # měření bojleru od 1. 10. 2026
+BOILER_POWER = "sensor.energy_boiler_power_w"  # atribut source == "měření" → Shelly, jinak odhad
 
 EXPORT_LIMIT = "number.goodwe_limit_dodavky_do_site"
 EXPORT_NORMAL_W = 10000  # běžný limit přetoku (jako v1 „Disable Overflow“)
@@ -83,8 +85,10 @@ DATA_STATES = {
     "ev_target": "input_number.ev_target_soc",
     "ev_car_limit": "number.ev6_ac_charging_limit",
     "ev_target_status": "sensor.ev_target_status",
-    "pool_on": "switch.filtrace_switch",
-    "pool_done_h": "sensor.pool_hours_done_today",
+    "pool_on": "switch.shellyproem50_841fe890fc44",
+    "pool_run": "binary_sensor.pool_pump_running",
+    "pool_w": "sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon",
+    "pool_done_h": "sensor.pool_hours_done",
     "system_mode": "input_select.energy_system_mode",
     "plan": "sensor.energy_plan",
     "ev_reg": "sensor.ev_regulator",
@@ -120,6 +124,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.defer_live = "standby"
         self.export_blocked = False
         self.export_published = None
+        self.neg_boiler = BO.NegPriceBoiler()
 
         self.run_every(self.heartbeat, "now", 60)
         self.run_daily(self.refresh_profile, "00:05:00")
@@ -258,22 +263,28 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             self.profile_source = f"fallback průměr {avg:.1f} kWh/den ({err})"
             self.log(f"profil spotřeby: {self.profile_source}", level="WARNING")
 
-        # bojler = co fakturuje PND navíc proti GoodWe (nákup navíc + prodej méně)
+        # bojler po hodinách za 8 dní: měření Shelly (od 1. 10. 2026), pro starší hodiny
+        # co fakturuje PND navíc proti GoodWe (nákup navíc + prodej méně)
         self.boiler_profile = {}
-        if self.pnd_consumption and self.pnd_production:
-            try:
-                stats = self._get_statistics([self.pnd_consumption, self.pnd_production, STAT_BUY, STAT_SELL], 8)
-                pi, pe, hi, he = (self._hourly(stats.get(i, [])) for i in
-                                  (self.pnd_consumption, self.pnd_production, STAT_BUY, STAT_SELL))
-                by_hour: Dict[int, List[float]] = {}
+        try:
+            ids = [STAT_BOILER] + ([self.pnd_consumption, self.pnd_production, STAT_BUY, STAT_SELL]
+                                   if self.pnd_consumption and self.pnd_production else [])
+            stats = self._get_statistics(ids, 8)
+            meas = self._hourly(stats.get(STAT_BOILER, []))
+            by_hour: Dict[int, List[float]] = {}
+            for ts, kwh in meas.items():
+                by_hour.setdefault(ts.hour, []).append(max(0.0, kwh))
+            if len(ids) > 1:
+                pi, pe, hi, he = (self._hourly(stats.get(i, [])) for i in ids[1:])
                 for ts in pi:
-                    if ts in hi and ts in pe and ts in he:
+                    if ts not in meas and ts in hi and ts in pe and ts in he:
                         unseen = (pi[ts] - hi[ts]) + (he[ts] - pe[ts])
                         by_hour.setdefault(ts.hour, []).append(max(0.0, unseen))
-                self.boiler_profile = {h: round(statistics.median(v), 3) for h, v in by_hour.items()
-                                       if len(v) >= 3 and statistics.median(v) > 0.1}
-            except Exception as err:  # noqa: BLE001
-                self.log(f"profil bojleru nedostupný: {err}", level="WARNING")
+            self.boiler_profile = {h: round(statistics.median(v), 3) for h, v in by_hour.items()
+                                   if len(v) >= 3 and statistics.median(v) > 0.1}
+            self.boiler_profile_source = f"měření {len(meas)} h + PND"
+        except Exception as err:  # noqa: BLE001
+            self.log(f"profil bojleru nedostupný: {err}", level="WARNING")
 
         self.set_state("sensor.energy_load_forecast",
                        state=round(sum(self.base_profile.get((False, h), 0) for h in range(24))
@@ -284,6 +295,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
                            "weekday_kwh_by_hour": [round(self.base_profile.get((False, h), 0), 3) for h in range(24)],
                            "weekend_kwh_by_hour": [round(self.base_profile.get((True, h), 0), 3) for h in range(24)],
                            "boiler_kwh_by_hour": self.boiler_profile,
+                           "boiler_source": getattr(self, "boiler_profile_source", "PND"),
                            "source": self.profile_source,
                        })
         self.log(f"profil spotřeby obnoven: {self.profile_source}, bojler {sum(self.boiler_profile.values()):.2f} kWh/den")
@@ -573,6 +585,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         Při limitu 0 GoodWe omezí FVE na spotřebu domu, takže přebytek pro EV a filtraci
         (FVE − dům) klesne k nule – proto se omezuje jen tehdy, když řízené spotřebiče nic
         nechtějí, a hned se uvolní, když něco začne chtít (připojení auta, chybějící hodiny).
+        S měřením bojleru (Shelly) limit = příkon bojleru + rezerva (hav2_boiler.NegPriceBoiler):
+        bojler je před měřením GoodWe, takže hřeje z přetoku, který do sítě neteče.
         """
         now = datetime.now(TZ)
         sell = self.fnum("sensor.energy_price_sell_now", 99.0)
@@ -581,7 +595,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         pool_on = (self.pool_virtual if getattr(self, "pool_virtual", None) is not None and not self.pool_executing()
                    else self.get_state(PUMP) == "on")
         pool_missing = (self.get_state("input_boolean.pool_season") == "on"
-                        and self.pool_target() - self.fnum("sensor.pool_hours_done_today", 0) > 0.05)
+                        and self.pool_target() - self.fnum("sensor.pool_hours_done", 0) > 0.05)
         ev_idle = not self.ev_wants_energy() and self.fnum("sensor.eco_volter_vykon", 0) < 100
         # (splněno, text když splněno, text když ne)
         checks = [
@@ -598,6 +612,13 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.export_blocked = block
         execute = self.battery_executing()
         limit = 0 if block else EXPORT_NORMAL_W
+        # záporný výkup: přetok jen tolik, kolik vezme bojler (je před měřením GoodWe) – jen se Shelly
+        boiler_measured = (self.get_state(BOILER_POWER, attribute="source") or "") == "měření"
+        if block and boiler_measured:
+            limit, btxt = self.neg_boiler.limit(now, self.fnum(BOILER_POWER, 0), self.fnum(EXPORT_LIMIT, 0))
+            reason += f"; {btxt}"
+        else:
+            self.neg_boiler.reset()
         key = (block, execute)
         if key != self.export_published:
             self.export_published = key

@@ -72,3 +72,48 @@ def boiler_days(
             d.cost_kc += imp_part * (nt_price if is_nt(ts) else vt_price)
             d.hours.append((ts.hour, round(imp_part + exp_part, 2)))
     return [days[k] for k in sorted(days)]
+
+
+# ------------------------------------------------ záporný výkup: přetok jen pro bojler
+# Bojler je mezi elektroměrem a měřením GoodWe → jeho odběr GoodWe počítá jako přetok.
+# Limit přetoku = příkon bojleru + rezerva: do sítě reálně teče jen rezerva (ze které WATTrouter
+# na L3 bojler dál přidává), zbytek přetoku podle GoodWe spotřebuje bojler. Bojler bere jen
+# přetok L3 (~⅓ celkového), proto rezerva 600 W ≈ 200 W na L3 → náběh ~200 W/min do 2,2 kW.
+NEG_MARGIN_W = 600
+NEG_MAX_W = 3000
+NEG_TAKES_W = 100  # bojler „bere“ nad tímto příkonem
+NEG_FULL_AFTER_S = 300  # rezerva nabízená 5 min a bojler nic → nahřátý (termostat)
+NEG_RETRY_S = 3600  # po hodině zkusit znovu
+NEG_MIN_STEP_W = 200  # menší změny limitu nezapisovat
+
+
+@dataclass
+class NegPriceBoiler:
+    """Limit přetoku při záporném výkupu podle změřeného příkonu bojleru (volat každou minutu)."""
+    probing_since: Optional[datetime] = None
+    full_since: Optional[datetime] = None
+
+    def limit(self, now: datetime, boiler_w: float, current_w: float) -> Tuple[int, str]:
+        if self.full_since:
+            if (now - self.full_since).total_seconds() < NEG_RETRY_S:
+                return 0, f"bojler nahřátý ({self.full_since:%H:%M}), limit 0 W"
+            self.full_since = None
+        if boiler_w >= NEG_TAKES_W:
+            self.probing_since = None
+            target = boiler_w + NEG_MARGIN_W
+            text = f"bojler bere {boiler_w:.0f} W"
+        else:
+            self.probing_since = self.probing_since or now
+            if (now - self.probing_since).total_seconds() >= NEG_FULL_AFTER_S:
+                self.full_since, self.probing_since = now, None
+                return 0, "bojler nebere (termostat), limit 0 W"
+            target = NEG_MARGIN_W
+            text = "nabízím přetok bojleru"
+        target = min(NEG_MAX_W, int(-(-target // 100) * 100))
+        if current_w > 0 and abs(target - current_w) < NEG_MIN_STEP_W:
+            target = int(current_w)
+        return target, f"{text}, limit {target} W"
+
+    def reset(self) -> None:
+        """Mimo záporný výkup – nový pokus začne od nabídky rezervy (nahřátí platí dál do NEG_RETRY_S)."""
+        self.probing_since = None

@@ -28,7 +28,7 @@ Principy vycházejí z měření ve Fázi 1:
   - Odezva na změnu proudu je 15–20 s, start ~20 s.
   - Wallbox občas vypadne na 20–70 s (`unavailable`).
 - **Kia:** SOC bývá staré i hodiny. Připojení a nabíjení se berou z EcoVolteru, SOC z Kia po `force_update` a dál se dopočítává.
-- **Čerpadlo filtrace:** L2, ~500 W. Shelly měří jen cívku stykače.
+- **Čerpadlo filtrace:** 1f, ~530 W (cos φ 0,92). **Od 1. 10. 2026 Shelly Pro EM-50** (`switch.shellyproem50_841fe890fc44` = relé → cívka stykače, `sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon` = snímač na fázi ze stykače k čerpadlu) místo Pro 1PM. Skutečný běh `binary_sensor.pool_pump_running` (> 150 W, záloha relé) → hodiny `sensor.pool_hours_done_today`, výkon `sensor.bazenova_filtrace_vykon`. Venku vypínače MANUAL/AUTOMAT a VYPNUTO/ZAPNUTO – nesoulad relé × běh 3 min → logbook + notifikace (`switch_mismatch` v `sensor.pool_controller`).
 - **Bojler (WATrouter ECO, 2,2 kW, 1f na L3) je mimo měření GoodWe.** Do 29. 9. 2026 každý den od **16:09** nucený ohřev (75–170 min), podle PND 12.–25. 9. **2,6–6,4 kWh/den, průměr 4,2 kWh a 22 Kč/den**, téměř vše VT (časový plán WATTrouteru ze starého HDO s odpoledním NT). **Od 29. 9. nucený ohřev 22:00–06:00 (NT).** WATTrouter reguluje SSR3 **plynule** (0–2,2 kW) podle přetoku **na L3** (režim „každá fáze samostatně“); GoodWe při plné baterii exportuje do fází zhruba rovnoměrně → bojler dostane ~⅓ přetoku. Baterie ho nepokryje. Pravděpodobná příčina zapojení: historický okruh na HDO odbočující před měřením GoodWe.
 - **Solcast:** časování sedí. Koeficienty: duben–září ×0,80, březen/říjen ×0,75, únor ×0,68, listopad–leden ×0,50. Odpoledne za jasna: 16 h ×0,70, 17 h ×0,55, 18 h ×0,40.
   **Ranní stín (doplněno 29. 9.):** komín před FVE, při nízkém slunci ráno 7–9 h jen ~50 % Solcastu. Pro září–říjen tvar dne
@@ -287,6 +287,9 @@ stateDiagram-v2
 **Plná baterie domu:** EV má přednost před prodejem až do 11 A.
 
 **3f z plné baterie (doplněno 26. 9.):** když má baterie ≥ 90 %, výkup je < 1 Kč/kWh a opravená FVE ji do večera dobije (rezerva 2 kWh), nabíjí se 3f na minimum i při přebytku od ~3,2 kW. Rozdíl do 1 kW kryje baterie, a to bez limitu epizody 10 min / 1 kWh. Přepnutí na 1f až pod ~3,2 kW. Důvod: přetok za ~0 Kč je horší než kWh pro EV, která by se jinak v noci koupila za NT.
+
+**Záporný výkup + bojler (1. 10. 2026):** když platí omezení přetoku (výkup < práh, baterie plná, EV ani filtrace nic nechtějí) a příkon bojleru je změřený (`sensor.energy_boiler_power_w`, `source: měření`), limit přetoku GoodWe = příkon bojleru + 600 W (nahoru na 100 W, max 3 kW, změny < 200 W se nezapisují). Bojler je před měřením GoodWe → jeho odběr GoodWe počítá jako přetok, do sítě reálně teče jen rezerva, ze které WATTrouter na L3 bojler přidává (~200 W/min). Bojler 5 min nic nebere → nahřátý, limit 0 W, nový pokus po hodině (`hav2_boiler.NegPriceBoiler`, testy `tests/hav2/test_neg_price_boiler.py`).
+**Profil bojleru v plánu baterie:** hodinová energie ze Shelly (`sensor.shellyproem50_ece334fd2370_energy_meter_0_energie`), pro hodiny bez měření PND − GoodWe; medián 8 dní (atribut `boiler_source` v `sensor.energy_load_forecast`).
 
 **Prostor pro bojler – od 29. 9. vypnuto (`input_boolean.ev_boiler_priority` off):** nucený ohřev je teď v NT, kWh v bojleru tedy ušetří jen NT 3,51 Kč jako kWh v EV; a protože bojler bere jen přetok L3, rezerva 2,5 kW by poslala ~⅔ do sítě za výkup. EV má přednost, bojler dostane zbytek přetoku automaticky. Přebytek a rezerva fáze L3 odečítají `sensor.energy_boiler_power_w` jen při zapnuté prioritě nebo v nočním okně; jistič počítá L3 ze sítě = odhad bojleru − přetok GoodWe na L3. Původní popis:
 

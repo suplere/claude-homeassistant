@@ -28,8 +28,12 @@ template:
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
+        # měření Pro EM-50 (pod 30 W = šum → 0); při výpadku měření odhad podle relé
         state: >
-          {% if is_state('switch.filtrace_switch', 'on') %}
+          {% set p = 'sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon' %}
+          {% if has_value(p) %}
+            {% set w = states(p) | float(0) %}{{ (w if w > 30 else 0) | round(0) }}
+          {% elif is_state('switch.shellyproem50_841fe890fc44', 'on') %}
             {{ states('input_number.filtrace_vykon_w') | float(450) | round(0) }}
           {% else %}
             0
@@ -125,7 +129,7 @@ template:
         state_class: measurement
         state: >
           {% set total = states('sensor.house_consumption_daily') | float(default=0) %}
-          {% set filtration_h = states('sensor.filtrace_spustena') | float(default=0) %}
+          {% set filtration_h = states('sensor.filtrace_spustena') | float(default=0) + states('sensor.pool_hours_done_legacy') | float(0) %}{# legacy přechodně 1. 10. 2026 #}
           {% set filtrace_w = states('input_number.filtrace_vykon_w') | float(450) %}
           {% set filtration_kwh = filtration_h * filtrace_w / 1000 %}
           {% set ev_kwh = states('sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy') | float(default=0) %}
@@ -162,7 +166,7 @@ input_number:
     max: 2000
     unit_of_measurement: W
     step: 10
-    initial: 500  # změřeno z fázové bilance L2 při sepnutí (2026-09-23), Shelly měří jen cívku
+    initial: 530  # změřeno Pro EM-50 1. 10. 2026 (dříve 500 z fázové bilance)
 
 input_boolean:
   time_to_use_overflows:

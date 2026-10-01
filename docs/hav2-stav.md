@@ -76,6 +76,15 @@ Test Auto běží dál (volno do 30. 9.). Kontroly: `make pull` → `config/appd
    chybný činný výkon), nebo PM Mini Gen3 do série. Po instalaci přepojit `sensor.bazenova_filtrace_vykon` na měření
    (+ hlídání „relé on, čerpadlo neběží“). Do té doby pevný odhad `input_number.filtrace_vykon_w` (500 W).
 
+8. **Filtrace – měření Pro EM-50 (1. 10. 2026):** nahrazen Pro 1PM, všechny odkazy (HAv2 i vypnuté v1) přepnuté na `switch.shellyproem50_841fe890fc44`; hodiny a výkon ze skutečného běhu. 1. 10. se hodiny dne vynulovaly (dříve odběhnuto 4,8 h) → ten den filtrace poběží navíc. Uživatel: smazat zařízení Pro 1PM v UI; volitelně povolit `sensor.shellyproem50_841fe890fc44_energy_meter_0_energie` (vypnuto integrací) pro Energy dashboard. Sledovat první notifikace nesouladu.
+   **Bojler – Pro EM-50 nainstalován 1. 10. 2026** (`sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon`, napájení B16/3 sv. 6 = L3,
+   snímač na šedém vodiči nad SSR3). Test SSR3: 2 232–2 320 W, účiník 1,00. Při plynulé regulaci pulzuje 0–800 W s účiníkem ~0,45
+   (pulzní spínání, činný výkon platí). `sensor.energy_boiler_power_w` a `binary_sensor.energy_boiler_heating` (> 1 000 W zap,
+   < 300 W vyp) teď z měření, napěťový index/odhad jen záloha (atribut `source`). Uživatel: povolit
+   `sensor.shellyproem50_ece334fd2370_energy_meter_0_energie` (povoleno 1. 10.). Hotovo 1. 10.: profil bojleru v plánu z měření
+   (PND jen pro starší hodiny) a záporné ceny – limit přetoku = příkon bojleru + 600 W (arch. §5.4). **Ověřit při první záporné
+   ceně s plnou baterií:** náběh bojleru (limit roste po ~200 W), PND export ~0, po nahřátí limit 0 W.
+
 ## 2. Mapa systému
 
 ### Home Assistant (YAML, `make push`)
@@ -123,6 +132,7 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - Validátor referencí zná i entity z AppDaemonu (hledá `set_state("…")` v `config/appdaemon/apps`). Testy validátoru: `PYTHONPATH=. pytest -o addopts="" tests/test_reference_validator.py` (ve venv chybí coverage).
 - **GoodWe EMS:** `conserve` nabíjí i ze sítě – nepoužívat; „drž SOC“ = `battery_standby`.
 - **AppDaemon `set_state` zahazuje falsy hodnoty** (0, False, i v seznamech) → čísla a logické hodnoty v atributech jako text, seznamy řádků s textovými hodnotami, nebo JSON řetězec.
+- AppDaemon **nevidí entity vzniklé v HA po svém startu** (1. 10.: `sensor.pool_hours_done` = None i po reloadu app) → restart doplňku. Start doplňku trvá ~4 min (instaluje chromium) → watchdogy HAv2 pošlou notifikaci a filtraci mimo NT vypnou; předem upozornit uživatele.
 - AppDaemon: nová podsložka apps se načte až po restartu doplňku; `log:` jen s definicí v `appdaemon.yaml`; `logbook.log` bez `entity_id`.
 - Trigger šablony: `this` nejde ve `variables`.
 - Nové YAML platformy (statistics, history_stats, integration) potřebují restart HA.

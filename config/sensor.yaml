@@ -3,7 +3,7 @@
   type: time
   name: Filtrace spuštěna
   unique_id: filtrace_spustena_daily_hours
-  entity_id: switch.filtrace_switch
+  entity_id: binary_sensor.pool_pump_running
   state: "on"
   start: "{{ today_at() }}"
   end: "{{ now() }}"

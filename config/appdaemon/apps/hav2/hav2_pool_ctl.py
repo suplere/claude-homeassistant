@@ -4,6 +4,8 @@ Mixin pro aplikaci Hav2 (hav2_app). Publikuje:
   sensor.pool_plan            – cíl a odběhnuté hodiny, očekávané hodiny ze slunce a v NT
   sensor.pool_controller      – stav řízení, doporučení zapnout/vypnout, důvod
   input_text.pool_last_decision + logbook – změny rozhodnutí
+Skutečný běh čerpadla (binary_sensor.pool_pump_running, měření Pro EM-50) se porovnává s relé:
+nesoulad = venkovní vypínač (VYPNUTO, nebo MANUAL + ZAPNUTO) → logbook + notifikace.
 Čerpadlo spíná JEN přes script.hav2_pool_set, a to jen když
 input_select.energy_system_mode == "Auto" a input_boolean.pool_control == on.
 V režimu „Jen doporučení“ řízení běží nad virtuálním čerpadlem (poslední vlastní povel).
@@ -16,7 +18,11 @@ from typing import Any, Dict, Optional, Tuple
 
 import hav2_pool as B
 
-PUMP = "switch.filtrace_switch"
+PUMP = "switch.shellyproem50_841fe890fc44"  # relé Pro EM-50 → cívka stykače
+PUMP_RUNNING = "binary_sensor.pool_pump_running"  # skutečný běh podle měření
+PUMP_POWER = "sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon"
+MISMATCH_AFTER = timedelta(minutes=3)
+NOTIFY = "notify/mobile_app_evzen_iphone"
 OVERRIDE_AFTER_S = 90
 OVERRIDE_FOR = timedelta(hours=2)
 
@@ -34,6 +40,9 @@ class PoolControl:
         self.pool_published: Optional[tuple] = None
         self.pool_logged: Optional[tuple] = None
         self.pool_solar_hours_left = 0.0
+        self.pool_mismatch: str = ""  # "" | "vypnuto vypínačem" | "běží ručně"
+        self.pool_mismatch_since: Optional[datetime] = None
+        self.pool_mismatch_kind: str = ""
         self.pool_is_nt = lambda ts: ts.hour >= 22 or ts.hour < 6
 
         self.run_every(self.pool_loop, "now+45", 60)
@@ -83,13 +92,14 @@ class PoolControl:
         available = state in ("on", "off")
         running = state == "on"
         self._pool_manual_expiry(now)
+        self._pool_check_real(now, available, running)
         if execute:
             self._pool_detect_override(now, available, running)
         elif self.pool_virtual is not None:
             running = self.pool_virtual
 
         target = self.pool_target()
-        done = self.fnum("sensor.pool_hours_done_today", 0)
+        done = self.fnum("sensor.pool_hours_done", 0)
         inp = B.PoolInputs(
             now=now,
             season=self.get_state("input_boolean.pool_season") == "on",
@@ -129,7 +139,7 @@ class PoolControl:
             "nt_hours_expected": f"{nt_h:.2f}",
             "day_start": B.pool_day_start(now).isoformat(),
         })
-        key = (cmd.on, cmd.state, cmd.reason, execute, overridden)
+        key = (cmd.on, cmd.state, cmd.reason, execute, overridden, self.pool_mismatch)
         if key != self.pool_published:
             self.pool_published = key
             self.set_state("sensor.pool_controller", state=cmd.state, replace=True, attributes={
@@ -140,6 +150,8 @@ class PoolControl:
                 "solar_starts_today": str(self.pool_ctl.solar_starts),
                 "executing": "ano" if execute else "ne",
                 "override_until": self.pool_override_until.isoformat() if overridden else "",
+                "pump_running_real": "ano" if self.get_state(PUMP_RUNNING) == "on" else "ne",
+                "switch_mismatch": self.pool_mismatch,
                 "updated": now.isoformat(),
             })
         decision = (cmd.on, cmd.state)
@@ -150,6 +162,28 @@ class PoolControl:
             self.call_service("input_text/set_value", entity_id="input_text.pool_last_decision", value=text[:255])
             self.call_service("logbook/log", name="HAv2 bazén", message=text[:500])
             self.log(text)
+
+    # ------------------------------------------- relé × skutečný běh (venkovní vypínače)
+    def _pool_check_real(self, now: datetime, available: bool, relay_on: bool) -> None:
+        real = self.get_state(PUMP_RUNNING)
+        if not available or real not in ("on", "off") or self.get_state(PUMP_POWER) in (None, "unknown", "unavailable"):
+            return
+        kind = ("vypnuto vypínačem" if relay_on and real == "off"
+                else "běží ručně" if not relay_on and real == "on" else "")
+        if kind != self.pool_mismatch_kind:
+            self.pool_mismatch_kind, self.pool_mismatch_since = kind, now
+        if kind and not self.pool_mismatch and now - self.pool_mismatch_since >= MISMATCH_AFTER:
+            self.pool_mismatch = kind
+            text = ("Relé filtrace je sepnuté, ale čerpadlo neběží – venku je nejspíš VYPNUTO."
+                    if relay_on else
+                    "Čerpadlo běží, i když ho HAv2 nesepnulo – venku je nejspíš MANUAL + ZAPNUTO.")
+            self.call_service("logbook/log", name="HAv2 bazén", message=text)
+            self.call_service(NOTIFY, title="Filtrace: " + kind, message=text + " Hodiny se počítají podle skutečného běhu.")
+            self.log(text, level="WARNING")
+        elif not kind and self.pool_mismatch:
+            self.call_service("logbook/log", name="HAv2 bazén",
+                              message=f"Filtrace: relé a skutečný běh zase souhlasí (konec „{self.pool_mismatch}“)")
+            self.pool_mismatch = ""
 
     # ------------------------------------------------ ruční zásah / override
     def _pool_detect_override(self, now: datetime, available: bool, running: bool) -> None:

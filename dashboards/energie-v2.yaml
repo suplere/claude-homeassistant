@@ -93,6 +93,22 @@ views:
       - type: grid
         cards:
           - type: heading
+            heading: Garáž
+            icon: mdi:garage
+          # jako v1 (lovelace.lovelace), ale s potvrzením proti náhodnému klepnutí
+          - type: tile
+            entity: cover.garage_door_dvere
+            name: Garáž
+            vertical: false
+            tap_action:
+              action: toggle
+              confirmation:
+                text: Opravdu pohnout garážovými vraty?
+            grid_options:
+              columns: 12
+      - type: grid
+        cards:
+          - type: heading
             heading: Systém
             icon: mdi:robot
           - type: tile
@@ -919,7 +935,7 @@ views:
               - type: numeric-input
                 style: buttons
           - type: tile
-            entity: switch.filtrace_switch
+            entity: switch.shellyproem50_841fe890fc44
             name: Čerpadlo
             tap_action:
               action: more-info
@@ -944,7 +960,7 @@ views:
               · slunce ~{{ state_attr(p, 'solar_hours_left') | float(0) | round(1) }} h
               · NT ~{{ state_attr(p, 'nt_hours_expected') | float(0) | round(1) }} h
           - type: tile
-            entity: sensor.pool_hours_done_today
+            entity: sensor.pool_hours_done
             name: Odběhnuto
             grid_options:
               columns: 6
@@ -979,6 +995,17 @@ views:
             entities:
               - entity: sensor.filtrace_spustena
                 name: Hodiny
+          # měření Shelly Pro EM-50 od 1. 10. 2026
+          - type: statistics-graph
+            title: Filtrace kWh za den (14 dní)
+            chart_type: bar
+            period: day
+            days_to_show: 14
+            stat_types:
+              - change
+            entities:
+              - entity: sensor.shellyproem50_841fe890fc44_energy_meter_0_energie
+                name: Filtrace
       - type: grid
         cards:
           - type: heading
@@ -1224,6 +1251,31 @@ views:
             content: |
               <small>Odchylka je bez bojleru (ten je mimo měření GoodWe). Při malém prodeji
               zkresluje % rozlišení GoodWe 0,1 kWh.</small>
+          - type: heading
+            heading: Bojler – měření (Shelly)
+            heading_style: subtitle
+            icon: mdi:water-boiler
+          - type: tile
+            entity: sensor.energy_boiler_power_w
+            name: Bojler teď
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: binary_sensor.energy_boiler_heating
+            name: Hřeje
+            grid_options:
+              columns: 6
+          # měření Shelly Pro EM-50 od 1. 10. 2026 (bojler je mimo měření GoodWe → ne do Energy dashboardu)
+          - type: statistics-graph
+            title: Bojler kWh za den (14 dní)
+            chart_type: bar
+            period: day
+            days_to_show: 14
+            stat_types:
+              - change
+            entities:
+              - entity: sensor.shellyproem50_ece334fd2370_energy_meter_0_energie
+                name: Bojler
           - type: heading
             heading: Bojler podle PND (D+1)
             heading_style: subtitle
