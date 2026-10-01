@@ -24,75 +24,51 @@ Po testu rozhodnout: smazat v1 (podle archivu) nebo vrátit.
 **Data z testu:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní,
 stáhne `make pull`, mimo git) + historie HA + PND D+1.
 
-## 1b. Sledovat v příští session (stav 29. 9. 2026)
+## 1b. Pro novou session (stav 1. 10. 2026 večer)
 
-Test Auto běží dál (volno do 30. 9.). Kontroly: `make pull` → `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl`
-(minutový záznam, klíče viz `DATA_STATES`/`DATA_ATTRS` v `hav2_app.py`), PND D+1 v `sensor.energy_boiler_pnd_daily`
-(`hours_json`, `export_loss_kwh`; hodinově, PND export/import po hodinách = statistiky `cez_pnd:859182400703740246_production/consumption`).
+Kontroly: `make pull` → `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (minutový záznam, klíče `DATA_STATES`/`DATA_ATTRS`
+v `hav2_app.py`, nově `pool_run`, `pool_w`), PND D+1 v `sensor.energy_boiler_pnd_daily`, měření Shelly (níže).
+Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog pošle notifikaci – předem říct uživateli).
 
-1. **Bojler – nucený ohřev přesunut do NT 22–06 (29. 9. odpoledne), priorita bojleru v poledne vypnuta** (důvod: architektura §5.4).
-   Ověřit: 30. 9. PND D+1 za 29. 9. – od 16 h bez bojleru, od 22 h ~2–4 kWh; detektor v noci on; večer stačí teplá voda.
-   Při NT nabíjení EV 3f + bojler: `energy_breaker_headroom_a` a strop EV 8 A (`boiler_3f_max_a`) musí zabrat.
-   Původní bod (dávka, už neplatí při vypnuté prioritě): **Bojler – energetická dávka (nasazeno 29. 9. 08:47, commit a3e2b2d):** na prvním slunečném dni s plnou baterií
-   a připojeným EV sledovat `boiler_gate` / `boiler_reserve_w` (jsonl, `sensor.ev_regulator`) a druhý den PND:
-   dostal bojler v poledne víc než 0,74 kWh (28. 9.)? Zkrátil se ohřev ze sítě 16–19 h? Nešel přetok do sítě
-   zbytečně (bojler plný, rezerva drží)? Doladit `BoilerParams.budget_share` (0,6), případně okno 10:00–15:30.
-2. **Večerní prodej z baterie (od 28. 9., commit 75fb3b3 + 7d07dce):** 28. 9. prodáno 5,2 kWh (18:01–18:16, 19:04–20:03),
-   PND export sedí, tržba ~34,8 Kč, čistě ~18,6 Kč. Při další špičce ≥ 7,2 Kč ověřit start/konec přesně na čtvrthodině
-   (přepočet plánu v :00:10/:15:10/…) a že ráno ve VT nechybí baterie.
-3. **EV:** cíl 80 %, termín 31. 10. 12:00 → nabíjí jen ze slunce, NT až poslední noc 30./31. 10. (zkontrolovat, že
-   plán „NT později“ drží – **opraveno 29. 9.**: za koncem rozpisu HDO (pár dní) `_nt_fn` vracel „ne NT“, takže vzdálené
-   noci chyběly; teď záloha 22–06). Kmitání proudu ±1 A/min (trouba) – zatím neřešeno.
-3b. **EV – jednorázový cíl nad limitem auta (nasazeno 29. 9. 16:33):** standardní cíl 80 %, standardní limit v autě 90 %,
-   okno 24 h (EV → Parametry regulace). Zatím neověřeno v reálu: při prvním použití (např. cíl 100 % s termínem) sledovat
-   `sensor.ev_target_status`, logbook „HAv2 EV“ (zápis limitu), že se `number.ev6_ac_charging_limit` v HA opravdu změní
-   (Kia cloud, jinak 3 pokusy → notifikace) a že se po nabití vrátí limit na 90 % a cíl na 80 %.
-   Test: cíl 100 %, termín pá 2. 10. 6:00, okno 8 h (od čt 22:00), čt ~17 h krátká jízda (odpojení cíl neruší).
-4. **Filtrace:** oprava posledního krátkého běhu (min. 15 min, jen do splnění) a doby běhu po restartu – ověřeno 28. 9.
-4b. **Předpověď FVE – ranní stín (29. 9.):** komín před FVE; září–říjen má naměřený hodinový tvar (7–8 h ~0,5 Solcastu).
-   Ověřit, že ranní SOC teď sedí s plánem (dashboard Plán). Pro listopad+ tvar přepočítat z dat: poměr hodinového průměru
-   `sensor.pv_power` ku historii `sensor.solcast_pv_forecast_forecast_this_hour` (Wh, recorder ~10 dní).
-   Nabíjení v NT jen se ziskem ≥ 0,3 Kč/kWh (29. 9.: plán chtěl 3 kWh kvůli zisku 0,27 Kč celkem).
-5. **Nenastalo, počkat:** záporné ceny bez zájmu EV (odložení nabíjení, limit přetoku 0 W), 3f z plné baterie,
-   NT nabíjení baterie před zataženým dnem, test watchdogu (zastavit AppDaemon ~4 min – jen se souhlasem).
-6. **Rozhodnutí po testu (uživatel):** převzít řízení natrvalo (záloha → smazat 16 vypnutých automatizací v1 podle
-   `archive/v1-2026-09-25/README.md`, statistiky `sensor.ev_nt_*` ponechat – tabulka vyúčtování je používá), nebo návrat.
-7. **Hardware (návrh uživateli):** měření okruhu bojleru – Shelly EM Gen3 / Pro EM-50 s klešťovým snímačem (+ druhý
-   snímač na L3 za elektroměrem = skutečný přetok, podle kterého spíná WATTrouter). Uživatel zvažuje; do té doby dávka (C). Teplotní čidlo v bojleru uživatel odmítl (29. 9.).
-   Místo pro Shelly Pro EM-50: volná DIN lišta vpravo od WATTrouteru v jeho rozvodnici; klešťový snímač na šedý
-   vodič L3 nad SSR3 (bez rozpojení), napájení L z B10/1 + N z lišty (práce pro elektrikáře).
-   Dále: přes USB a WATTconfig ECO opsat nastavení WATTrouteru (režim regulace součet/fáze, režim výstupu S bojleru zap/vyp vs. proporcionální, časové plány,
-   CombiWATT) – nucený ohřev 16:09 je nejspíš časový plán „Vynutit“.
-   **Opsáno 29. 9. (WATTconfig ECO, FW 3.2.1):** SSR1–3 „plynulá reg.“ 2,2 kW, priorita první, fáze L1/L2/L3 (bojler fyzicky
-   jen SSR3 = L3; SSR1/2 regulují do zaizolovaných vodičů); režim regulace **každá fáze samostatně** (správně – fakturace
-   po fázích; bojler dostane jen přetok L3), ofset −0,10 kW; CombiWATT vyp., „hlídej spotřebu“ vyp., S-Connect vyp.
-   Časový plán SSR1–3: **vynutit 16:00–19:00, 100 %, denně** = relikt starého HDO s odpoledním NT (ČEZ změnil ~2025,
-   teď NT 22–06) → celý nucený ohřev jde ve VT. Hodiny regulátoru ~4 min pozadu. Doporučeno uživateli: plán SSR3
-   22:00–06:00 (+ na 1–2 týdny pojistka 17–18 h), synchronizace času, záloha konfigurace. → HAv2 model bojleru
-   (plynule 0–2,2 kW z přetoku L3, ne on/off 2,2 kW) upravit až po změně plánu a se souhlasem.
-7b. **Hardware bazén (29. 9.):** Shelly Pro 1PM UL spíná jen cívku stykače → měří cívku, ne čerpadlo (vstup pro kleště nemá).
-   Stykač zůstává (rozhodnutí uživatele). Bazén má **vlastní rozvaděč** (ne společný s bojlerem) → samostatný měřák:
-   Shelly EM Gen3 / Pro EM-50 s klešťovým snímačem na L2 k čerpadlu za stykačem, **napájení z L2** (stejná fáze, jinak
-   chybný činný výkon), nebo PM Mini Gen3 do série. Po instalaci přepojit `sensor.bazenova_filtrace_vykon` na měření
-   (+ hlídání „relé on, čerpadlo neběží“). Do té doby pevný odhad `input_number.filtrace_vykon_w` (500 W).
+### A. Hned 2. 10. ráno
+1. **Po 06:00 smazat přechodný `sensor.pool_hours_done_legacy`** (history_stats v `hav2_data.yaml`) + jeho sčítání
+   v `sensor.pool_hours_done` (template) a v `base_final_daily_house_consumption` (`configuration.yaml`). Pak uživatel
+   smaže zařízení Shelly Pro 1PM v UI (dřív ne – legacy čte jeho historii).
+2. **Noc 1./2. 10. – souběh EV a bojleru:** EV v NT 22–23 h (cíl 100 %, termín 2. 10. 6:00, ~5,9 kWh) + nucený ohřev
+   bojleru od 22:00. Ověřit z jsonl/historie: `breaker_headroom_a` nikdy < 2 A, strop EV 8 A ve 3f při `boiler_on`,
+   že EV do 6:00 nabilo, a jednorázový cíl nad limitem auta (bod C2).
+3. **Bojler v noci podle měření:** `sensor.shellyproem50_ece334fd2370_energy_meter_0_energie` – kolik vzal 22–06 h
+   (večer 19–20 h už dostal 1,32 kWh z prodeje baterie). Porovnat s PND D+1 za 1. 10.
 
-8. **Filtrace – měření Pro EM-50 (1. 10. 2026):** nahrazen Pro 1PM, všechny odkazy (HAv2 i vypnuté v1) přepnuté na `switch.shellyproem50_841fe890fc44`; hodiny a výkon ze skutečného běhu. 1. 10. se hodiny dne vynulovaly (dříve odběhnuto 4,8 h) → ten den filtrace poběží navíc. Uživatel: smazat zařízení Pro 1PM v UI; volitelně povolit `sensor.shellyproem50_841fe890fc44_energy_meter_0_energie` (vypnuto integrací) pro Energy dashboard. Sledovat první notifikace nesouladu.
-   **Bojler – Pro EM-50 nainstalován 1. 10. 2026** (`sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon`, napájení B16/3 sv. 6 = L3,
-   snímač na šedém vodiči nad SSR3). Test SSR3: 2 232–2 320 W, účiník 1,00. Při plynulé regulaci pulzuje 0–800 W s účiníkem ~0,45
-   (pulzní spínání, činný výkon platí). `sensor.energy_boiler_power_w` a `binary_sensor.energy_boiler_heating` (> 1 000 W zap,
-   < 300 W vyp) teď z měření, napěťový index/odhad jen záloha (atribut `source`). Uživatel: povolit
-   `sensor.shellyproem50_ece334fd2370_energy_meter_0_energie` (povoleno 1. 10.). Hotovo 1. 10.: profil bojleru v plánu z měření
-   (PND jen pro starší hodiny) a záporné ceny – limit přetoku = příkon bojleru + 600 W (arch. §5.4). **Ověřit při první záporné
-   ceně s plnou baterií:** náběh bojleru (limit roste po ~200 W), PND export ~0, po nahřátí limit 0 W.
+### B. Rozpracované – čeká na uživatele
+1. **Bojler bere při prodeji z baterie (1. 10.):** prodej 19–20 h 5 kW → WATTrouter poslal do bojleru 1,32 kWh (~1,35 kW,
+   celou L3), do sítě jen ~2,9 kWh místo 4,2 → ztráta ~3,6 Kč (výkup 6,24 vs. NT 3,51). Návrh: beznapěťový kontakt I/O
+   bojlerového Pro EM-50 (`switch.shellyproem50_ece334fd2370`, nepoužitý) → vstup WATTrouteru **LT–GND**, ve WATTconfigu
+   časový plán SSR3 typu „blokovat“ 00–24 s podmínkou „Binární vstup“; HAv2 sepne relé při `plan = discharge`
+   (případně i jindy). **Uživatel pošle screenshot roletek** v záložce Časové plány (typ plánu u „vynutit“, „Binární
+   vstup → žádný“). Bez hardwaru alternativa: plánovač počítá při prodeji ~⅓ přetoku do bojleru za hodnotu NT.
+2. **Rozhodnutí po testu Auto (uživatel):** převzít řízení natrvalo (záloha → smazat 16 vypnutých automatizací v1 podle
+   `archive/v1-2026-09-25/README.md`; pozor – v1 automatizace už odkazují na nový spínač filtrace; statistiky
+   `sensor.ev_nt_*` ponechat), nebo návrat.
 
-9. **Zítra (2. 10.) – otevřené:**
-   - Po 06:00 smazat přechodný `sensor.pool_hours_done_legacy` (+ sčítání v `sensor.pool_hours_done` a `base_final_daily`);
-     pak uživatel smaže zařízení Pro 1PM v UI.
-   - Ověřit noc 1./2. 10.: EV v NT 22–23 h souběžně s nuceným ohřevem bojleru (strop EV 8 A, `energy_breaker_headroom_a`).
-   - **Bojler bere při prodeji z baterie:** 1. 10. 19–20 h prodej 5 kW, WATTrouter poslal do bojleru 1,32 kWh (~1,35 kW, celá L3)
-     → do sítě jen ~2,9 kWh místo 4,2; ztráta ~3,6 Kč (6,24 výkup vs. 3,51 NT). Návrh: relé I/O bojlerového Pro EM-50 → vstup
-     WATTrouteru LT/GND + časový plán SSR3 „blokovat“ s binárním vstupem; HAv2 sepne relé při prodeji. Uživatel pošle
-     screenshot nabídek časového plánu (typ plánu, binární vstup) z WATTconfigu.
+### C. Ověřit, až nastane
+1. **Záporný výkup s plnou baterií** (nové 1. 10.): limit přetoku = příkon bojleru + 600 W (`hav2_boiler.NegPriceBoiler`)
+   – náběh bojleru ~200 W/min, PND export ~0, po nahřátí limit 0 W a pokus po hodině; logbook „HAv2 přetok“.
+2. **EV – jednorázový cíl nad limitem auta (29. 9.):** `sensor.ev_target_status`, zápis `number.ev6_ac_charging_limit`
+   (Kia cloud), po nabití návrat limitu 90 % a cíle 80 %. Probíhá teď (cíl 100 %, termín 2. 10. 6:00).
+3. **Filtrace – nesoulad s venkovními vypínači:** první notifikace „vypnuto vypínačem“ / „běží ručně“
+   (`switch_mismatch` v `sensor.pool_controller`).
+4. **Večerní prodej z baterie:** start/konec na čtvrthodině, ráno ve VT nechybí baterie (1. 10.: prodej 19:00–20:00 OK).
+5. **Profil bojleru v plánu** se přeučuje z 16–18 h na noc (medián 8 dní, měření Shelly + PND) – do ~5. 10. plán
+   nadhodnocuje večerní nákup; atribut `boiler_source` v `sensor.energy_load_forecast`.
+6. Nenastalo: 3f z plné baterie, NT nabíjení baterie před zataženým dnem, test watchdogu (jen se souhlasem).
+7. FVE ranní stín: od listopadu přepočítat hodinový tvar (`hav2.jinja`, poměr `sensor.pv_power` / Solcast this_hour).
+
+### D. Nápady / později
+- Kmitání proudu EV ±1 A/min (trouba).
+- Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); grafy kWh/den na Energie v2
+  (Bazén, Úspory).
+- Druhý kanál (IB) obou Pro EM-50 volný.
 
 ## 2. Mapa systému
 
@@ -175,6 +151,12 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
   (přežije restart); EV při rezervě bojleru nedotuje z baterie; krátký poslední běh filtrace; NT končí v 06:00 (ne 06:00:01);
   přepočet plánu na hranicích čtvrthodin; atributy AppDaemon senzorů `replace=True`; přesnost `energy_buy_sum`/`sell_sum`
   na 3 desetinná místa (uživatel v GUI 28. 9.).
+- **29. 9.–1. 10. hotovo:** WATTrouter ECO opsán (SSR1–3 plynulá regulace, režim „každá fáze samostatně“, bojler jen SSR3 = L3,
+  relé R1/R2 nezapojená); nucený ohřev přesunut z 16–19 h (VT, relikt starého HDO) na **22–06 h** (30. 9.: 3,8 kWh / 13,2 Kč místo ~22 Kč);
+  hodiny regulátoru synchronizovány. Priorita bojleru v poledne vypnuta (`input_boolean.ev_boiler_priority` off – bojler bere jen ~⅓ přetoku).
+  **Shelly Pro EM-50 bojler** (`..._ece334fd2370`, napájení B16/3 sv. 6 = L3, snímač na šedém vodiči nad SSR3; test 2,3 kW, účiník 1,00;
+  při pulzní regulaci účiník ~0,45, činný výkon platí). **Shelly Pro EM-50 filtrace** (`..._841fe890fc44`) místo Pro 1PM – relé spíná
+  cívku stykače, snímač na fázi ze stykače k čerpadlu, 530 W, cos φ 0,92. Garáž na přehledu Energie v2 (s potvrzením).
 - PND v HA jen **hodinově** (15min data integrace hned agreguje). cez_pnd v1.1.8 (od 30. 9.) funguje bez lokálního patche.
 
 ## 4. Další kroky
