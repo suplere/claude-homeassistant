@@ -85,6 +85,15 @@ Test Auto běží dál (volno do 30. 9.). Kontroly: `make pull` → `config/appd
    (PND jen pro starší hodiny) a záporné ceny – limit přetoku = příkon bojleru + 600 W (arch. §5.4). **Ověřit při první záporné
    ceně s plnou baterií:** náběh bojleru (limit roste po ~200 W), PND export ~0, po nahřátí limit 0 W.
 
+9. **Zítra (2. 10.) – otevřené:**
+   - Po 06:00 smazat přechodný `sensor.pool_hours_done_legacy` (+ sčítání v `sensor.pool_hours_done` a `base_final_daily`);
+     pak uživatel smaže zařízení Pro 1PM v UI.
+   - Ověřit noc 1./2. 10.: EV v NT 22–23 h souběžně s nuceným ohřevem bojleru (strop EV 8 A, `energy_breaker_headroom_a`).
+   - **Bojler bere při prodeji z baterie:** 1. 10. 19–20 h prodej 5 kW, WATTrouter poslal do bojleru 1,32 kWh (~1,35 kW, celá L3)
+     → do sítě jen ~2,9 kWh místo 4,2; ztráta ~3,6 Kč (6,24 výkup vs. 3,51 NT). Návrh: relé I/O bojlerového Pro EM-50 → vstup
+     WATTrouteru LT/GND + časový plán SSR3 „blokovat“ s binárním vstupem; HAv2 sepne relé při prodeji. Uživatel pošle
+     screenshot nabídek časového plánu (typ plánu, binární vstup) z WATTconfigu.
+
 ## 2. Mapa systému
 
 ### Home Assistant (YAML, `make push`)
