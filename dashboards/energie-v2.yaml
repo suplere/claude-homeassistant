@@ -109,6 +109,28 @@ views:
       - type: grid
         cards:
           - type: heading
+            heading: Světla
+            icon: mdi:lightbulb-group
+          # jako v1 (lovelace.lovelace, karta „Světla“)
+          - type: tile
+            entity: light.policka_2
+            state_content:
+              - state
+              - color_mode
+              - brightness
+            grid_options:
+              columns: 12
+          - type: tile
+            entity: light.policka
+            state_content:
+              - state
+              - color_mode
+              - brightness
+            grid_options:
+              columns: 12
+      - type: grid
+        cards:
+          - type: heading
             heading: Systém
             icon: mdi:robot
           - type: tile
