@@ -37,6 +37,9 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
 1. **Prodej 2. 10. 19:00–20:00 s blokací bojleru (B1):** z jsonl / historie – `plan = discharge`, `switch.bojler_blokace_rele`
    on po dobu prodeje a pak off, `sensor.bojler_vykon` ≈ 0 W, `sensor.bojler_z_pretoku_w` 0; PND 2. 10. (D+1 ráno 3. 10.):
    export ≈ GoodWe export. Při úspěchu B1 uzavřít.
+   **Výsledek 2. 10.:** discharge 19:00:10–20:00:10, relé on 19:01:02–20:01:02 (živá smyčka až po ~52 s) → bojler
+   19:00:18–19:01:06 ~1,1–1,6 kW (~15 Wh), pak 0 W; prodej bez bojleru 3,79 kWh (baterie 5 kWh, SOC 92 → 46 %).
+   Opraveno: `_boiler_block()` se volá hned při změně plánu před `battery_apply()`. Zbývá jen PND 2. 10. (3. 10. ráno).
 2. **Ranní souhrn 3. 10. 7:40** – zeptat se uživatele, jestli přišel a je čitelný (folded YAML = jeden odstavec).
 3. **Přesnost předpovědí:** první řádek `history` v `sensor.energy_forecast_accuracy` za 2. 10. (předpověď FVE 20,4 /
    Solcast 27,3 / spotřeba 9,6 kWh) proti skutečnosti; graf na Baterie & FVE.

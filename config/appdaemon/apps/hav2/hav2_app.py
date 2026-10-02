@@ -556,6 +556,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         if act.mode != P.MODE_DEFER:
             self.defer_live = "standby"
         if execute:
+            self._boiler_block()  # relé dřív, než baterie začne prodávat (2. 10.: živá smyčka až po 52 s)
             self.battery_apply()
 
     def _sauna_window(self, now: datetime) -> Optional[Tuple[datetime, datetime, float]]:
