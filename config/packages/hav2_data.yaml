@@ -33,17 +33,6 @@ sensor:
     start: >
       {{ today_at('06:00') if now() >= today_at('06:00') else today_at('06:00') - timedelta(days=1) }}
     end: "{{ now() }}"
-  # PŘECHODNĚ (1. 10. 2026): běh do výměny Pro 1PM → Pro EM-50 (starý spínač, historie zůstala).
-  # Od 2. 10. 06:00 je vždy 0 → pak smazat i se sčítáním v sensor.pool_hours_done a base_final_daily.
-  - platform: history_stats
-    name: pool_hours_done_legacy
-    unique_id: hav2_pool_hours_done_legacy
-    entity_id: switch.filtrace_switch
-    state: "on"
-    type: time
-    start: >
-      {{ today_at('06:00') if now() >= today_at('06:00') else today_at('06:00') - timedelta(days=1) }}
-    end: "{{ now() }}"
 
 template:
   - sensor:
@@ -53,11 +42,9 @@ template:
         unit_of_measurement: h
         state_class: measurement
         icon: mdi:timer-sand-complete
-        # bazénový den 06:00–06:00: skutečný běh + přechodně běh před výměnou Shelly (1. 10. 2026)
+        # bazénový den 06:00–06:00: skutečný běh čerpadla
         availability: "{{ has_value('sensor.pool_hours_done_today') }}"
-        state: >
-          {{ (states('sensor.pool_hours_done_today') | float(0)
-              + states('sensor.pool_hours_done_legacy') | float(0)) | round(2) }}
+        state: "{{ states('sensor.pool_hours_done_today') | float(0) | round(2) }}"
 
       # ----------------------------------------------------------- bojler (L3)
       - name: Napěťový index bojleru

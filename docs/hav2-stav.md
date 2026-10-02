@@ -24,21 +24,20 @@ Po testu rozhodnout: smazat v1 (podle archivu) nebo vrátit.
 **Data z testu:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní,
 stáhne `make pull`, mimo git) + historie HA + PND D+1.
 
-## 1b. Pro novou session (stav 1. 10. 2026 večer)
+## 1b. Pro novou session (stav 2. 10. 2026 ráno)
 
 Kontroly: `make pull` → `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (minutový záznam, klíče `DATA_STATES`/`DATA_ATTRS`
 v `hav2_app.py`, nově `pool_run`, `pool_w`), PND D+1 v `sensor.energy_boiler_pnd_daily`, měření Shelly (níže).
 Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog pošle notifikaci – předem říct uživateli).
 
-### A. Hned 2. 10. ráno
-1. **Po 06:00 smazat přechodný `sensor.pool_hours_done_legacy`** (history_stats v `hav2_data.yaml`) + jeho sčítání
-   v `sensor.pool_hours_done` (template) a v `base_final_daily_house_consumption` (`configuration.yaml`). Pak uživatel
-   smaže zařízení Shelly Pro 1PM v UI (dřív ne – legacy čte jeho historii).
-2. **Noc 1./2. 10. – souběh EV a bojleru:** EV v NT 22–23 h (cíl 100 %, termín 2. 10. 6:00, ~5,9 kWh) + nucený ohřev
-   bojleru od 22:00. Ověřit z jsonl/historie: `breaker_headroom_a` nikdy < 2 A, strop EV 8 A ve 3f při `boiler_on`,
-   že EV do 6:00 nabilo, a jednorázový cíl nad limitem auta (bod C2).
-3. **Bojler v noci podle měření:** `sensor.shellyproem50_ece334fd2370_energy_meter_0_energie` – kolik vzal 22–06 h
-   (večer 19–20 h už dostal 1,32 kWh z prodeje baterie). Porovnat s PND D+1 za 1. 10.
+### A. Hotovo 2. 10. ráno
+1. **Smazán `sensor.pool_hours_done_legacy`** i se sčítáním v `sensor.pool_hours_done` a `base_final_daily_house_consumption`.
+   **Uživatel v UI:** smazat osiřelou entitu `sensor.pool_hours_done_legacy` a zařízení Shelly Pro 1PM (`switch.filtrace_switch`).
+2. **Noc 1./2. 10. – souběh EV a bojleru: OK.** EV 22:00–23:22 (89,7 → 99 %, auto končí na 99 %), bojler 22:06–22:42
+   → EV staženo na 8 A ve 3f, `breaker_headroom_a` min. 7,5 A (22:06), po vypnutí bojleru zpět 11 A. Jednorázový cíl:
+   23:31 cíl 80 %, 23:34 limit auta zpět 90 % (bod C2 ověřen).
+3. **Bojler v noci (Shelly):** 22:06–22:42 1,33 kWh (PND 22 h: 1,31 kWh ✔), 03:45–04:02 dalších ~0,6 kWh.
+   PND 1. 10. celkem 3,63 kWh (2 h 0,54 / 12 h 0,46 / 19 h 1,32 prodej / 22 h 1,31).
 
 ### B. Rozpracované – čeká na uživatele
 1. **HOTOVO 2. 10. – blokování bojleru při prodeji** (arch. §5.4): relé Pro EM-50 → LT, plán SSR3 omezit 16–22 vyp+LT, `script.hav2_boiler_block`, `input_boolean.energy_boiler_block_on_sale`. **Ověřit při prvním prodeji:** relé on po dobu `discharge`, bojler 0 W (Shelly), PND export ≈ GoodWe export; po prodeji relé off. Uživatel: v Shelly auto-off 2 h.
@@ -55,8 +54,7 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 ### C. Ověřit, až nastane
 1. **Záporný výkup s plnou baterií** (nové 1. 10.): limit přetoku = příkon bojleru + 600 W (`hav2_boiler.NegPriceBoiler`)
    – náběh bojleru ~200 W/min, PND export ~0, po nahřátí limit 0 W a pokus po hodině; logbook „HAv2 přetok“.
-2. **EV – jednorázový cíl nad limitem auta (29. 9.):** `sensor.ev_target_status`, zápis `number.ev6_ac_charging_limit`
-   (Kia cloud), po nabití návrat limitu 90 % a cíle 80 %. Probíhá teď (cíl 100 %, termín 2. 10. 6:00).
+2. ~~EV – jednorázový cíl nad limitem auta~~ – ověřeno v noci 1./2. 10. (viz A2).
 3. **Filtrace – nesoulad s venkovními vypínači:** první notifikace „vypnuto vypínačem“ / „běží ručně“
    (`switch_mismatch` v `sensor.pool_controller`).
 4. **Večerní prodej z baterie:** start/konec na čtvrthodině, ráno ve VT nechybí baterie (1. 10.: prodej 19:00–20:00 OK).

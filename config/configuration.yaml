@@ -129,7 +129,7 @@ template:
         state_class: measurement
         state: >
           {% set total = states('sensor.house_consumption_daily') | float(default=0) %}
-          {% set filtration_h = states('sensor.filtrace_spustena') | float(default=0) + states('sensor.pool_hours_done_legacy') | float(0) %}{# legacy přechodně 1. 10. 2026 #}
+          {% set filtration_h = states('sensor.filtrace_spustena') | float(default=0) %}
           {% set filtrace_w = states('input_number.filtrace_vykon_w') | float(450) %}
           {% set filtration_kwh = filtration_h * filtrace_w / 1000 %}
           {% set ev_kwh = states('sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy') | float(default=0) %}
