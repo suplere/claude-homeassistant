@@ -77,6 +77,11 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 - Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); místo toho na Energie v2
   grafy kWh/den (Bazén, Úspory) a od 2. 10. sankey + skládaný graf spotřeby na Úsporách.
 - Druhý kanál (IB) obou Pro EM-50 volný.
+- **Infrasauna (2. 10., čeká na uživatele):** další velký spotřebič, příkon zatím neznámý (štítek/návod). Hardware podle příkonu:
+  do ~2,3 kW kvalitní zásuvka Shelly; 2,3–3,6 kW 1f Shelly Pro 1PM / 1PM Gen4 v rozvaděči; 3f nebo víc Pro EM-50 + stykač
+  (rozvaděč = elektrikář). Běžné zásuvky Shelly (~10–12 A) nejsou na hodinový souvislý odběr. Funkce: přepínač „dnes sauna“
+  pro plánovač baterie (počítat večerní odběr, neprodávat baterii); měření vyřadit z profilu běžné spotřeby. Sauna je za
+  měřením GoodWe → ochrana jističe ji už vidí.
 
 ## 2. Mapa systému
 
