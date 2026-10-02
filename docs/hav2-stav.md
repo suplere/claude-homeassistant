@@ -77,6 +77,11 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
    - **Kontrola PND s měřeným bojlerem:** atributy `meas_*` v `sensor.energy_boiler_pnd_daily` (PND nákup ≈ GoodWe +
      bojler ze sítě, PND prodej ≈ prodej bez bojleru); dlaždice odchylek je použijí od prvního celého dne (3. 10. → PND 4. 10.).
    - **Úklid v1 (B2)** odložen na rozhodnutí po kontrole prodeje s blokací bojleru.
+   - **Přehled → tok energie:** přidán uzel „Bojler“ (`sensor.bojler_vykon`, individual v power-flow-card-plus);
+     síť = `sensor.energy_buy_gross_w` (odběr GoodWe + bojler ze sítě) / `sensor.energy_sell_net_w` (prodej bez bojleru),
+     dům = `sensor.house_consumption_with_boiler_w` (`hav2_data.yaml`). Karta umí spotřebiče jen jako větev z domu.
+     Sankey 2. 10. bez větve Celkem → Bojler: `energy_sources_total` má statistiky až od 9:29, „Celkem“ je menší
+     než součet spotřebičů → na bojler (poslední v pořadí) nezbyde nic. Od 3. 10. v pořádku.
 
 ### B. Rozpracované – čeká na uživatele
 1. **HOTOVO 2. 10. – blokování bojleru při prodeji** (arch. §5.4): relé Pro EM-50 → LT, plán SSR3 omezit 16–22 vyp+LT, `script.hav2_boiler_block`, `input_boolean.energy_boiler_block_on_sale`. **Ověřit při prvním prodeji:** relé on po dobu `discharge`, bojler 0 W (Shelly), PND export ≈ GoodWe export; po prodeji relé off. Auto-off 2 h v Shelly nastaven (2. 10.). První prodej s blokací: 2. 10. 19:00–20:00.
