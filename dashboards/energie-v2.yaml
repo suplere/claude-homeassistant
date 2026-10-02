@@ -1737,10 +1737,9 @@ views:
                 section: 0
                 name: Baterie (vybíjení)
                 color: "#43a047"
-              - id: boiler_outside
-                entity_id: sensor.bojler_energie
+              - id: sensor.bojler_ze_site_energie
                 section: 0
-                name: Mimo GoodWe
+                name: Síť (bojler)
                 color: "#8d6e63"
               # 1 – celkem (měřeno GoodWe)
               - id: sensor.energy_sources_total
@@ -1771,9 +1770,9 @@ views:
                 section: 2
                 name: Baterie (nabíjení)
                 color: "#66bb6a"
-              - id: sensor.energy_sell_sum
+              - id: sensor.energy_sell_net_energie
                 section: 2
-                name: Přetok do sítě
+                name: Prodej do sítě
                 color: "#ffa726"
               - id: rest
                 type: remaining_parent_state
@@ -1804,19 +1803,23 @@ views:
               - source: sensor.energy_sources_total
                 target: sensor.total_battery_charge
               - source: sensor.energy_sources_total
-                target: sensor.energy_sell_sum
+                target: sensor.energy_sell_net_energie
+              - source: sensor.energy_sources_total
+                target: sensor.bojler_energie
+                value: sensor.bojler_z_pretoku_energie
               - source: sensor.energy_sources_total
                 target: rest
-              - source: boiler_outside
+              - source: sensor.bojler_ze_site_energie
                 target: boiler_pass
               - source: boiler_pass
                 target: sensor.bojler_energie
           - type: markdown
             content: >
               <small>Od půlnoci, kWh. Levá část a „Celkem“ je bilance měřená GoodWe (nákup a prodej po fázích).
-              Bojler je zapojený mimo měření GoodWe – hřeje z přetoku (ten je pak započtený i v „Přetoku do sítě“)
-              nebo ze sítě; skutečný rozpad je až v PND D+1 výše. „Ostatní / ztráty“ = ztráty střídače a baterie
-              a nepřesnosti měření.</small>
+              Bojler je zapojený mimo měření GoodWe (jen L3): z „Celkem“ dostává část přetoku, kterou GoodWe na L3
+              exportoval (min. z příkonu bojleru a exportu L3), zbytek bere přímo ze sítě. „Prodej do sítě“ = export
+              bez bojleru (≈ PND). „Ostatní / ztráty“ = ztráty střídače a baterie a nepřesnosti měření.
+              Rozpad bojleru od 2. 10. 2026.</small>
           - type: heading
             heading: Spotřeba po dnech
             heading_style: subtitle

@@ -57,6 +57,31 @@ sensor:
     round: 3
     unit_prefix: k
     unit_time: h
+  # bojler z přetoku / ze sítě a skutečný prodej (sankey, graf bojleru) – od 2. 10. 2026
+  - platform: integration
+    name: bojler_z_pretoku_energie
+    unique_id: hav2_bojler_z_pretoku_energie
+    source: sensor.bojler_z_pretoku_w
+    method: left
+    round: 3
+    unit_prefix: k
+    unit_time: h
+  - platform: integration
+    name: bojler_ze_site_energie
+    unique_id: hav2_bojler_ze_site_energie
+    source: sensor.bojler_ze_site_w
+    method: left
+    round: 3
+    unit_prefix: k
+    unit_time: h
+  - platform: integration
+    name: energy_sell_net_energie
+    unique_id: hav2_energy_sell_net_energie
+    source: sensor.energy_sell_net_w
+    method: left
+    round: 3
+    unit_prefix: k
+    unit_time: h
   - platform: integration
     name: energy_base_house_energy
     unique_id: hav2_energy_base_house_energy

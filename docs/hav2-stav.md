@@ -136,7 +136,9 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
   (atributy `solar`/`battery`/`grid_nt`/`grid_vt` senzoru `sensor.ev_session_energy`, od 2. 10., nulují se při připojení).
 - **Úspory → Toky energie dnes:** sankey (`custom:sankey-chart`, `time_period_from: now/d`) – zdroje GoodWe → `sensor.energy_sources_total`
   (FVE + nákup NT/VT po fázích + vybíjení baterie) → dům / EV / filtrace / nabíjení baterie / přetok, „Ostatní / ztráty“ = zbytek;
-  bojler zvlášť jako tok „Mimo GoodWe“. Pod ním skládaný graf kWh/den 14 dní (apexcharts, statistiky `change`).
+  bojler rozdělený (od 2. 10.): z „Celkem“ část přetoku (`sensor.bojler_z_pretoku_w` = min(příkon bojleru, export L3),
+  kWh `sensor.bojler_z_pretoku_energie`), zbytek „Síť (bojler)“ (`sensor.bojler_ze_site_w` / `_energie`); „Prodej do sítě“ =
+  `sensor.energy_sell_net_w` / `_energie` (export GoodWe bez bojleru ≈ PND). Pod ním skládaný graf kWh/den 14 dní.
 - **Doplněno 2. 10.:** Přehled → „Dnes“ (FVE, spotřeba, EV, nákup, prodej, netto Kč) a „Světla a zásuvka“ (jako starý
   dashboard + `switch.zasuvka_rizena`); EV → „Kia EV6“ (SOC z auta, dojezd, zámek a předtopení jen přes detail, port,
   tlačítko force refresh s potvrzením, mapa); Baterie & FVE → předpověď 7 dní (atribut `week` senzoru
