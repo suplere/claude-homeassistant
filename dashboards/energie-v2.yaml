@@ -151,7 +151,7 @@ views:
       - type: grid
         cards:
           - type: heading
-            heading: Světla a zásuvka
+            heading: Světla
             icon: mdi:lightbulb-group
           # jako v1 (lovelace.lovelace, karta „Světla“)
           - type: tile
@@ -170,19 +170,77 @@ views:
               - brightness
             grid_options:
               columns: 12
+      - type: grid
+        cards:
+          - type: heading
+            heading: Sauna
+            icon: mdi:sauna
           - type: tile
-            entity: switch.zasuvka_rizena
-            name: Zásuvka řízená
+            entity: switch.sauna
+            name: Sauna
             state_content:
               - state
               - last_changed
             grid_options:
               columns: 6
           - type: tile
-            entity: sensor.zasuvka_rizena_power
-            name: Výkon zásuvky
+            entity: sensor.sauna_power
+            name: Výkon
             grid_options:
               columns: 6
+          - type: tile
+            entity: input_boolean.energy_sauna_today
+            name: Dnes sauna (pro plán baterie)
+            grid_options:
+              columns: 12
+            features_position: inline
+            features:
+              - type: toggle
+          - type: tile
+            entity: input_datetime.energy_sauna_start
+            name: Od
+            visibility:
+              - condition: state
+                entity: input_boolean.energy_sauna_today
+                state: "on"
+            grid_options:
+              columns: 12
+            features_position: inline
+            features:
+              - type: date-set
+          - type: tile
+            entity: input_number.energy_sauna_duration_h
+            name: Délka vč. nahřátí
+            visibility:
+              - condition: state
+                entity: input_boolean.energy_sauna_today
+                state: "on"
+            grid_options:
+              columns: 12
+            features_position: inline
+            features:
+              - type: numeric-input
+                style: buttons
+          - type: markdown
+            content: >
+              {% set a = state_attr('sensor.energy_plan', 'sauna') %}
+              {% if is_state('input_boolean.energy_sauna_today', 'on') %}
+              Plán baterie počítá se saunou: **{{ a if a and a != 'ne' else 'čeká na přepočet' }}**
+              ({{ states('input_number.energy_sauna_power_kw') }} kW, po skončení se přepínač vypne sám).
+              {% else %}<small>Zapni „Dnes sauna“, když večer půjdeš do sauny – plán pak neprodá baterii,
+              kterou sauna spotřebuje. Příkon {{ states('input_number.energy_sauna_power_kw') }} kW
+              (změřeno 2. 10.).</small>{% endif %}
+              {% if is_state('binary_sensor.sauna_overpowering', 'on') %}⚠️ **Zásuvka hlásí přetížení!**{% endif %}
+          - type: statistics-graph
+            title: Sauna kWh za den (14 dní)
+            chart_type: bar
+            period: day
+            days_to_show: 14
+            stat_types:
+              - change
+            entities:
+              - entity: sensor.sauna_energy
+                name: Sauna
       - type: grid
         cards:
           - type: heading
@@ -1705,6 +1763,10 @@ views:
                 section: 2
                 name: Filtrace
                 color: "#29b6f6"
+              - id: sensor.sauna_energy
+                section: 2
+                name: Sauna
+                color: "#ef6c00"
               - id: sensor.total_battery_charge
                 section: 2
                 name: Baterie (nabíjení)
@@ -1737,6 +1799,8 @@ views:
                 target: sensor.ecovolter_revcr01c00002056_total_charged_energy
               - source: sensor.energy_sources_total
                 target: sensor.shellyproem50_841fe890fc44_energy_meter_0_energie
+              - source: sensor.energy_sources_total
+                target: sensor.sauna_energy
               - source: sensor.energy_sources_total
                 target: sensor.total_battery_charge
               - source: sensor.energy_sources_total
@@ -1802,6 +1866,9 @@ views:
               - entity: sensor.shellyproem50_ece334fd2370_energy_meter_0_energie
                 name: Bojler
                 color: "#8d6e63"
+              - entity: sensor.sauna_energy
+                name: Sauna
+                color: "#ef6c00"
 
   # ============================================================ NASTAVENÍ
   - title: Nastavení

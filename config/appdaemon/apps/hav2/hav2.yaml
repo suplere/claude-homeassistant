@@ -27,3 +27,7 @@ hav2:
     - input_boolean.ev_deadline_hard
     - input_boolean.ev_control
     - input_boolean.pool_control
+    - input_boolean.energy_sauna_today
+    - input_datetime.energy_sauna_start
+    - input_number.energy_sauna_duration_h
+    - input_number.energy_sauna_power_kw

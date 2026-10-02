@@ -153,6 +153,23 @@ def build_slots(
     return slots
 
 
+def add_extra_load(slots: Sequence[Slot], start: datetime, end: datetime, kw: float) -> List[Slot]:
+    """Přičte plánovanou zátěž (např. sauna) k load_kwh slotů v intervalu [start, end).
+
+    Zátěž je za měřením GoodWe → baterie ji může krýt (na rozdíl od grid_only_kwh bojleru).
+    U částečného prvního slotu se počítá jen jeho zbývající část (fraction).
+    """
+    if kw <= 0 or end <= start:
+        return list(slots)
+    out: List[Slot] = []
+    for s in slots:
+        s_end = s.start + SLOT
+        live_start = s_end - SLOT * s.fraction  # první slot začíná „teď“
+        overlap = (min(s_end, end) - max(live_start, start)).total_seconds() / 3600
+        out.append(replace(s, load_kwh=s.load_kwh + kw * overlap) if overlap > 0 else s)
+    return out
+
+
 # ------------------------------------------------------------- simulace
 
 

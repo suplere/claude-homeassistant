@@ -61,7 +61,8 @@ template:
           {% set total = states('sensor.house_consumption') | float(default=0) %}
           {% set filtration = states('sensor.bazenova_filtrace_vykon') | float(default=0) %}
           {% set ev = states('sensor.eco_volter_vykon') | float(default=0) %}
-          {{ [total - filtration - ev, 0] | max }}
+          {% set sauna = states('sensor.sauna_power') | float(default=0) %}
+          {{ [total - filtration - ev - sauna, 0] | max }}
       - name: "Base Nighttime Consumption"
         unique_id: base_nighttime_consumption
         unit_of_measurement: "W"

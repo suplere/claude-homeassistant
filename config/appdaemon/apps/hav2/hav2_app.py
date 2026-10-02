@@ -40,6 +40,8 @@ STAT_POOL = "sensor.filtrace_sum"
 STAT_BUY = "sensor.energy_buy_sum"
 STAT_SELL = "sensor.energy_sell_sum"
 STAT_BOILER = "sensor.shellyproem50_ece334fd2370_energy_meter_0_energie"  # měření bojleru od 1. 10. 2026
+STAT_SAUNA = "sensor.sauna_energy"  # Shelly Plug E od 2. 10. 2026 (v profilu ne, plánuje se přes „Dnes sauna“)
+SAUNA_TODAY = "input_boolean.energy_sauna_today"
 BOILER_POWER = "sensor.energy_boiler_power_w"  # atribut source == "měření" → Shelly, jinak odhad
 
 EXPORT_LIMIT = "number.goodwe_limit_dodavky_do_site"
@@ -89,6 +91,8 @@ DATA_STATES = {
     "pool_run": "binary_sensor.pool_pump_running",
     "pool_w": "sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon",
     "pool_done_h": "sensor.pool_hours_done",
+    "sauna_w": "sensor.sauna_power",
+    "sauna_plan": "input_boolean.energy_sauna_today",
     "system_mode": "input_select.energy_system_mode",
     "plan": "sensor.energy_plan",
     "ev_reg": "sensor.ev_regulator",
@@ -247,11 +251,12 @@ class Hav2(EvControl, PoolControl, hass.Hass):
 
     def refresh_profile(self, kwargs: Dict[str, Any]) -> None:
         try:
-            stats = self._get_statistics([STAT_HOUSE, STAT_EV, STAT_POOL], 14)
-            house, ev, pool = (self._hourly(stats.get(i, [])) for i in (STAT_HOUSE, STAT_EV, STAT_POOL))
+            stats = self._get_statistics([STAT_HOUSE, STAT_EV, STAT_POOL, STAT_SAUNA], 14)
+            house, ev, pool, sauna = (self._hourly(stats.get(i, []))
+                                      for i in (STAT_HOUSE, STAT_EV, STAT_POOL, STAT_SAUNA))
             buckets: Dict[Tuple[bool, int], List[float]] = {}
             for ts, kwh in house.items():
-                base = max(0.0, kwh - ev.get(ts, 0.0) - pool.get(ts, 0.0))
+                base = max(0.0, kwh - ev.get(ts, 0.0) - pool.get(ts, 0.0) - sauna.get(ts, 0.0))
                 buckets.setdefault((ts.weekday() >= 5, ts.hour), []).append(base)
             if len(house) >= 24 * 3:
                 self.base_profile = {k: statistics.median(v) for k, v in buckets.items()}
@@ -421,6 +426,9 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             return self.boiler_profile.get(h.hour, 0.0)
 
         slots = P.build_slots(now, pv, load, boiler, self._spot(), is_nt)
+        sauna = self._sauna_window(now)
+        if sauna:
+            slots = P.add_extra_load(slots, *sauna)
         batt = P.BatteryParams(
             capacity_kwh=self.fnum("input_number.battery_capacity", 10.0),
             soc_pct=self.fnum("sensor.battery_state_of_charge", 50.0),
@@ -486,6 +494,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             "forecast_ok": "ano" if forecast_ok else "ne",
             "nt_source": nt_source,
             "profile_source": self.profile_source,
+            "sauna": (f"{sauna[0]:%H:%M}–{sauna[1]:%H:%M}, {sauna[2]:.1f} kW" if sauna else "ne"),
             "candidates": plan.candidates,
             "defer_slots": str(plan.defer_slots),
             "days_since_full": f"{days_since_full:.1f}",
@@ -516,6 +525,22 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             self.defer_live = "standby"
         if execute:
             self.battery_apply()
+
+    def _sauna_window(self, now: datetime) -> Optional[Tuple[datetime, datetime, float]]:
+        """„Dnes sauna“: (začátek, konec, kW) dnes; po konci se přepínač sám vypne."""
+        if self.get_state(SAUNA_TODAY) != "on":
+            return None
+        try:
+            hh, mm = (int(x) for x in str(self.get_state("input_datetime.energy_sauna_start")).split(":")[:2])
+        except (TypeError, ValueError):
+            return None
+        start = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        end = start + timedelta(hours=self.fnum("input_number.energy_sauna_duration_h", 1.5))
+        if now >= end:
+            self.call_service("input_boolean/turn_off", entity_id=SAUNA_TODAY)
+            self.call_service("logbook/log", name="HAv2 sauna", message=f"sauna {start:%H:%M}–{end:%H:%M} skončila")
+            return None
+        return start, end, self.fnum("input_number.energy_sauna_power_kw", 2.3)
 
     # ------------------------------------------------- výkon plánu baterie
     def battery_apply(self) -> None:

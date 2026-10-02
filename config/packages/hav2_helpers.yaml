@@ -220,6 +220,21 @@ input_number:
     max: 12
     step: 0.5
     unit_of_measurement: h
+  # sauna (Shelly Plug E, ~2,3 kW na L2, test 2. 10. 2026) – plánovač baterie s ní počítá při „Dnes sauna“
+  energy_sauna_duration_h:
+    name: Sauna délka (vč. nahřátí)
+    icon: mdi:timer-outline
+    min: 0.5
+    max: 4
+    step: 0.25
+    unit_of_measurement: h
+  energy_sauna_power_kw:
+    name: Sauna příkon
+    icon: mdi:flash
+    min: 0.5
+    max: 6
+    step: 0.1
+    unit_of_measurement: kW
 
 input_boolean:
   energy_battery_control:
@@ -246,8 +261,16 @@ input_boolean:
   pool_use_recommendation:
     name: Filtrace podle doporučení
     icon: mdi:lightbulb-auto
+  energy_sauna_today:
+    name: Dnes sauna
+    icon: mdi:sauna
 
 input_datetime:
+  energy_sauna_start:
+    name: Sauna od
+    icon: mdi:clock-start
+    has_date: false
+    has_time: true
   energy_battery_last_full:
     name: Baterie naposledy na 100 %
     icon: mdi:battery-check

@@ -16,6 +16,7 @@ from hav2_planner import (  # noqa: E402
     MODE_STANDBY,
     BatteryParams,
     Prices,
+    add_extra_load,
     build_slots,
     plan_battery,
     simulate,
@@ -306,3 +307,39 @@ def test_nt_charge_needs_minimum_gain_per_kwh():
     assert marginal.grid_charge_kwh == 0
     clear = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 5.0, 8: 5.0, 9: 5.0}), batt, Prices())
     assert clear.grid_charge_kwh > 3
+
+
+# ------------------------------------------------------------- doplňková zátěž (sauna)
+
+
+def test_extra_load_added_only_inside_window():
+    now = datetime(2026, 10, 2, 17, 0, tzinfo=TZ)
+    slots = build_slots(now, [], lambda h: 0.4, lambda h: 0.0, {}, nt)
+    out = add_extra_load(slots, now.replace(hour=19), now.replace(hour=20, minute=30), 2.3)
+    added = sum(b.load_kwh - a.load_kwh for a, b in zip(slots, out))
+    assert added == pytest.approx(2.3 * 1.5)
+    by_start = {s.start: s.load_kwh - a.load_kwh for s, a in zip(out, slots)}
+    assert by_start[now.replace(hour=18, minute=45)] == 0
+    assert by_start[now.replace(hour=19)] == pytest.approx(2.3 * 0.25)
+    assert by_start[now.replace(hour=20, minute=30)] == 0
+
+
+def test_extra_load_partial_slots_and_running_now():
+    now = datetime(2026, 10, 2, 19, 5, tzinfo=TZ)  # sauna už běží, první slot jen 10 min
+    slots = build_slots(now, [], lambda h: 0.4, lambda h: 0.0, {}, nt)
+    out = add_extra_load(slots, now.replace(hour=18, minute=50), now.replace(hour=19, minute=40), 2.0)
+    added = sum(b.load_kwh - a.load_kwh for a, b in zip(slots, out))
+    assert added == pytest.approx(2.0 * 35 / 60)  # 19:05–19:40
+
+
+def test_extra_load_battery_keeps_energy_for_sauna():
+    """Večerní prodej z baterie (scénář 28. 9.) – se saunou 19–21 h se prodá méně."""
+    now = datetime(2026, 9, 28, 17, 0, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=100.0, min_soc_pct=20.0)
+    slots = make_slots(now, 1.0, 6.0, spot={17: 5.76, 18: 7.53, 19: 8.33, 20: 6.75})
+    base = plan_battery(slots, batt, Prices())
+    sauna = plan_battery(add_extra_load(slots, now.replace(hour=19), now.replace(hour=21), 2.3), batt, Prices())
+    sold = lambda p: sum(r.grid_export_kwh for r in p.results)
+    assert sold(base) > 0
+    assert sold(sauna) < sold(base)
+    assert min(r.soc_pct for r in sauna.results) >= 20.0 - 1e-6

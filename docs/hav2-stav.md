@@ -77,11 +77,14 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 - Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); místo toho na Energie v2
   grafy kWh/den (Bazén, Úspory) a od 2. 10. sankey + skládaný graf spotřeby na Úsporách.
 - Druhý kanál (IB) obou Pro EM-50 volný.
-- **Infrasauna (2. 10., čeká na uživatele):** další velký spotřebič, příkon zatím neznámý (štítek/návod). Hardware podle příkonu:
-  do ~2,3 kW kvalitní zásuvka Shelly; 2,3–3,6 kW 1f Shelly Pro 1PM / 1PM Gen4 v rozvaděči; 3f nebo víc Pro EM-50 + stykač
-  (rozvaděč = elektrikář). Běžné zásuvky Shelly (~10–12 A) nejsou na hodinový souvislý odběr. Funkce: přepínač „dnes sauna“
-  pro plánovač baterie (počítat večerní odběr, neprodávat baterii); měření vyřadit z profilu běžné spotřeby. Sauna je za
-  měřením GoodWe → ochrana jističe ji už vidí.
+- **Infrasauna – hotovo 2. 10.:** Shelly Plug E (16 A) = `switch.sauna`, `sensor.sauna_power`, `sensor.sauna_energy`
+  (zařízení „Sauna (Shelly Plug E)“, entity přejmenovány z „Zásuvka řízená/Filtrace“ se souhlasem uživatele). Test 2. 10.:
+  **2,28 kW, 9,6 A, fáze L2** (s filtrací), termostat za 8 min nespínal. Odečtená z `sensor.base_house_consumption`
+  a z profilu plánovače (`STAT_SAUNA`); „Dnes sauna“ (`input_boolean.energy_sauna_today`, `input_datetime.energy_sauna_start`,
+  `input_number.energy_sauna_duration_h`, `..._power_kw` = 2,3) přičte zátěž do slotů plánu (`hav2_planner.add_extra_load`,
+  baterie ji může krýt) a po konci se sama vypne; atribut `sauna` v `sensor.energy_plan`. Dashboard: Přehled → Sauna,
+  sankey a skládaný graf. Později možná Shelly Pro 1PM v rozvaděči bazénu (L2, B16, chybí místo na liště – elektrikář);
+  pak nové entity přejmenovat na stejná `sauna_*` ID.
 
 ## 2. Mapa systému
 
