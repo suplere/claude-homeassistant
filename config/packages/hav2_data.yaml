@@ -378,6 +378,14 @@ template:
         state: "{{ states('sensor.davkovac_teplota') | float }}"
 
   - binary_sensor:
+      # Solcast automatické tlumení: vyřadit půlhodiny, kdy HAv2 omezuje přetok (záporný výkup,
+      # NegPriceBoiler) → výroba je uměle snížená, ne stínem. Název entity určuje integrace.
+      - name: Solcast potlačit automatické tlumení
+        unique_id: hav2_solcast_suppress_auto_dampening
+        default_entity_id: binary_sensor.solcast_suppress_auto_dampening
+        icon: mdi:solar-power-variant-outline
+        state: "{{ states('number.goodwe_limit_dodavky_do_site') | float(10000) < 10000 }}"
+
       - name: Čerpadlo filtrace běží
         unique_id: hav2_pool_pump_running
         default_entity_id: binary_sensor.pool_pump_running

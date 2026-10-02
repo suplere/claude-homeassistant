@@ -63,7 +63,12 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 6. Nenastalo: 3f z plné baterie, NT nabíjení baterie před zataženým dnem, test watchdogu (jen se souhlasem).
 7. **EV – kmitání proudu (úprava 2. 10.):** proud se mění až po 2 min trvání (nahoru i dolů); přehrání 26. 9.–1. 10.
    změn 177 → 57. Ověřit při prvním solárním nabíjení s troubou: proud drží, baterie kryje krátké poklesy.
-8. FVE ranní stín: od listopadu přepočítat hodinový tvar (`hav2.jinja`, poměr `sensor.pv_power` / Solcast this_hour).
+8. **Solcast – automatické tlumení, krok 1 (2. 10.):** zapnuto jen `get_actuals` (odhad skutečné výroby, 1 volání/den,
+   limit prognóz 10 → 9), `generation_entities` = `sensor.total_pv_generation`, `auto_dampen` **vypnuto**. Potlačení
+   půlhodin s omezeným přetokem: `binary_sensor.solcast_suppress_auto_dampening` (limit přetoku < 10 000 W).
+   **Kolem 16. 10.:** porovnat pevnou korekci `hav2.jinja` (měsíc × hodina) s faktory tlumení Solcastu (14 dní dat)
+   → buď zapnout `auto_dampen` a `hav2.jinja` zjednodušit (jinak dvojí korekce!), nebo zůstat u pevné korekce.
+9. FVE ranní stín: od listopadu přepočítat hodinový tvar (`hav2.jinja`, poměr `sensor.pv_power` / Solcast this_hour).
 
 ### D. Nápady / později
 - Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); grafy kWh/den na Energie v2
@@ -158,6 +163,22 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
   při pulzní regulaci účiník ~0,45, činný výkon platí). **Shelly Pro EM-50 filtrace** (`..._841fe890fc44`) místo Pro 1PM – relé spíná
   cívku stykače, snímač na fázi ze stykače k čerpadlu, 530 W, cos φ 0,92. Garáž na přehledu Energie v2 (s potvrzením).
 - PND v HA jen **hodinově** (15min data integrace hned agreguje). cez_pnd v1.1.8 (od 30. 9.) funguje bez lokálního patche.
+- **Test tlumení předpovědi Solcast (od 2. 10. 2026, vyhodnotit ~16. 10.):** Solcast nadhodnocuje (o 20–34 %) a nevidí
+  místní stín (komín ráno 7–9 h, odpoledne). Dosud to řeší jen pevná korekce HAv2 v `custom_templates/hav2.jinja`
+  (měsíční faktor × hodinový tvar dne, naměřeno 19.–28. 9.), kterou je nutné ručně přepočítat s každou změnou výšky
+  slunce. Integrace Solcast (HACS) umí **automatické tlumení**: z 14 dní porovná skutečnou výrobu s vlastním odhadem
+  skutečné výroby („estimated actuals“, ze satelitu) a pro slunečné půlhodiny, kdy výroba soustavně nedosahuje odhadu,
+  spočítá tlumicí faktor, který se pak průběžně mění se sluncem. **Krok 1 (2. 10.):** zapnuto jen stahování odhadu
+  skutečné výroby (1 API volání/den po půlnoci → limit prognóz 10 → 9), zdroj výroby `sensor.total_pv_generation`,
+  tlumení **vypnuté** – plánování se nemění. Půlhodiny, kdy HAv2 uměle omezuje přetok (záporný výkup, `NegPriceBoiler`),
+  vyřazuje `binary_sensor.solcast_suppress_auto_dampening` (limit přetoku < 10 000 W), jinak by je tlumení bralo jako
+  stín. **Vyhodnocení:** na jasných dnech po půlhodinách porovnat skutečnou výrobu, odhad skutečné výroby Solcastu,
+  surovou prognózu p50 a korekci HAv2 (`sensor.energy_pv_forecast_corrected`, slotová data v plánu). Faktory tlumení
+  integrace počítá jen se zapnutým `auto_dampen` (atribut `dampening_factor` v `detailedForecast`, senzor Accuracy) –
+  pro porovnání lze tlumení zapnout krátce a `solcast_solar.force_update_estimates` (nespotřebuje volání), pak hned
+  vypnout, aby se korekce nesčítala. **Rozhodnutí:** pokud tlumení vystihne stín aspoň stejně dobře jako `hav2.jinja`,
+  zapnout `auto_dampen` natrvalo a v `hav2.jinja` ponechat jen měsíční faktor (bez hodinového tvaru) a ten přeměřit;
+  jinak tlumení nechat vypnuté, odhad skutečné výroby použít pro ruční přepočet tvaru dne (C9) a limit vrátit na 10.
 
 ## 4. Další kroky
 
@@ -168,8 +189,7 @@ Aktuální seznam sledování a rozhodnutí je v **§1b**. Dlouhodobě:
    `predictive_overflow_negative_price`) → baterie DoD 80 % → Auto zůstává.
 3. **Po převzetí:** smazat helpery „nepotřebujeme“ (archiv README). AppDaemon PND app vypnout až po přepojení
    `hav2_boiler.py` na data HACS integrace a ověření VT/NT.
-4. Volitelně: rozvržení stránky EV (sekce „Aktuální session“ k ručnímu ovládání), sankey na Úsporách, Solcast
-   auto-dampening.
+4. Volitelně: rozvržení stránky EV (sekce „Aktuální session“ k ručnímu ovládání), sankey na Úsporách.
 
 ## 5. Známé drobnosti
 - `sensor.pool_water_temperature` a `sensor.pool_hours_recommended` mají hodnotu až po ≥ 10 min běhu filtrace.

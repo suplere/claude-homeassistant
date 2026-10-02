@@ -34,6 +34,8 @@ Principy vycházejí z měření ve Fázi 1:
   **Ranní stín (doplněno 29. 9.):** komín před FVE, při nízkém slunci ráno 7–9 h jen ~50 % Solcastu. Pro září–říjen tvar dne
   = naměřený poměr skutečnost/p50 po hodinách (19.–28. 9.): 7 h 0,49, 8 h 0,54, 9 h 0,94, 10–15 h 0,79–0,92, 16 h 0,60, 17 h 0,40,
   18 h 0,31 (`custom_templates/hav2.jinja`, `pv_hour_shape`). Listopad–březen doplnit z dat (slunce níž → stín pravděpodobně větší).
+  **Solcast tlumení:** v integraci je tlumení vypnuté (všechny faktory 1,0), korekci dělá jen `hav2.jinja`. Od 2. 10. 2026
+  integrace stahuje odhad skutečné výroby (`get_actuals`) kvůli posouzení automatického tlumení (`docs/hav2-stav.md` §1b C8).
 
 ## 2. Architektura a tok dat
 
