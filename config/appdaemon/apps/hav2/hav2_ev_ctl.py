@@ -443,10 +443,10 @@ class EvControl:
     def _ev_log_boiler(self, now: datetime) -> None:
         """Do logbooku jen začátek/konec rezervy pro bojler a „nahřátý“."""
         state = (self.ev_boiler_reserve_w > 0, self.ev_boiler.done)
-        if self.ev_boiler_logged is None or state == self.ev_boiler_logged:
-            self.ev_boiler_logged = state
+        prev, self.ev_boiler_logged = self.ev_boiler_logged, state
+        # beze změny, nebo jen půlnoční vynulování „nahřátý“ (bez rezervy) → nic nehlásit
+        if prev is None or state == prev or (not state[0] and not prev[0] and prev[1] and not state[1]):
             return
-        self.ev_boiler_logged = state
         if self.ev_boiler.done:
             self.call_service("input_datetime/set_datetime", entity_id=BOILER_LAST_FULL,
                               timestamp=int(now.timestamp()))
