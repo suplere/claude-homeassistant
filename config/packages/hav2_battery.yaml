@@ -167,6 +167,55 @@ script:
               message: "Limit přetoku {{ limit_target }} W – {{ reason | default('') }}"
               entity_id: script.hav2_export_set
 
+  hav2_boiler_block:
+    alias: HAv2 – blokovat bojler (relé → WATTrouter LT)
+    description: >
+      Relé bojlerového Shelly Pro EM-50 spíná vstup LT WATTrouteru; časový plán SSR3 „omezit“
+      16–22 h s binárním vstupem LT (podmínka vyp) pak bojler zablokuje – při prodeji z baterie by
+      jinak WATTrouter poslal přetok L3 do bojleru. Sepne jen v režimu Auto se zapnutým řízením
+      baterie a input_boolean.energy_boiler_block_on_sale; vypnout lze vždy. Zapisuje jen při rozdílu.
+    icon: mdi:water-boiler-off
+    mode: queued
+    max: 3
+    fields:
+      block:
+        description: true = blokovat bojler
+        required: true
+        selector:
+          boolean:
+      reason:
+        description: Důvod (do logbooku)
+        required: false
+        selector:
+          text:
+    variables:
+      want: >
+        {{ (block | default(false)) | bool
+            and is_state('input_select.energy_system_mode', 'Auto')
+            and is_state('input_boolean.energy_battery_control', 'on')
+            and is_state('input_boolean.energy_boiler_block_on_sale', 'on') }}
+    sequence:
+      - if:
+          - condition: template
+            value_template: "{{ has_value('switch.shellyproem50_ece334fd2370') and is_state('switch.shellyproem50_ece334fd2370', 'on') != want }}"
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ want }}"
+            then:
+              - action: switch.turn_on
+                target:
+                  entity_id: switch.shellyproem50_ece334fd2370
+            else:
+              - action: switch.turn_off
+                target:
+                  entity_id: switch.shellyproem50_ece334fd2370
+          - action: logbook.log
+            data:
+              name: HAv2 bojler
+              message: "Bojler {{ 'blokován' if want else 'odblokován' }} – {{ reason | default('') }}"
+              entity_id: script.hav2_boiler_block
+
 automation:
   - id: hav2_battery_last_full
     alias: HAv2 – baterie dosáhla 100 %
@@ -241,6 +290,10 @@ automation:
         entity_id: input_boolean.energy_battery_control
         state: "on"
     actions:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.shellyproem50_ece334fd2370
+        continue_on_error: true
       - action: number.set_value
         target:
           entity_id: number.goodwe_ems_power_limit
@@ -266,4 +319,4 @@ automation:
           title: HAv2 – plánovač baterie neodpovídá
           message: >
             Heartbeat je starý {{ ((now() - (states('input_datetime.hav2_heartbeat') | as_datetime(now()) | as_local)).total_seconds() / 60) | round(0) }} min.
-            Baterie přepnuta na auto (vlastní spotřeba), limit přetoku 10 000 W. Zkontroluj AppDaemon.
+            Baterie přepnuta na auto (vlastní spotřeba), limit přetoku 10 000 W, blokování bojleru vypnuto. Zkontroluj AppDaemon.

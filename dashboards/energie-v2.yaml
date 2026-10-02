@@ -1265,6 +1265,20 @@ views:
             name: Hřeje
             grid_options:
               columns: 6
+          # relé → vstup LT WATTrouteru; plán SSR3 „omezit“ 16–22 h blokuje bojler při prodeji z baterie
+          - type: tile
+            entity: input_boolean.energy_boiler_block_on_sale
+            name: Blokovat při prodeji
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: switch.shellyproem50_ece334fd2370
+            name: Bojler blokován
+            icon: mdi:water-boiler-off
+            tap_action:
+              action: more-info
+            grid_options:
+              columns: 6
           # měření Shelly Pro EM-50 od 1. 10. 2026 (bojler je mimo měření GoodWe → ne do Energy dashboardu)
           - type: statistics-graph
             title: Bojler kWh za den (14 dní)

@@ -41,7 +41,8 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
    (večer 19–20 h už dostal 1,32 kWh z prodeje baterie). Porovnat s PND D+1 za 1. 10.
 
 ### B. Rozpracované – čeká na uživatele
-1. **Bojler bere při prodeji z baterie (1. 10.):** prodej 19–20 h 5 kW → WATTrouter poslal do bojleru 1,32 kWh (~1,35 kW,
+1. **HOTOVO 2. 10. – blokování bojleru při prodeji** (arch. §5.4): relé Pro EM-50 → LT, plán SSR3 omezit 16–22 vyp+LT, `script.hav2_boiler_block`, `input_boolean.energy_boiler_block_on_sale`. **Ověřit při prvním prodeji:** relé on po dobu `discharge`, bojler 0 W (Shelly), PND export ≈ GoodWe export; po prodeji relé off. Uživatel: v Shelly auto-off 2 h.
+   Původní popis: **Bojler bere při prodeji z baterie (1. 10.):** prodej 19–20 h 5 kW → WATTrouter poslal do bojleru 1,32 kWh (~1,35 kW,
    celou L3), do sítě jen ~2,9 kWh místo 4,2 → ztráta ~3,6 Kč (výkup 6,24 vs. NT 3,51). Návrh: beznapěťový kontakt I/O
    bojlerového Pro EM-50 (`switch.shellyproem50_ece334fd2370`, nepoužitý) → vstup WATTrouteru **LT–GND**, ve WATTconfigu
    časový plán SSR3 typu „blokovat“ 00–24 s podmínkou „Binární vstup“; HAv2 sepne relé při `plan = discharge`

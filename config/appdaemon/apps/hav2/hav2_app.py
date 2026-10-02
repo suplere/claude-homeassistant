@@ -125,6 +125,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.export_blocked = False
         self.export_published = None
         self.neg_boiler = BO.NegPriceBoiler()
+        self.boiler_block_sent: Optional[bool] = None
 
         self.run_every(self.heartbeat, "now", 60)
         self.run_daily(self.refresh_profile, "00:05:00")
@@ -542,6 +543,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         try:
             self._defer_guard()
             self._export_control()
+            self._boiler_block()
         except Exception as err:  # noqa: BLE001
             self.log(f"živá smyčka baterie selhala: {err}", level="ERROR")
         try:
@@ -563,6 +565,21 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             for old in DATA_DIR.glob("*.jsonl"):
                 if old.stem < f"{now - timedelta(days=DATA_KEEP_DAYS):%Y-%m-%d}":
                     old.unlink()
+
+    def _boiler_block(self) -> None:
+        """Při prodeji z baterie zablokovat bojler (relé Shelly → vstup LT WATTrouteru, plán SSR3 16–22 h).
+
+        Jinak WATTrouter vidí přetok L3 a pošle ho do bojleru (1. 10. 2026: 1,32 kWh z 4,2 kWh prodeje).
+        Zapnutí posílá každou minutu (obnoví relé i po jeho automatickém vypnutí v Shelly), vypnutí
+        jen při změně; skript hav2_boiler_block sám hlídá režim Auto a zapisuje jen při rozdílu.
+        """
+        want = bool(self.battery_executing() and self.plan_act and self.plan_act.mode == P.MODE_DISCHARGE)
+        if want or want != self.boiler_block_sent:
+            reason = "prodej z baterie" if want else "konec prodeje z baterie"
+            self.call_service("script/hav2_boiler_block", block=want, reason=reason)
+            if want != self.boiler_block_sent:
+                self.log(f"bojler: {'blokovat' if want else 'odblokovat'} ({reason})")
+            self.boiler_block_sent = want
 
     def _defer_guard(self) -> None:
         """Odložené nabíjení = battery_standby; když dům začne nakupovat, vrátit auto (a zpět)."""

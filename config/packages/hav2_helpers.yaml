@@ -228,6 +228,9 @@ input_boolean:
   energy_boiler_preheat:
     name: Experiment předehřev bojleru
     icon: mdi:water-boiler
+  energy_boiler_block_on_sale:
+    name: Blokovat bojler při prodeji z baterie
+    icon: mdi:water-boiler-off
   ev_deadline_hard:
     name: EV nabít za každou cenu
     icon: mdi:alert-decagram
