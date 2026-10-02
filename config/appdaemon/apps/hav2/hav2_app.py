@@ -40,8 +40,11 @@ STAT_POOL = "sensor.filtrace_sum"
 STAT_BUY = "sensor.energy_buy_sum"
 STAT_SELL = "sensor.energy_sell_sum"
 STAT_BOILER = "sensor.bojler_energie"  # měření bojleru od 1. 10. 2026
+STAT_SELL_NET = "sensor.energy_sell_net_energie"  # prodej bez bojleru (od 2. 10. 2026)
+STAT_BOILER_GRID = "sensor.bojler_ze_site_energie"  # bojler ze sítě (od 2. 10. 2026)
 STAT_SAUNA = "sensor.sauna_energy"  # Shelly Plug E od 2. 10. 2026 (v profilu ne, plánuje se přes „Dnes sauna“)
 SAUNA_TODAY = "input_boolean.energy_sauna_today"
+SAUNA_ON_W = 1000  # nad tímto výkonem sauna topí (2,3 kW; termostat spíná celým výkonem)
 BOILER_POWER = "sensor.energy_boiler_power_w"  # atribut source == "měření" → Shelly, jinak odhad
 
 EXPORT_LIMIT = "number.goodwe_limit_dodavky_do_site"
@@ -130,6 +133,9 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.export_published = None
         self.neg_boiler = BO.NegPriceBoiler()
         self.boiler_block_sent: Optional[bool] = None
+        self.sauna_on_since: Optional[datetime] = None
+        self.sauna_off_since: Optional[datetime] = None
+        self.sauna_seen = False  # sauna v této session „Dnes sauna“ opravdu běžela
 
         self.run_every(self.heartbeat, "now", 60)
         self.run_daily(self.refresh_profile, "00:05:00")
@@ -323,6 +329,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
                 raise ValueError("žádný úplný den v PND")
             d = full[-1]
             ri, re_ = d.residual_pct("import"), d.residual_pct("export")
+            meas = self._pnd_measured_check(d.day, pi, pe, hi)
             self.set_state("sensor.energy_boiler_pnd_daily", state=round(d.boiler_kwh, 2), attributes={
                 "friendly_name": "Bojler podle PND (poslední den)", "icon": "mdi:water-boiler",
                 "unit_of_measurement": "kWh", "device_class": "energy", "state_class": "measurement",
@@ -340,6 +347,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
                 # čísla jako text (AppDaemon zahazuje nuly); „–“ když nelze spočítat
                 "residual_import_pct": f"{ri}" if ri is not None else "–",
                 "residual_export_pct": f"{re_}" if re_ is not None else "–",
+                # kontrola s měřením bojleru (Shelly): PND nákup ≈ GoodWe + bojler ze sítě, PND prodej ≈ prodej bez bojleru
+                **meas,
                 "days_json": json.dumps([[x.day.isoformat(), round(x.boiler_kwh, 2), round(x.cost_kc, 2)]
                                          for x in full[-14:]]),
                 "month_kwh": f"{sum(x.boiler_kwh for x in full if x.day.month == d.day.month and x.day.year == d.day.year):.2f}",
@@ -352,6 +361,29 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             self.log(f"bojler {d.day}: {d.boiler_kwh:.2f} kWh, {d.cost_kc:.1f} Kč; odchylka nákupu {ri} %, prodeje {re_} %")
         except Exception as err:  # noqa: BLE001
             self.log(f"kontrola PND selhala: {err}", level="WARNING")
+
+    def _pnd_measured_check(self, day, pi, pe, hi) -> Dict[str, str]:
+        """Odchylka PND proti HA s měřeným bojlerem za den `day`; „–“ dokud nejsou data celého dne."""
+        out = {"meas_import_pct": "–", "meas_export_pct": "–", "meas_import_kwh": "–", "meas_export_kwh": "–"}
+        try:
+            stats = self._get_statistics([STAT_SELL_NET, STAT_BOILER_GRID], 3)
+            sn, bg = (self._hourly(stats.get(i, [])) for i in (STAT_SELL_NET, STAT_BOILER_GRID))
+            hours = [ts for ts in pi if ts.date() == day]
+            if sum(1 for ts in hours if ts in sn and ts in bg) < 23:
+                return out
+            pnd_i = sum(pi[ts] for ts in hours)
+            pnd_e = sum(pe.get(ts, 0.0) for ts in hours)
+            exp_i = sum(hi.get(ts, 0.0) + bg.get(ts, 0.0) for ts in hours)
+            exp_e = sum(sn.get(ts, 0.0) for ts in hours)
+            out["meas_import_kwh"] = f"{pnd_i - exp_i:.2f}"
+            out["meas_export_kwh"] = f"{pnd_e - exp_e:.2f}"
+            if pnd_i > 0.5:
+                out["meas_import_pct"] = f"{(pnd_i - exp_i) / pnd_i * 100:.1f}"
+            if pnd_e > 0.5:
+                out["meas_export_pct"] = f"{(pnd_e - exp_e) / pnd_e * 100:.1f}"
+        except Exception as err:  # noqa: BLE001
+            self.log(f"kontrola PND s měřením bojleru: {err}", level="WARNING")
+        return out
 
     # --------------------------------------------------------------- vstupy
     def _pv_slots(self) -> List[Tuple[datetime, float]]:
@@ -572,9 +604,45 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         except Exception as err:  # noqa: BLE001
             self.log(f"živá smyčka baterie selhala: {err}", level="ERROR")
         try:
+            self._sauna_detect()
+        except Exception as err:  # noqa: BLE001
+            self.log(f"detekce sauny selhala: {err}", level="WARNING")
+        try:
             self._record_data()
         except Exception as err:  # noqa: BLE001 – záznam nesmí ovlivnit řízení
             self.log(f"záznam dat selhal: {err}", level="WARNING")
+
+    def _sauna_detect(self) -> None:
+        """Sauna běží ≥ 5 min bez „Dnes sauna“ → zapnout (začátek = skutečný start); po vypnutí
+        sauny na ≥ 20 min (termostat po nahřátí spíná; a když v session běžela) „Dnes sauna“ vypnout → plán se hned přepočítá."""
+        now = datetime.now(TZ)
+        running = self.fnum("sensor.sauna_power", 0) > SAUNA_ON_W
+        if running:
+            self.sauna_on_since = self.sauna_on_since or now
+            self.sauna_off_since = None
+        else:
+            self.sauna_off_since = self.sauna_off_since or now
+            self.sauna_on_since = None
+        planned = self.get_state(SAUNA_TODAY) == "on"
+        if running and planned:
+            self.sauna_seen = True
+        if running and not planned and now - self.sauna_on_since >= timedelta(minutes=5):
+            start = self.sauna_on_since
+            self.call_service("input_datetime/set_datetime", entity_id="input_datetime.energy_sauna_start",
+                              time=start.strftime("%H:%M:00"))
+            self.call_service("input_boolean/turn_on", entity_id=SAUNA_TODAY)
+            self.sauna_seen = True
+            text = f"{now:%H:%M} sauna běží od {start:%H:%M} → „Dnes sauna“ zapnuto automaticky"
+            self.call_service("logbook/log", name="HAv2 sauna", message=text)
+            self.log(text)
+        elif planned and self.sauna_seen and not running and now - self.sauna_off_since >= timedelta(minutes=20):
+            self.call_service("input_boolean/turn_off", entity_id=SAUNA_TODAY)
+            self.sauna_seen = False
+            text = f"{now:%H:%M} sauna vypnutá → „Dnes sauna“ ukončeno"
+            self.call_service("logbook/log", name="HAv2 sauna", message=text)
+            self.log(text)
+        if not planned and not running:
+            self.sauna_seen = False
 
     def _record_data(self) -> None:
         now = datetime.now(TZ)

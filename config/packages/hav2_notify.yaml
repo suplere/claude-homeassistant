@@ -1,0 +1,50 @@
+# HAv2 – ranní souhrn do mobilu (2. 10. 2026)
+# Včerejší bilance (denní snímky ve 23:59:50), bojler podle PND (D+1, stahuje se ráno),
+# plán na dnešek a varování. Vypíná se přepínačem input_boolean.energy_morning_summary.
+
+input_boolean:
+  energy_morning_summary:
+    name: Ranní souhrn do mobilu
+    icon: mdi:message-text-clock
+
+automation:
+  - id: hav2_morning_summary
+    alias: HAv2 – ranní souhrn
+    description: Ráno pošle včerejší bilanci, bojler podle PND, plán dne a varování.
+    mode: single
+    triggers:
+      - trigger: time
+        at: "07:40:00"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.energy_morning_summary
+        state: "on"
+    actions:
+      - action: notify.mobile_app_evzen_iphone
+        data:
+          title: "HAv2 – {{ now().strftime('%-d. %-m.') }}"
+          message: >
+            {% set acc = state_attr('sensor.energy_forecast_accuracy', 'history') or [] %}
+            {% set y = acc[-1] if acc else none %}
+            {% set yday = (now() - timedelta(days=1)).date() | string %}
+            ☀️ Včera: FVE {{ states('sensor.pv_generation_day') }} kWh
+            {%- if y and y[0] == yday and y[1] is number %} (předpověď {{ y[1] }}){% endif %},
+            nákup {{ states('sensor.energy_grid_import_day') }}, prodej {{ states('sensor.energy_grid_export_day') }} kWh,
+            netto {{ states('sensor.energy_net_cost_day') }} Kč.
+            {% set b = 'sensor.energy_boiler_pnd_daily' %}
+            {% if state_attr(b, 'date') == yday %}
+            🚿 Bojler (PND): {{ states(b) }} kWh – ze sítě {{ state_attr(b, 'import_kwh') }}, z přetoku {{ state_attr(b, 'export_loss_kwh') }}, {{ state_attr(b, 'cost_kc') }} Kč.
+            {% else %}
+            🚿 Bojler: PND za včerejšek zatím není.
+            {% endif %}
+            📅 Dnes: FVE ~{{ state_attr('sensor.energy_pv_forecast_corrected', 'today_kwh') }} kWh.
+            🔋 {{ state_attr('sensor.energy_plan', 'reason') }}.
+            🚗 {{ states('sensor.ev_plan') }}.
+            🏊 {{ states('sensor.pool_plan') }}.
+            {% if is_state('input_boolean.energy_sauna_today', 'on') %}🧖 Sauna: {{ state_attr('sensor.energy_plan', 'sauna') }}.{% endif %}
+            {% set w = [] %}
+            {% if not is_state('input_select.energy_system_mode', 'Auto') %}{% set w = w + ['režim ' ~ states('input_select.energy_system_mode')] %}{% endif %}
+            {% if is_state('binary_sensor.energy_forecast_valid', 'off') %}{% set w = w + ['Solcast předpověď neplatná'] %}{% endif %}
+            {% if is_state('sensor.energy_plan', 'error') %}{% set w = w + ['plán baterie selhal'] %}{% endif %}
+            {% if states('sensor.ev_target_status') not in ['OK', 'unavailable', 'unknown'] %}{% set w = w + [state_attr('sensor.ev_target_status', 'message')] %}{% endif %}
+            {% if w %}⚠️ {{ w | join('; ') }}{% endif %}

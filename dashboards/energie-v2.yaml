@@ -228,7 +228,8 @@ views:
               Plán baterie počítá se saunou: **{{ a if a and a != 'ne' else 'čeká na přepočet' }}**
               ({{ states('input_number.energy_sauna_power_kw') }} kW, po skončení se přepínač vypne sám).
               {% else %}<small>Zapni „Dnes sauna“, když večer půjdeš do sauny – plán pak neprodá baterii,
-              kterou sauna spotřebuje. Příkon {{ states('input_number.energy_sauna_power_kw') }} kW
+              kterou sauna spotřebuje. Když zapomeneš, HAv2 ho zapne samo po 5 min topení
+              a po 20 min bez topení zase vypne. Příkon {{ states('input_number.energy_sauna_power_kw') }} kW
               (změřeno 2. 10.).</small>{% endif %}
               {% if is_state('binary_sensor.sauna_overpowering', 'on') %}⚠️ **Zásuvka hlásí přetížení!**{% endif %}
       - type: grid
@@ -1431,6 +1432,63 @@ views:
                 stroke_width: 2
                 data_generator: |
                   return (entity.attributes.week || []).map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[3]]);
+          - type: custom:apexcharts-card
+            grid_options:
+              columns: full
+            graph_span: 14d
+            span:
+              end: day
+            header:
+              show: true
+              title: Přesnost předpovědí (předpověď z 6:00 × skutečnost)
+              show_states: false
+            apex_config:
+              chart:
+                height: 260
+              legend:
+                show: true
+              stroke:
+                dashArray: [0, 0, 4, 0, 4]
+            yaxis:
+              - min: 0
+                decimals: 0
+                apex_config:
+                  title:
+                    text: kWh
+            series:
+              - entity: sensor.energy_forecast_accuracy
+                name: FVE skutečnost
+                type: column
+                color: "#f4b400"
+                data_generator: |
+                  return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[2]]);
+              - entity: sensor.energy_forecast_accuracy
+                name: FVE předpověď HAv2
+                type: line
+                color: "#e65100"
+                stroke_width: 3
+                data_generator: |
+                  return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[1]]);
+              - entity: sensor.energy_forecast_accuracy
+                name: Solcast surová
+                type: line
+                color: "#ffcc80"
+                stroke_width: 2
+                data_generator: |
+                  return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[3]]);
+              - entity: sensor.energy_forecast_accuracy
+                name: Spotřeba skutečnost
+                type: column
+                color: "#90a4ae"
+                data_generator: |
+                  return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[5]]);
+              - entity: sensor.energy_forecast_accuracy
+                name: Spotřeba předpověď
+                type: line
+                color: "#455a64"
+                stroke_width: 2
+                data_generator: |
+                  return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[4]]);
       - type: grid
         cards:
           - type: heading
@@ -1896,6 +1954,10 @@ views:
               - entity: input_boolean.ev_control
               - entity: input_boolean.pool_control
               - entity: input_datetime.energy_override_until
+              - entity: input_boolean.energy_morning_summary
+                name: Ranní souhrn do mobilu (7:40)
+              - entity: input_number.energy_sauna_power_kw
+                name: Sauna příkon (pro plán)
       - type: grid
         cards:
           - type: heading

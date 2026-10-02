@@ -47,6 +47,18 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 5. **Watchdog otestován (2. 10. 11:31, nechtěně):** při restartu AppDaemonu (> 3 min bez heartbeatu) watchdog vypnul filtraci,
    baterii přepnul na auto, limit přetoku 10 000 W, relé bojleru off + notifikace; po startu HAv2 vše převzalo zpět.
 
+6. **Vylepšení 2. 10. odpoledne:**
+   - **Ranní souhrn** `automation.hav2_ranni_souhrn` (`packages/hav2_notify.yaml`) v 7:40 do mobilu: včera (FVE, nákup,
+     prodej, netto Kč – snímky `sensor.pv_generation_day`, `energy_net_cost_day` ve 23:59:50), bojler podle PND, plán dne,
+     varování; vypínač `input_boolean.energy_morning_summary`. **Ověřit 3. 10. 7:40** (první plný souhrn).
+   - **Automatická detekce sauny** (`_sauna_detect` v `hav2_app.py`): sauna > 1 kW ≥ 5 min bez „Dnes sauna“ → zapne
+     se samo (začátek = skutečný start); po 20 min bez topení (a když v session běžela) se vypne → plán se přepočítá.
+   - **Přesnost předpovědí:** `sensor.energy_forecast_day_morning` (6:00: FVE opravená/Solcast, základní spotřeba),
+     `sensor.energy_forecast_accuracy` (23:59:50, atribut `history` 30 dní) → graf na Baterie & FVE. Podklad pro C8 (Solcast).
+   - **Kontrola PND s měřeným bojlerem:** atributy `meas_*` v `sensor.energy_boiler_pnd_daily` (PND nákup ≈ GoodWe +
+     bojler ze sítě, PND prodej ≈ prodej bez bojleru); dlaždice odchylek je použijí od prvního celého dne (3. 10. → PND 4. 10.).
+   - **Úklid v1 (B2)** odložen na rozhodnutí po kontrole prodeje s blokací bojleru.
+
 ### B. Rozpracované – čeká na uživatele
 1. **HOTOVO 2. 10. – blokování bojleru při prodeji** (arch. §5.4): relé Pro EM-50 → LT, plán SSR3 omezit 16–22 vyp+LT, `script.hav2_boiler_block`, `input_boolean.energy_boiler_block_on_sale`. **Ověřit při prvním prodeji:** relé on po dobu `discharge`, bojler 0 W (Shelly), PND export ≈ GoodWe export; po prodeji relé off. Auto-off 2 h v Shelly nastaven (2. 10.). První prodej s blokací: 2. 10. 19:00–20:00.
    Původní popis: **Bojler bere při prodeji z baterie (1. 10.):** prodej 19–20 h 5 kW → WATTrouter poslal do bojleru 1,32 kWh (~1,35 kW,
