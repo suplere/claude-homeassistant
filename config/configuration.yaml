@@ -145,13 +145,6 @@ input_select:
     icon: mdi:calendar
 
 input_number:
-  battery_capacity:
-    name: Battery Capacity
-    icon: mdi:battery
-    min: 0
-    max: 30
-    unit_of_measurement: kWh
-    step: 0.1
   winter_dod:
     name: Winter DoD Value
     icon: mdi:battery

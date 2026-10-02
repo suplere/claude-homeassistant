@@ -416,7 +416,7 @@ jako zdroj utility_meter helperu.
 
 **Proč 4 GUI helpery a ne YAML:** Tyto konkrétní 4 `input_number` vznikly původně
 přes GUI (dřív, než jsme zjistili, že `input_number` jde i přes YAML jako
-`battery_capacity`/`winter_dod`/`filtrace_vykon_w`). Nezkoušejte je znovu definovat
+`winter_dod`/`filtrace_vykon_w`). Nezkoušejte je znovu definovat
 v `configuration.yaml` — už jednou to vytvořilo duplicitní entity se suffixem `_2`.
 
 ### Dashboard "NT nabíjení EV" – graf po měsících ukazoval 0 Kč (zjištěno 15.8.2026)
@@ -485,7 +485,7 @@ za dané období = přesně to, co chceme zobrazit). Ověřeno funkční po nasa
 `input_number.ev_nt_start_energie_kwh`, `ev_nt_start_cena_kc_kwh`,
 `ev_nt_energie_celkem_kwh`, `ev_nt_naklady_celkem_kc` — vytvořeny v HA GUI (sledování
 nákladů NT nabíjení, viz sekce výše). Pozn.: `input_number`/`input_boolean` *jde*
-definovat i přes YAML (`configuration.yaml`, viz `battery_capacity`, `winter_dod`,
+definovat i přes YAML (`configuration.yaml`, viz `winter_dod`,
 `filtrace_vykon_w`, `time_to_use_overflows`) — tyto konkrétní 4 ale už existují
 z GUI, takže je znovu nedefinujte v YAML (vznikne duplicita se suffixem `_2`).
 

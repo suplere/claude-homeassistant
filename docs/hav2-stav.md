@@ -169,7 +169,7 @@ Aktuální seznam sledování a rozhodnutí je v **§1b**. Dlouhodobě:
 3. **Po převzetí:** smazat helpery „nepotřebujeme“ (archiv README). AppDaemon PND app vypnout až po přepojení
    `hav2_boiler.py` na data HACS integrace a ověření VT/NT.
 4. Volitelně: rozvržení stránky EV (sekce „Aktuální session“ k ručnímu ovládání), sankey na Úsporách, Solcast
-   auto-dampening, duplicitní `input_number.battery_capacity`.
+   auto-dampening.
 
 ## 5. Známé drobnosti
 - `sensor.pool_water_temperature` a `sensor.pool_hours_recommended` mají hodnotu až po ≥ 10 min běhu filtrace.
