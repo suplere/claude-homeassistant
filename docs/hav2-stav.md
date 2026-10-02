@@ -32,7 +32,7 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 
 ### A. Hotovo 2. 10. ráno
 1. **Smazán `sensor.pool_hours_done_legacy`** i se sčítáním v `sensor.pool_hours_done` a `base_final_daily_house_consumption`.
-   **Uživatel v UI:** smazat osiřelou entitu `sensor.pool_hours_done_legacy` a zařízení Shelly Pro 1PM (`switch.filtrace_switch`).
+   Osiřelá entita i zařízení Shelly Pro 1PM (`switch.filtrace_switch`) smazány v UI (2. 10.).
 2. **Noc 1./2. 10. – souběh EV a bojleru: OK.** EV 22:00–23:22 (89,7 → 99 %, auto končí na 99 %), bojler 22:06–22:42
    → EV staženo na 8 A ve 3f, `breaker_headroom_a` min. 7,5 A (22:06), po vypnutí bojleru zpět 11 A. Jednorázový cíl:
    23:31 cíl 80 %, 23:34 limit auta zpět 90 % (bod C2 ověřen).
