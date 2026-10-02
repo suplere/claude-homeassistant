@@ -121,6 +121,11 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - **Úspory → Toky energie dnes:** sankey (`custom:sankey-chart`, `time_period_from: now/d`) – zdroje GoodWe → `sensor.energy_sources_total`
   (FVE + nákup NT/VT po fázích + vybíjení baterie) → dům / EV / filtrace / nabíjení baterie / přetok, „Ostatní / ztráty“ = zbytek;
   bojler zvlášť jako tok „Mimo GoodWe“. Pod ním skládaný graf kWh/den 14 dní (apexcharts, statistiky `change`).
+- **Doplněno 2. 10.:** Přehled → „Dnes“ (FVE, spotřeba, EV, nákup, prodej, netto Kč) a „Světla a zásuvka“ (jako starý
+  dashboard + `switch.zasuvka_rizena`); EV → „Kia EV6“ (SOC z auta, dojezd, zámek a předtopení jen přes detail, port,
+  tlačítko force refresh s potvrzením, mapa); Baterie & FVE → předpověď 7 dní (atribut `week` senzoru
+  `sensor.energy_pv_forecast_corrected`: Solcast p50 / × měsíční faktor / p10 × faktor); Nastavení → Zdraví → diagnostika
+  (teploty střídače, baterie, EcoVolteru, napětí fází).
 
 ## 3. Úskalí (důležité pro další práci)
 

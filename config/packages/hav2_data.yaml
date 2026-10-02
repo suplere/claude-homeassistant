@@ -229,6 +229,19 @@ template:
                 * pv_conservative_factor(t.month) | float) | round(2) }}
           solcast_raw_today_kwh: "{{ states('sensor.solcast_pv_forecast_forecast_today') | float(0) }}"
           solcast_raw_tomorrow_kwh: "{{ states('sensor.solcast_pv_forecast_forecast_tomorrow') | float(0) }}"
+          # 7 dní pro dashboard: [datum, Solcast p50, p50 × měsíční faktor, p10 × měsíční faktor] (kWh)
+          week: >
+            {% from 'hav2.jinja' import pv_month_factor %}
+            {% set ns = namespace(out=[]) %}
+            {% for k in ['today', 'tomorrow', 'day_3', 'day_4', 'day_5', 'day_6', 'day_7'] %}
+              {% set e = 'sensor.solcast_pv_forecast_forecast_' ~ k %}
+              {% set d = (now() + timedelta(days=loop.index0)).date() %}
+              {% set f = pv_month_factor(d.month) | float %}
+              {% set raw = states(e) | float(0) %}
+              {% set ns.out = ns.out + [[d.isoformat(), raw | round(1), (raw * f) | round(1),
+                  (state_attr(e, 'estimate10') | float(raw) * f) | round(1)]] %}
+            {% endfor %}
+            {{ ns.out }}
           slots: >
             {% from 'hav2.jinja' import pv_corrected_slots %}
             {{ (pv_corrected_slots(state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedForecast')) | from_json)

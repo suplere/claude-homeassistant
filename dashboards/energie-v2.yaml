@@ -35,6 +35,48 @@ views:
         show_name: true
     sections:
       - type: grid
+        column_span: 3
+        cards:
+          - type: heading
+            heading: Dnes
+            icon: mdi:calendar-today
+          - type: tile
+            entity: sensor.today_s_pv_generation
+            name: FVE
+            icon: mdi:solar-power
+            grid_options:
+              columns: 4
+          - type: tile
+            entity: sensor.today_load
+            name: Spotřeba (GoodWe)
+            icon: mdi:home-lightning-bolt
+            grid_options:
+              columns: 4
+          - type: tile
+            entity: sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy
+            name: EV
+            icon: mdi:car-electric
+            grid_options:
+              columns: 4
+          - type: tile
+            entity: sensor.energy_buy_daily
+            name: Nákup
+            icon: mdi:transmission-tower-import
+            grid_options:
+              columns: 4
+          - type: tile
+            entity: sensor.energy_sell_daily
+            name: Prodej
+            icon: mdi:transmission-tower-export
+            grid_options:
+              columns: 4
+          - type: tile
+            entity: sensor.energy_net_cost_daily
+            name: Náklady netto
+            icon: mdi:scale-balance
+            grid_options:
+              columns: 4
+      - type: grid
         column_span: 2
         cards:
           - type: heading
@@ -109,7 +151,7 @@ views:
       - type: grid
         cards:
           - type: heading
-            heading: Světla
+            heading: Světla a zásuvka
             icon: mdi:lightbulb-group
           # jako v1 (lovelace.lovelace, karta „Světla“)
           - type: tile
@@ -128,6 +170,19 @@ views:
               - brightness
             grid_options:
               columns: 12
+          - type: tile
+            entity: switch.zasuvka_rizena
+            name: Zásuvka řízená
+            state_content:
+              - state
+              - last_changed
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.zasuvka_rizena_power
+            name: Výkon zásuvky
+            grid_options:
+              columns: 6
       - type: grid
         cards:
           - type: heading
@@ -778,6 +833,84 @@ views:
       - type: grid
         cards:
           - type: heading
+            heading: Kia EV6
+            icon: mdi:car-info
+          - type: tile
+            entity: sensor.ev6_ev_battery_level
+            name: SOC z auta
+            state_content:
+              - state
+              - last_changed
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev6_ev_range
+            name: Dojezd
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: lock.ev6_door_lock
+            name: Zámek
+            tap_action:
+              action: more-info
+            icon_tap_action:
+              action: more-info
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: binary_sensor.ev6_ev_charge_port
+            name: Nabíjecí port
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: climate.ev6_climate_control
+            name: Předtopení
+            tap_action:
+              action: more-info
+            icon_tap_action:
+              action: more-info
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev6_odometer
+            name: Najeto
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: button.ev6_force_refresh
+            name: Aktualizovat z auta
+            icon: mdi:car-connected
+            state_content: last_changed
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.ev6_force_refresh
+              confirmation:
+                text: Probudit auto a stáhnout aktuální data? (Kia má denní limit dotazů)
+            icon_tap_action:
+              action: none
+            grid_options:
+              columns: 12
+          - type: markdown
+            content: >
+              {% set t = states('sensor.ev6_last_updated_at') | as_datetime %}
+              {% set m = ((now() - t).total_seconds() / 60) | int if t else none %}
+              <small>Data z auta: {{ as_local(t).strftime('%-d. %-m. %H:%M') if t else '?' }}
+              {% if m is not none %}({{ (m // 60 ~ ' h ' if m >= 60 else '') ~ (m % 60) ~ ' min' }} zpět){% endif %} ·
+              HAv2 odhad SOC {{ states('sensor.ev_soc_estimate') | int(0) }} %
+              ({{ state_attr('sensor.ev_soc_estimate', 'source') }})</small>
+          - type: map
+            entities:
+              - entity: device_tracker.ev6_location
+            default_zoom: 14
+            hours_to_show: 0
+            grid_options:
+              columns: full
+              rows: 4
+      - type: grid
+        cards:
+          - type: heading
             heading: Parametry regulace
             icon: mdi:tune
           - type: entities
@@ -1203,6 +1336,52 @@ views:
               - entity: sensor.battery_state_of_charge
               - entity: sensor.pv_power
               - entity: sensor.battery_power
+          - type: custom:apexcharts-card
+            grid_options:
+              columns: full
+            graph_span: 7d
+            span:
+              start: day
+            header:
+              show: true
+              title: Předpověď FVE na 7 dní (kWh)
+              show_states: false
+            apex_config:
+              chart:
+                height: 240
+              legend:
+                show: true
+              plotOptions:
+                bar:
+                  columnWidth: 75%
+              dataLabels:
+                enabled: true
+                enabledOnSeries: [1]
+                formatter: |
+                  EVAL:function(v) { return v ? v.toFixed(0) : ''; }
+            yaxis:
+              - min: 0
+                decimals: 0
+            series:
+              - entity: sensor.energy_pv_forecast_corrected
+                name: Solcast
+                type: column
+                color: "#ffe082"
+                data_generator: |
+                  return (entity.attributes.week || []).map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[1]]);
+              - entity: sensor.energy_pv_forecast_corrected
+                name: HAv2 (opraveno)
+                type: column
+                color: "#f4b400"
+                data_generator: |
+                  return (entity.attributes.week || []).map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[2]]);
+              - entity: sensor.energy_pv_forecast_corrected
+                name: Pesimisticky (p10)
+                type: line
+                color: "#8d6e63"
+                stroke_width: 2
+                data_generator: |
+                  return (entity.attributes.week || []).map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[3]]);
       - type: grid
         cards:
           - type: heading
@@ -1671,7 +1850,7 @@ views:
               - entity: binary_sensor.energy_forecast_valid
                 name: Solcast předpověď
               - entity: sensor.solcast_pv_forecast_api_used
-                name: Solcast API použito (limit 10)
+                name: Solcast API použito (limit 9 + 1 odhad)
                 icon: mdi:api
               - entity: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
                 name: EcoVolter (auto připojeno)
@@ -1686,6 +1865,30 @@ views:
                 name: PND data stažena
                 icon: mdi:file-compare
                 secondary_info: last-updated
+          - type: heading
+            heading: Diagnostika zařízení
+            heading_style: subtitle
+            icon: mdi:thermometer
+          - type: entities
+            entities:
+              - entity: sensor.inverter_temperature_radiator
+                name: Střídač – chladič
+              - entity: sensor.inverter_temperature_air
+                name: Střídač – vzduch
+              - entity: sensor.battery_temperature
+                name: Baterie – teplota
+              - entity: sensor.ecovolter_revcr01c00002056_temperature_internal
+                name: EcoVolter – uvnitř
+              - entity: sensor.ecovolter_revcr01c00002056_temperature_relay1
+                name: EcoVolter – relé
+              - type: section
+                label: Napětí sítě (GoodWe)
+              - entity: sensor.on_grid_l1_voltage
+                name: L1
+              - entity: sensor.on_grid_l2_voltage
+                name: L2
+              - entity: sensor.on_grid_l3_voltage
+                name: L3
       - type: grid
         cards:
           - type: heading
