@@ -61,10 +61,11 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 5. **Profil bojleru v plánu** se přeučuje z 16–18 h na noc (medián 8 dní, měření Shelly + PND) – do ~5. 10. plán
    nadhodnocuje večerní nákup; atribut `boiler_source` v `sensor.energy_load_forecast`.
 6. Nenastalo: 3f z plné baterie, NT nabíjení baterie před zataženým dnem, test watchdogu (jen se souhlasem).
-7. FVE ranní stín: od listopadu přepočítat hodinový tvar (`hav2.jinja`, poměr `sensor.pv_power` / Solcast this_hour).
+7. **EV – kmitání proudu (úprava 2. 10.):** proud se mění až po 2 min trvání (nahoru i dolů); přehrání 26. 9.–1. 10.
+   změn 177 → 57. Ověřit při prvním solárním nabíjení s troubou: proud drží, baterie kryje krátké poklesy.
+8. FVE ranní stín: od listopadu přepočítat hodinový tvar (`hav2.jinja`, poměr `sensor.pv_power` / Solcast this_hour).
 
 ### D. Nápady / později
-- Kmitání proudu EV ±1 A/min (trouba).
 - Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); grafy kWh/den na Energie v2
   (Bazén, Úspory).
 - Druhý kanál (IB) obou Pro EM-50 volný.

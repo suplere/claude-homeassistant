@@ -245,7 +245,7 @@ a watchdog baterie vrací 10 000 W.
 
 **Vstupy:** `energy_surplus_smoothed_w` (90 s), fázová rezerva, SOC baterie, Solcast na dalších 30–60 min, stav wallboxu.
 
-**Krok:** 1× za `ev_regulation_interval_s` (výchozí 60 s, min. 30 s kvůli odezvě 15–20 s), max ±1 A.
+**Krok:** 1× za `ev_regulation_interval_s` (výchozí 60 s, min. 30 s kvůli odezvě 15–20 s); změna proudu až po 2 min trvání (viz níže).
 
 **Přepočet výkon ↔ proud** podle naměřené tabulky:
 
@@ -262,15 +262,16 @@ Tabulka se průběžně zpřesňuje z naměřených hodnot.
 - Přepnutí max. 1× za 10 min, jde to za běhu.
 
 **Hystereze proudu:**
-- zvýšit o 1 A, když rezerva > výkon dalšího kroku + 150 W,
-- snížit o 1 A, když rezerva < −100 W.
+- zvýšit, když rezerva > výkon dalšího kroku + 150 W **po dobu 2 min** → rovnou na proud podle minima přebytku za tu dobu,
+- snížit, když rezerva < −100 W **po dobu 2 min** → na proud podle přebytku (krátký pokles kryje baterie; SOC ≤ 30 % → hned).
+  Důvod: trouba spíná ~2,5 kW na ~1 min každé 3–4 min → dřív ±1 A každou minutu (úprava 2. 10. 2026).
 
 ```mermaid
 stateDiagram-v2
   [*] --> Idle
   Idle --> NabijiSolar: připojeno, režim Solár/Solár+NT,<br/>přebytek ≥ min výkon 5 min
   Idle --> NabijiPlan: slot NT/VT z plánovače
-  NabijiSolar --> NabijiSolar: ±1 A / krok, 1f↔3f hystereze
+  NabijiSolar --> NabijiSolar: proud po 2 min trvání, 1f↔3f hystereze
   NabijiSolar --> Dotuje: přebytek < výkon při 6 A 1f
   Dotuje --> NabijiSolar: přebytek se vrátil
   Dotuje --> Pozastaveno: SOC ≤ 60 % nebo > 10 min nebo > 1 kWh<br/>nebo Solcast nevidí návrat do 30–60 min

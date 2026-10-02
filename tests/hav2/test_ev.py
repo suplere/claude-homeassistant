@@ -67,12 +67,31 @@ def test_power_table_and_inverse():
 # ---------------------------------------------------------------- regulátor
 
 
-def test_ramps_up_one_amp_per_step():
+def test_ramps_up_after_stable_surplus_to_fitting_current():
     reg = Regulator(state=STATE_SOLAR)
-    cmd, inp = run(reg, inputs(surplus_w=7200), 1)
-    assert (cmd.amps, cmd.phases) == (7, 3)
+    cmd, inp = run(reg, inputs(surplus_w=7200), 2)
+    assert (cmd.amps, cmd.phases) == (6, 3)  # 2 kroky: ještě čeká
     cmd, _ = run(reg, inp, 1)
-    assert cmd.amps == 8
+    assert cmd.amps == max_amps_for(3, (7200 - 150) / 1000, 6, 11) == 11
+
+
+def test_up_uses_minimum_surplus_while_waiting():
+    reg = Regulator(state=STATE_SOLAR)
+    _, inp = run(reg, inputs(surplus_w=7200), 1)
+    _, inp = run(reg, inp, 1, surplus_w=5300)
+    cmd, _ = run(reg, inp, 1, surplus_w=7200)
+    assert cmd.amps == max_amps_for(3, (5300 - 150) / 1000, 6, 11) < 11
+
+
+def test_oven_cycling_does_not_oscillate():
+    """Přebytek skáče po minutě o ~1 kW (trouba) → proud drží, ne ±1 A každou minutu."""
+    reg = Regulator(state=STATE_SOLAR)
+    inp = inputs(surplus_w=2900, cur_amps=9, cur_phases=1)
+    seen = []
+    for k in range(12):
+        cmd, inp = run(reg, inp, 1, surplus_w=2900 if k % 2 == 0 else 1800)
+        seen.append(cmd.amps)
+    assert len(set(seen)) == 1
 
 
 def test_respects_interval_between_steps():
@@ -84,8 +103,19 @@ def test_respects_interval_between_steps():
 
 def test_ramps_down_and_holds_in_band():
     reg = Regulator(state=STATE_SOLAR)
-    cmd, _ = run(reg, inputs(surplus_w=4700, cur_amps=9), 1)
-    assert cmd.amps == 8
+    cmd, inp = run(reg, inputs(surplus_w=4700, cur_amps=9), 2)
+    assert cmd.amps == 9  # krátký pokles kryje baterie
+    fit = max_amps_for(3, 4.8, 6, 11)  # proud podle přebytku + down_margin
+    cmd, _ = run(reg, inp, 1)
+    assert cmd.amps == fit < 9
+    reg = Regulator(state=STATE_SOLAR)
+    cmd, _ = run(reg, inputs(surplus_w=4700, cur_amps=9, battery_soc=25), 1)
+    assert cmd.amps == fit  # nízká baterie → hned
+    reg = Regulator(state=STATE_SOLAR)
+    _, inp = run(reg, inputs(surplus_w=4700, cur_amps=9), 2)
+    cmd, inp = run(reg, inp, 1, surplus_w=7000)
+    cmd, _ = run(reg, inp, 1, surplus_w=4700)
+    assert cmd.amps == 9  # pokles přerušen → čekání znovu od začátku
     reg = Regulator(state=STATE_SOLAR)
     cmd, _ = run(reg, inputs(surplus_w=4950, cur_amps=8), 1)  # 5,00 − 100 W ≤ 4,95
     assert cmd.amps == 8

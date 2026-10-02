@@ -290,6 +290,12 @@ class RegParams:
     resume_after_min: float = 5.0
     up_margin_w: float = 150.0
     down_margin_w: float = 100.0
+    # trouba/varná deska spínají ~2,5 kW na ~1 min každé 3–4 min → bez čekání ±1 A každou minutu.
+    # Zvýšit až po stabilním přebytku, snížit až po trvalém poklesu (krátký pokles kryje baterie,
+    # pod down_hold_min_soc snižuje hned). Přehráno na datech 26. 9.–1. 10.: změn 177 → 57, obratů 63 → 14.
+    up_hold_s: float = 120.0
+    down_hold_s: float = 120.0
+    down_hold_min_soc: float = 30.0
     to3f_w: float = 4600.0
     to1f_w: float = 3900.0
     phase_hold_s: float = 180.0
@@ -351,6 +357,11 @@ class Regulator:
     support_kwh: float = 0.0
     breaker_since: Optional[datetime] = None
     last_cmd: Optional[Command] = None
+    up_since: Optional[datetime] = None
+    up_min_w: float = 0.0
+    _up_pending: bool = False
+    down_since: Optional[datetime] = None
+    _down_pending: bool = False
 
     # ----------------------------------------------------------- pomocné
     def _cap(self, i: RegInputs, phases: int, amps: int) -> int:
@@ -428,6 +439,18 @@ class Regulator:
         return self._solar(i, dt_s)
 
     def _solar(self, i: RegInputs, dt_s: float) -> Command:
+        if dt_s > 2 * self.p.interval_s:
+            self.up_since = None
+            self.down_since = None
+        self._up_pending = self._down_pending = False
+        cmd = self._solar_step(i, dt_s)
+        if not self._up_pending:
+            self.up_since = None
+        if not self._down_pending:
+            self.down_since = None
+        return cmd
+
+    def _solar_step(self, i: RegInputs, dt_s: float) -> Command:
         p = self.p
         avail_kw = i.surplus_w / 1000
         min_1f = ev_power_kw(1, p.amin)
@@ -489,19 +512,39 @@ class Regulator:
         else:
             self.phase_cond_dir, self.phase_cond_since = 0, None
 
-        # --- ±1 A
+        # --- nahoru po stabilním přebytku (na proud podle minima za dobu čekání), dolů po trvalém poklesu
         now_kw = ev_power_kw(ph, amps)
         if amps < p.amax and avail_kw * 1000 > ev_power_kw(ph, amps + 1) * 1000 + p.up_margin_w:
             self._reset_episode()
-            return self._cmd(True, self._cap(i, ph, amps + 1), ph, STATE_SOLAR,
-                             f"přebytek {i.surplus_w:.0f} W → {amps + 1} A {ph}f")
+            self._up_pending = True
+            if self.up_since is None:
+                self.up_since, self.up_min_w = i.now, i.surplus_w
+            else:
+                self.up_min_w = min(self.up_min_w, i.surplus_w)
+            held = (i.now - self.up_since).total_seconds()
+            if held < p.up_hold_s:
+                return self._cmd(True, self._cap(i, ph, amps), ph, STATE_SOLAR,
+                                 f"přebytek {i.surplus_w:.0f} W, drží {amps} A {ph}f "
+                                 f"(zvýšení po {p.up_hold_s / 60:.0f} min stability)")
+            fit = max_amps_for(ph, (self.up_min_w - p.up_margin_w) / 1000, p.amin, p.amax) or amps + 1
+            new = max(amps + 1, fit)
+            self.up_since = None
+            return self._cmd(True, self._cap(i, ph, new), ph, STATE_SOLAR,
+                             f"přebytek {self.up_min_w:.0f} W stabilní {held / 60:.0f} min → {new} A {ph}f")
         if avail_kw * 1000 >= now_kw * 1000 - p.down_margin_w:
             self._reset_episode()
             return self._cmd(True, self._cap(i, ph, amps), ph, STATE_SOLAR,
                              f"přebytek {i.surplus_w:.0f} W, drží {amps} A {ph}f")
         if amps > p.amin:
-            return self._cmd(True, self._cap(i, ph, amps - 1), ph, STATE_SOLAR,
-                             f"přebytek {i.surplus_w:.0f} W → {amps - 1} A {ph}f")
+            self._down_pending = True
+            self.down_since = self.down_since or i.now
+            if i.battery_soc > p.down_hold_min_soc and (i.now - self.down_since).total_seconds() < p.down_hold_s:
+                return self._cmd(True, self._cap(i, ph, amps), ph, STATE_SOLAR,
+                                 f"přebytek {i.surplus_w:.0f} W, drží {amps} A {ph}f (krátký pokles kryje baterie)")
+            self.down_since = None
+            new = min(amps - 1, max_amps_for(ph, avail_kw + p.down_margin_w / 1000, p.amin, p.amax) or p.amin)
+            return self._cmd(True, self._cap(i, ph, new), ph, STATE_SOLAR,
+                             f"přebytek {i.surplus_w:.0f} W → {new} A {ph}f")
 
         # --- na minimu a přebytek nestačí → dotování z baterie, nebo pauza
         deficit_kw = max(0.0, now_kw - avail_kw)
