@@ -215,6 +215,7 @@ views:
               {% if pool != 'Auto' %}🏊 **Filtrace ručně: {{ pool }}** (na {{ states('input_number.pool_manual_duration_h') | float(0) }} h){% endif %}
               {% set o = states('input_datetime.energy_override_until') | as_datetime(none) %}
               {% if o and o | as_local > now() %}✋ **Ruční zásah platí do {{ (o | as_local).strftime('%H:%M') }}**{% endif %}
+              {% if m == 'Auto' and ev == 'Auto' and pool == 'Auto' and not (o and o | as_local > now()) %}✅ Vše běží automaticky, žádný ruční zásah.{% endif %}
       - type: grid
         cards:
           - type: heading
