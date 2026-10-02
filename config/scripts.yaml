@@ -35,18 +35,18 @@ fve_grid_export_status:
 filtrace_on:
   alias: Filtrace ON
   sequence:
-  - type: turn_on
-    device_id: 9b432627a59a5a8bbae912cb8f499f2d
-    entity_id: 7086253917cb89b0e2f59fa29fbef4a8
-    domain: switch
+  # relé Shelly Pro EM-50 → stykač čerpadla (od 1. 10. 2026 místo Pro 1PM)
+  - action: switch.turn_on
+    target:
+      entity_id: switch.shellyproem50_841fe890fc44
   mode: single
   icon: mdi:power-plug
 filtrace_off:
   alias: Filtrace OFF
   sequence:
-  - type: turn_off
-    device_id: 9b432627a59a5a8bbae912cb8f499f2d
-    entity_id: 7086253917cb89b0e2f59fa29fbef4a8
-    domain: switch
+  # relé Shelly Pro EM-50 → stykač čerpadla (od 1. 10. 2026 místo Pro 1PM)
+  - action: switch.turn_off
+    target:
+      entity_id: switch.shellyproem50_841fe890fc44
   mode: single
   icon: mdi:power-plug-off

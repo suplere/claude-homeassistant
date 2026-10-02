@@ -50,8 +50,9 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 2. **Rozhodnutí po testu Auto (uživatel):** převzít řízení natrvalo (záloha → smazat 16 vypnutých automatizací v1 podle
    `archive/v1-2026-09-25/README.md`; pozor – v1 automatizace už odkazují na nový spínač filtrace; statistiky
    `sensor.ev_nt_*` ponechat), nebo návrat.
-   Po smazání Pro 1PM (2. 10.) jsou rozbité v1 zbytky: skripty `filtrace_on`/`filtrace_off` (HA je při startu vypne – neznámé
-   zařízení) a GUI šablona `sensor.filtrace` (čte zaniklý `sensor.filtrace_vykon`, chyba v logu) – smazat s úklidem v1.
+   Po smazání Pro 1PM (2. 10.) opraveno: skripty `filtrace_on`/`filtrace_off` spínají `switch.shellyproem50_841fe890fc44`
+   (zpřístupněné v Assist), GUI šablona `sensor.filtrace` čte `sensor.bazenova_filtrace_vykon`. Při úklidu v1 rozhodnout,
+   zda je ponechat (archiv je vede jako „smazat“ / „nepotřebujeme“).
 
 ### C. Ověřit, až nastane
 1. **Záporný výkup s plnou baterií** (nové 1. 10.): limit přetoku = příkon bojleru + 600 W (`hav2_boiler.NegPriceBoiler`)
