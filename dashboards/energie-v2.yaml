@@ -231,16 +231,6 @@ views:
               kterou sauna spotřebuje. Příkon {{ states('input_number.energy_sauna_power_kw') }} kW
               (změřeno 2. 10.).</small>{% endif %}
               {% if is_state('binary_sensor.sauna_overpowering', 'on') %}⚠️ **Zásuvka hlásí přetížení!**{% endif %}
-          - type: statistics-graph
-            title: Sauna kWh za den (14 dní)
-            chart_type: bar
-            period: day
-            days_to_show: 14
-            stat_types:
-              - change
-            entities:
-              - entity: sensor.sauna_energy
-                name: Sauna
       - type: grid
         cards:
           - type: heading
@@ -1562,6 +1552,16 @@ views:
             grid_options:
               columns: 6
           # měření Shelly Pro EM-50 od 1. 10. 2026 (bojler je mimo měření GoodWe → ne do Energy dashboardu)
+          - type: statistics-graph
+            title: Sauna kWh za den (14 dní)
+            chart_type: bar
+            period: day
+            days_to_show: 14
+            stat_types:
+              - change
+            entities:
+              - entity: sensor.sauna_energy
+                name: Sauna
           - type: statistics-graph
             title: Bojler kWh za den (14 dní)
             chart_type: bar
