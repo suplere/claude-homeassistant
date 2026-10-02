@@ -24,13 +24,32 @@ Po testu rozhodnout: smazat v1 (podle archivu) nebo vrátit.
 **Data z testu:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní,
 stáhne `make pull`, mimo git) + historie HA + PND D+1.
 
-## 1b. Pro novou session (stav 2. 10. 2026 ráno)
+## 1b. Pro novou session (stav 2. 10. 2026 odpoledne)
 
 Kontroly: `make pull` → `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (minutový záznam, klíče `DATA_STATES`/`DATA_ATTRS`
 v `hav2_app.py`, nově `pool_run`, `pool_w`), PND D+1 v `sensor.energy_boiler_pnd_daily`, měření Shelly (níže).
-Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog pošle notifikaci – předem říct uživateli).
+Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog pošle notifikaci – předem říct uživateli;
+watchdog při něm vypne filtraci, baterii dá na auto – je to v pořádku). YAML `platform: integration` senzory chtějí restart HA.
+Lokální `.storage` je po přejmenování entit zastaralý → před `make push` stáhnout jen registr
+(`rsync homeassistant:/config/.storage/core.entity_registry config/.storage/`), celý `make pull` by přepsal neuložené YAML.
 
-### A. Hotovo 2. 10. ráno
+### 0. Hned v nové session (checklist)
+1. **Prodej 2. 10. 19:00–20:00 s blokací bojleru (B1):** z jsonl / historie – `plan = discharge`, `switch.bojler_blokace_rele`
+   on po dobu prodeje a pak off, `sensor.bojler_vykon` ≈ 0 W, `sensor.bojler_z_pretoku_w` 0; PND 2. 10. (D+1 ráno 3. 10.):
+   export ≈ GoodWe export. Při úspěchu B1 uzavřít.
+2. **Ranní souhrn 3. 10. 7:40** – zeptat se uživatele, jestli přišel a je čitelný (folded YAML = jeden odstavec).
+3. **Přesnost předpovědí:** první řádek `history` v `sensor.energy_forecast_accuracy` za 2. 10. (předpověď FVE 20,4 /
+   Solcast 27,3 / spotřeba 9,6 kWh) proti skutečnosti; graf na Baterie & FVE.
+4. **Rozpad bojleru za celý 3. 10.** (`sensor.bojler_z_pretoku_energie` / `_ze_site_energie`, sankey „Celkem“ správně od 3. 10.;
+   `sensor.energy_sources_total` sbírá statistiky od 2. 10. 9:29).
+5. **PND kontrola `meas_*`** poprvé za 3. 10. (PND 4. 10.) – odchylka prodeje by měla být ~0 (dosud −9,8 % kvůli bojleru).
+6. **Sobota 4. 10. – test sauny** (uživatel): auto-detekce „Dnes sauna“ po 5 min, přepočet plánu, konec po 20 min bez topení,
+   nákup ve VT po sauně, teplota zásuvky Plug E; prodej v 19 h se saunou (test 2. 10.: 4,2 → 1,9 kWh, SOC 20 %, VT nákup 0,7 kWh –
+   posoudit, jestli prodávat a pak kupovat ve VT dává smysl).
+7. **B2 – úklid v1** (rozhodnutí uživatele) po uzavření B1.
+8. EV: vynucená aktualizace Kia při připojení funguje (30. 9., 1. 10. – data do 30 s), limit 2×/den, uživatel ponechává.
+
+### A. Hotovo 2. 10.
 1. **Smazán `sensor.pool_hours_done_legacy`** i se sčítáním v `sensor.pool_hours_done` a `base_final_daily_house_consumption`.
    Osiřelá entita i zařízení Shelly Pro 1PM (`switch.filtrace_switch`) smazány v UI (2. 10.).
 2. **Noc 1./2. 10. – souběh EV a bojleru: OK.** EV 22:00–23:22 (89,7 → 99 %, auto končí na 99 %), bojler 22:06–22:42
