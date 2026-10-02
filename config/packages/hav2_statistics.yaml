@@ -166,6 +166,22 @@ template:
           {{ (states('sensor.energy_import_cost_total') | float
               - states('sensor.energy_export_revenue_total') | float) | round(2) }}
 
+      - name: Energie zdroje celkem
+        unique_id: hav2_energy_sources_total
+        default_entity_id: sensor.energy_sources_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:sigma
+        # střed sankey diagramu (Úspory): FVE + nákup po fázích (NT+VT) + vybíjení baterie;
+        # při výpadku kteréhokoli zdroje unavailable (jinak by pokles vypadal jako reset čítače)
+        availability: >
+          {{ ['sensor.total_pv_generation', 'sensor.energy_import_nt_total', 'sensor.energy_import_vt_total',
+              'sensor.total_battery_discharge'] | select('has_value') | list | count == 4 }}
+        state: >
+          {{ (states('sensor.total_pv_generation') | float + states('sensor.energy_import_nt_total') | float
+              + states('sensor.energy_import_vt_total') | float + states('sensor.total_battery_discharge') | float) | round(3) }}
+
       - name: EV průměrná cena session
         unique_id: hav2_ev_session_avg_price
         default_entity_id: sensor.ev_session_avg_price
@@ -389,6 +405,14 @@ template:
         device_class: energy
         icon: mdi:ev-station
         state: "{{ 0 if trigger.id == 'connect' else (this.state | float(0) + d) | round(3) }}"
+        # rozpad session podle zdroje (kWh), stejný poměrový výpočet jako *_total výše
+        attributes:
+          solar: "{{ 0 if trigger.id == 'connect' else (this.attributes.get('solar', 0) | float(0) + e_solar) | round(3) }}"
+          battery: "{{ 0 if trigger.id == 'connect' else (this.attributes.get('battery', 0) | float(0) + e_battery) | round(3) }}"
+          grid_nt: >
+            {{ 0 if trigger.id == 'connect' else (this.attributes.get('grid_nt', 0) | float(0) + (e_grid if is_nt else 0)) | round(3) }}
+          grid_vt: >
+            {{ 0 if trigger.id == 'connect' else (this.attributes.get('grid_vt', 0) | float(0) + (0 if is_nt else e_grid)) | round(3) }}
       - name: EV náklady session
         unique_id: hav2_ev_session_cost
         default_entity_id: sensor.ev_session_cost

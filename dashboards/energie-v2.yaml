@@ -526,6 +526,55 @@ views:
     max_columns: 3
     sections:
       - type: grid
+        visibility:
+          - condition: state
+            entity: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
+            state: "on"
+        cards:
+          - type: heading
+            heading: Aktuální session
+            icon: mdi:ev-plug-type2
+          - type: tile
+            entity: sensor.ev_session_energy
+            name: Nabito
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_session_cost
+            name: Cena
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_session_avg_price
+            name: Průměr
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.ev_soc_estimate
+            name: SOC
+            grid_options:
+              columns: 6
+          - type: markdown
+            content: |
+              {% set e = 'sensor.ev_session_energy' %}
+              {% set st = state_attr('sensor.ev_session_cost', 'started') %}
+              {% set r = 'sensor.ev_regulator' %}
+              {% if st %}{% set m = ((now() - as_datetime(st)).total_seconds() / 60) | int %}
+              Připojeno {{ as_local(as_datetime(st)).strftime('%-d. %-m. %H:%M') }} ({{ m // 60 }} h {{ m % 60 }} min)
+              · SOC {{ states('sensor.ev_soc_estimate') | int(0) }} → {{ states('input_number.ev_target_soc') | int(0) }} %
+              {% endif %}
+
+              **Teď:** {{ 'nabíjí ' ~ state_attr(r, 'current_a') ~ ' A ' ~ state_attr(r, 'phases') if state_attr(r, 'enable') == 'ano' else 'nenabíjí' }} – {{ states(r) }}
+
+              {% set src = [('☀️ Slunce', 'solar'), ('🔋 Baterie', 'battery'), ('🌙 Síť NT', 'grid_nt'), ('⚡ Síť VT', 'grid_vt')] %}
+              {% set tot = states(e) | float(0) %}
+              {% if state_attr(e, 'solar') is not none %}
+              | Zdroj | kWh | podíl |
+              |:--|--:|--:|
+              {% for label, k in src %}| {{ label }} | {{ '%.2f' | format(state_attr(e, k) | float(0)) }} | {{ (state_attr(e, k) | float(0) / tot * 100) | round(0) | int if tot > 0 else 0 }} % |
+              {% endfor %}
+              {% else %}<small>Rozpad podle zdroje se zobrazí od příštího připojení auta.</small>{% endif %}
+      - type: grid
         cards:
           - type: heading
             heading: Ruční ovládání
@@ -1422,6 +1471,162 @@ views:
               - entity: cez_pnd:859182400703740246_production
                 name: Prodej PND
                 color: "#2e7d32"
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Toky energie dnes
+            icon: mdi:chart-sankey
+          - type: custom:sankey-chart
+            grid_options:
+              columns: full
+            time_period_from: now/d
+            show_names: true
+            round: 1
+            min_state: 0.05
+            height: 320
+            ignore_missing_entities: true
+            nodes:
+              # 0 – zdroje
+              - id: sensor.total_pv_generation
+                section: 0
+                name: FVE
+                color: "#f4b400"
+              - id: sensor.energy_import_nt_total
+                section: 0
+                name: Síť NT
+                color: "#5c6bc0"
+              - id: sensor.energy_import_vt_total
+                section: 0
+                name: Síť VT
+                color: "#e53935"
+              - id: sensor.total_battery_discharge
+                section: 0
+                name: Baterie (vybíjení)
+                color: "#43a047"
+              - id: boiler_outside
+                entity_id: sensor.shellyproem50_ece334fd2370_energy_meter_0_energie
+                section: 0
+                name: Mimo GoodWe
+                color: "#8d6e63"
+              # 1 – celkem (měřeno GoodWe)
+              - id: sensor.energy_sources_total
+                section: 1
+                name: Celkem (GoodWe)
+                color: "#78909c"
+              - id: boiler_pass
+                type: passthrough
+                section: 1
+              # 2 – spotřebiče
+              - id: sensor.energy_base_house_energy
+                section: 2
+                name: Dům
+                color: "#90a4ae"
+              - id: sensor.ecovolter_revcr01c00002056_total_charged_energy
+                section: 2
+                name: EV
+                color: "#26a69a"
+              - id: sensor.shellyproem50_841fe890fc44_energy_meter_0_energie
+                section: 2
+                name: Filtrace
+                color: "#29b6f6"
+              - id: sensor.total_battery_charge
+                section: 2
+                name: Baterie (nabíjení)
+                color: "#66bb6a"
+              - id: sensor.energy_sell_sum
+                section: 2
+                name: Přetok do sítě
+                color: "#ffa726"
+              - id: rest
+                type: remaining_parent_state
+                section: 2
+                name: Ostatní / ztráty
+                color: "#bdbdbd"
+              - id: sensor.shellyproem50_ece334fd2370_energy_meter_0_energie
+                section: 2
+                name: Bojler
+                color: "#8d6e63"
+            links:
+              - source: sensor.total_pv_generation
+                target: sensor.energy_sources_total
+              - source: sensor.energy_import_nt_total
+                target: sensor.energy_sources_total
+              - source: sensor.energy_import_vt_total
+                target: sensor.energy_sources_total
+              - source: sensor.total_battery_discharge
+                target: sensor.energy_sources_total
+              - source: sensor.energy_sources_total
+                target: sensor.energy_base_house_energy
+              - source: sensor.energy_sources_total
+                target: sensor.ecovolter_revcr01c00002056_total_charged_energy
+              - source: sensor.energy_sources_total
+                target: sensor.shellyproem50_841fe890fc44_energy_meter_0_energie
+              - source: sensor.energy_sources_total
+                target: sensor.total_battery_charge
+              - source: sensor.energy_sources_total
+                target: sensor.energy_sell_sum
+              - source: sensor.energy_sources_total
+                target: rest
+              - source: boiler_outside
+                target: boiler_pass
+              - source: boiler_pass
+                target: sensor.shellyproem50_ece334fd2370_energy_meter_0_energie
+          - type: markdown
+            content: >
+              <small>Od půlnoci, kWh. Levá část a „Celkem“ je bilance měřená GoodWe (nákup a prodej po fázích).
+              Bojler je zapojený mimo měření GoodWe – hřeje z přetoku (ten je pak započtený i v „Přetoku do sítě“)
+              nebo ze sítě; skutečný rozpad je až v PND D+1 výše. „Ostatní / ztráty“ = ztráty střídače a baterie
+              a nepřesnosti měření.</small>
+          - type: heading
+            heading: Spotřeba po dnech
+            heading_style: subtitle
+            icon: mdi:chart-bar-stacked
+          - type: custom:apexcharts-card
+            grid_options:
+              columns: full
+            graph_span: 14d
+            span:
+              end: day
+            stacked: true
+            header:
+              show: true
+              title: Spotřeba kWh za den (14 dní)
+              show_states: false
+            apex_config:
+              chart:
+                height: 300
+              legend:
+                show: true
+              plotOptions:
+                bar:
+                  columnWidth: 70%
+            yaxis:
+              - min: 0
+                decimals: 0
+                apex_config:
+                  title:
+                    text: kWh
+            all_series_config:
+              type: column
+              float_precision: 1
+              statistics:
+                type: change
+                period: day
+                align: start
+            series:
+              - entity: sensor.energy_base_house_energy
+                name: Dům
+                color: "#90a4ae"
+              - entity: sensor.ecovolter_revcr01c00002056_total_charged_energy
+                name: EV
+                color: "#26a69a"
+              - entity: sensor.shellyproem50_841fe890fc44_energy_meter_0_energie
+                name: Filtrace
+                color: "#29b6f6"
+              - entity: sensor.shellyproem50_ece334fd2370_energy_meter_0_energie
+                name: Bojler
+                color: "#8d6e63"
 
   # ============================================================ NASTAVENÍ
   - title: Nastavení

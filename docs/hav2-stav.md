@@ -73,8 +73,8 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 9. FVE ranní stín: od listopadu přepočítat hodinový tvar (`hav2.jinja`, poměr `sensor.pv_power` / Solcast this_hour).
 
 ### D. Nápady / později
-- Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); grafy kWh/den na Energie v2
-  (Bazén, Úspory).
+- Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); místo toho na Energie v2
+  grafy kWh/den (Bazén, Úspory) a od 2. 10. sankey + skládaný graf spotřeby na Úsporách.
 - Druhý kanál (IB) obou Pro EM-50 volný.
 
 ## 2. Mapa systému
@@ -114,7 +114,12 @@ Zdroj pravdy `dashboards/energie-v2.yaml`, nahrání:
 source venv/bin/activate && set -a && source .env && set +a
 python dashboards/push_dashboard.py energie-v2 dashboards/energie-v2.yaml
 ```
-HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entities, card-mod, mushroom.
+HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entities, card-mod, mushroom, sankey-chart.
+- **EV → Aktuální session** (jen s připojeným autem): energie, cena, průměr, SOC → cíl, délka a rozpad podle zdroje
+  (atributy `solar`/`battery`/`grid_nt`/`grid_vt` senzoru `sensor.ev_session_energy`, od 2. 10., nulují se při připojení).
+- **Úspory → Toky energie dnes:** sankey (`custom:sankey-chart`, `time_period_from: now/d`) – zdroje GoodWe → `sensor.energy_sources_total`
+  (FVE + nákup NT/VT po fázích + vybíjení baterie) → dům / EV / filtrace / nabíjení baterie / přetok, „Ostatní / ztráty“ = zbytek;
+  bojler zvlášť jako tok „Mimo GoodWe“. Pod ním skládaný graf kWh/den 14 dní (apexcharts, statistiky `change`).
 
 ## 3. Úskalí (důležité pro další práci)
 
@@ -191,7 +196,7 @@ Aktuální seznam sledování a rozhodnutí je v **§1b**. Dlouhodobě:
    `predictive_overflow_negative_price`) → baterie DoD 80 % → Auto zůstává.
 3. **Po převzetí:** smazat helpery „nepotřebujeme“ (archiv README). AppDaemon PND app vypnout až po přepojení
    `hav2_boiler.py` na data HACS integrace a ověření VT/NT.
-4. Volitelně: rozvržení stránky EV (sekce „Aktuální session“ k ručnímu ovládání), sankey na Úsporách.
+4. ~~Volitelně: stránka EV „Aktuální session“, sankey na Úsporách~~ – hotovo 2. 10. (viz §2 Dashboard).
 
 ## 5. Známé drobnosti
 - `sensor.pool_water_temperature` a `sensor.pool_hours_recommended` mají hodnotu až po ≥ 10 min běhu filtrace.
