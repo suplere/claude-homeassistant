@@ -548,10 +548,6 @@ views:
     max_columns: 3
     sections:
       - type: grid
-        visibility:
-          - condition: state
-            entity: binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected
-            state: "on"
         cards:
           - type: heading
             heading: Aktuální session
@@ -581,7 +577,10 @@ views:
               {% set e = 'sensor.ev_session_energy' %}
               {% set st = state_attr('sensor.ev_session_cost', 'started') %}
               {% set r = 'sensor.ev_regulator' %}
-              {% if st %}{% set m = ((now() - as_datetime(st)).total_seconds() / 60) | int %}
+              {% set conn = is_state('binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected', 'on') %}
+              {% if not conn %}<small>Auto nepřipojeno – údaje poslední session.</small>
+
+              {% elif st %}{% set m = ((now() - as_datetime(st)).total_seconds() / 60) | int %}
               Připojeno {{ as_local(as_datetime(st)).strftime('%-d. %-m. %H:%M') }} ({{ m // 60 }} h {{ m % 60 }} min)
               · SOC {{ states('sensor.ev_soc_estimate') | int(0) }} → {{ states('input_number.ev_target_soc') | int(0) }} %
               {% endif %}
@@ -776,32 +775,6 @@ views:
                 name: EV kW
               - entity: sensor.energy_surplus_smoothed_w
                 name: Přebytek W
-      - type: grid
-        cards:
-          - type: heading
-            heading: Aktuální session
-            icon: mdi:ev-plug-type2
-          - type: tile
-            entity: sensor.ev_session_energy
-            name: Energie
-            vertical: true
-            grid_options:
-              columns: 4
-              rows: 2
-          - type: tile
-            entity: sensor.ev_session_cost
-            name: Náklady
-            vertical: true
-            grid_options:
-              columns: 4
-              rows: 2
-          - type: tile
-            entity: sensor.ev_session_avg_price
-            name: Kč/kWh
-            vertical: true
-            grid_options:
-              columns: 4
-              rows: 2
       - type: grid
         cards:
           - type: heading
