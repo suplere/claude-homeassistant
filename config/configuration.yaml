@@ -30,10 +30,10 @@ template:
         state_class: measurement
         # měření Pro EM-50 (pod 30 W = šum → 0); při výpadku měření odhad podle relé
         state: >
-          {% set p = 'sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon' %}
+          {% set p = 'sensor.bazen_cerpadlo_vykon' %}
           {% if has_value(p) %}
             {% set w = states(p) | float(0) %}{{ (w if w > 30 else 0) | round(0) }}
-          {% elif is_state('switch.shellyproem50_841fe890fc44', 'on') %}
+          {% elif is_state('switch.bazen_filtrace_rele', 'on') %}
             {{ states('input_number.filtrace_vykon_w') | float(450) | round(0) }}
           {% else %}
             0

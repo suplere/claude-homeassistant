@@ -39,7 +39,7 @@ STAT_EV = "sensor.ecovolter_revcr01c00002056_total_charged_energy"
 STAT_POOL = "sensor.filtrace_sum"
 STAT_BUY = "sensor.energy_buy_sum"
 STAT_SELL = "sensor.energy_sell_sum"
-STAT_BOILER = "sensor.shellyproem50_ece334fd2370_energy_meter_0_energie"  # měření bojleru od 1. 10. 2026
+STAT_BOILER = "sensor.bojler_energie"  # měření bojleru od 1. 10. 2026
 STAT_SAUNA = "sensor.sauna_energy"  # Shelly Plug E od 2. 10. 2026 (v profilu ne, plánuje se přes „Dnes sauna“)
 SAUNA_TODAY = "input_boolean.energy_sauna_today"
 BOILER_POWER = "sensor.energy_boiler_power_w"  # atribut source == "měření" → Shelly, jinak odhad
@@ -87,9 +87,9 @@ DATA_STATES = {
     "ev_target": "input_number.ev_target_soc",
     "ev_car_limit": "number.ev6_ac_charging_limit",
     "ev_target_status": "sensor.ev_target_status",
-    "pool_on": "switch.shellyproem50_841fe890fc44",
+    "pool_on": "switch.bazen_filtrace_rele",
     "pool_run": "binary_sensor.pool_pump_running",
-    "pool_w": "sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon",
+    "pool_w": "sensor.bazen_cerpadlo_vykon",
     "pool_done_h": "sensor.pool_hours_done",
     "sauna_w": "sensor.sauna_power",
     "sauna_plan": "input_boolean.energy_sauna_today",

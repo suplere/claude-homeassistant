@@ -84,10 +84,10 @@ template:
         # pulzuje 0–2,2 kW, účiník pak ~0,45 – činný výkon platí). Záloha při výpadku měření:
         # z přetoku GoodWe na L3 (bojler je před měřením GoodWe), v noci 22–06 plný výkon.
         availability: >
-          {{ has_value('sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon')
+          {{ has_value('sensor.bojler_vykon')
              or (has_value('binary_sensor.energy_boiler_heating') and has_value('sensor.meter_active_power_l3')) }}
         state: >
-          {% set m = 'sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon' %}
+          {% set m = 'sensor.bojler_vykon' %}
           {% if has_value(m) %}{{ [states(m) | float(0), 0] | max | round(0) }}
           {% elif is_state('binary_sensor.energy_boiler_heating', 'on') %}
             {% if now().hour >= 22 or now().hour < 6 %}2250
@@ -95,7 +95,7 @@ template:
           {% else %}0{% endif %}
         attributes:
           source: >
-            {{ 'měření' if has_value('sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon') else 'odhad (měření nedostupné)' }}
+            {{ 'měření' if has_value('sensor.bojler_vykon') else 'odhad (měření nedostupné)' }}
 
       # ------------------------------------------------------- přebytek a fáze
       - name: Přebytek pro řízené spotřebiče
@@ -407,12 +407,12 @@ template:
         # skutečný běh podle měření Pro EM-50 (zachytí i MANUAL/VYPNUTO na venkovních vypínačích);
         # při výpadku měření záloha = stav relé
         state: >
-          {% set p = 'sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon' %}
+          {% set p = 'sensor.bazen_cerpadlo_vykon' %}
           {% if has_value(p) %}{{ states(p) | float(0) > 150 }}
-          {% else %}{{ is_state('switch.shellyproem50_841fe890fc44', 'on') }}{% endif %}
+          {% else %}{{ is_state('switch.bazen_filtrace_rele', 'on') }}{% endif %}
         attributes:
           source: >
-            {{ 'měření' if has_value('sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon') else 'stav relé (měření nedostupné)' }}
+            {{ 'měření' if has_value('sensor.bazen_cerpadlo_vykon') else 'stav relé (měření nedostupné)' }}
 
       - name: Bojler hřeje
         unique_id: hav2_energy_boiler_heating
@@ -430,10 +430,10 @@ template:
         delay_off:
           minutes: 3
         availability: >
-          {{ has_value('sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon')
+          {{ has_value('sensor.bojler_vykon')
              or has_value('sensor.energy_boiler_voltage_index_5min') }}
         state: >
-          {% set m = 'sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon' %}
+          {% set m = 'sensor.bojler_vykon' %}
           {% set on = is_state('binary_sensor.energy_boiler_heating', 'on') %}
           {% if has_value(m) %}
             {{ states(m) | float(0) > (300 if on else 1000) }}
@@ -446,7 +446,7 @@ template:
           {% endif %}
         attributes:
           source: >
-            {{ 'měření' if has_value('sensor.shellyproem50_ece334fd2370_energy_meter_0_vykon') else 'napěťový index (záloha)' }}
+            {{ 'měření' if has_value('sensor.bojler_vykon') else 'napěťový index (záloha)' }}
 
       - name: Předpověď FVE platná
         unique_id: hav2_energy_forecast_valid

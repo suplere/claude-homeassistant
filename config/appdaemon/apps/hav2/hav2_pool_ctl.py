@@ -18,9 +18,9 @@ from typing import Any, Dict, Optional, Tuple
 
 import hav2_pool as B
 
-PUMP = "switch.shellyproem50_841fe890fc44"  # relé Pro EM-50 → cívka stykače
+PUMP = "switch.bazen_filtrace_rele"  # relé Pro EM-50 → cívka stykače
 PUMP_RUNNING = "binary_sensor.pool_pump_running"  # skutečný běh podle měření
-PUMP_POWER = "sensor.shellyproem50_841fe890fc44_energy_meter_0_vykon"
+PUMP_POWER = "sensor.bazen_cerpadlo_vykon"
 MISMATCH_AFTER = timedelta(minutes=3)
 NOTIFY = "notify/mobile_app_evzen_iphone"
 OVERRIDE_AFTER_S = 90

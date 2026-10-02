@@ -38,7 +38,7 @@ filtrace_on:
   # relé Shelly Pro EM-50 → stykač čerpadla (od 1. 10. 2026 místo Pro 1PM)
   - action: switch.turn_on
     target:
-      entity_id: switch.shellyproem50_841fe890fc44
+      entity_id: switch.bazen_filtrace_rele
   mode: single
   icon: mdi:power-plug
 filtrace_off:
@@ -47,6 +47,6 @@ filtrace_off:
   # relé Shelly Pro EM-50 → stykač čerpadla (od 1. 10. 2026 místo Pro 1PM)
   - action: switch.turn_off
     target:
-      entity_id: switch.shellyproem50_841fe890fc44
+      entity_id: switch.bazen_filtrace_rele
   mode: single
   icon: mdi:power-plug-off

@@ -39,18 +39,26 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 3. **Bojler v noci (Shelly):** 22:06–22:42 1,33 kWh (PND 22 h: 1,31 kWh ✔), 03:45–04:02 dalších ~0,6 kWh.
    PND 1. 10. celkem 3,63 kWh (2 h 0,54 / 12 h 0,46 / 19 h 1,32 prodej / 22 h 1,31).
 
+4. **Přejmenování Shelly Pro EM-50 (2. 10., se souhlasem uživatele):** zařízení „Bazén (Shelly Pro EM-50)“ (MAC …841fe890fc44)
+   a „Bojler (Shelly Pro EM-50)“ (…ece334fd2370), všech 50 entit: `switch.bazen_filtrace_rele`, `sensor.bazen_cerpadlo_vykon`
+   / `_energie` / `_ucinik` …, kanál 1 `bazen_kanal2_*`, servisní `bazen_em_*`; `switch.bojler_blokace_rele`, `sensor.bojler_vykon`
+   / `_energie` …, `bojler_kanal2_*`, `bojler_em_*`. Historie a statistiky se přenesly. Ve starších záznamech (jsonl, §3b) zůstávají
+   stará ID `shellyproem50_<MAC>_energy_meter_0_*`.
+5. **Watchdog otestován (2. 10. 11:31, nechtěně):** při restartu AppDaemonu (> 3 min bez heartbeatu) watchdog vypnul filtraci,
+   baterii přepnul na auto, limit přetoku 10 000 W, relé bojleru off + notifikace; po startu HAv2 vše převzalo zpět.
+
 ### B. Rozpracované – čeká na uživatele
 1. **HOTOVO 2. 10. – blokování bojleru při prodeji** (arch. §5.4): relé Pro EM-50 → LT, plán SSR3 omezit 16–22 vyp+LT, `script.hav2_boiler_block`, `input_boolean.energy_boiler_block_on_sale`. **Ověřit při prvním prodeji:** relé on po dobu `discharge`, bojler 0 W (Shelly), PND export ≈ GoodWe export; po prodeji relé off. Auto-off 2 h v Shelly nastaven (2. 10.). První prodej s blokací: 2. 10. 19:00–20:00.
    Původní popis: **Bojler bere při prodeji z baterie (1. 10.):** prodej 19–20 h 5 kW → WATTrouter poslal do bojleru 1,32 kWh (~1,35 kW,
    celou L3), do sítě jen ~2,9 kWh místo 4,2 → ztráta ~3,6 Kč (výkup 6,24 vs. NT 3,51). Návrh: beznapěťový kontakt I/O
-   bojlerového Pro EM-50 (`switch.shellyproem50_ece334fd2370`, nepoužitý) → vstup WATTrouteru **LT–GND**, ve WATTconfigu
+   bojlerového Pro EM-50 (`switch.bojler_blokace_rele`, nepoužitý) → vstup WATTrouteru **LT–GND**, ve WATTconfigu
    časový plán SSR3 typu „blokovat“ 00–24 s podmínkou „Binární vstup“; HAv2 sepne relé při `plan = discharge`
    (případně i jindy). **Uživatel pošle screenshot roletek** v záložce Časové plány (typ plánu u „vynutit“, „Binární
    vstup → žádný“). Bez hardwaru alternativa: plánovač počítá při prodeji ~⅓ přetoku do bojleru za hodnotu NT.
 2. **Rozhodnutí po testu Auto (uživatel):** převzít řízení natrvalo (záloha → smazat 16 vypnutých automatizací v1 podle
    `archive/v1-2026-09-25/README.md`; pozor – v1 automatizace už odkazují na nový spínač filtrace; statistiky
    `sensor.ev_nt_*` ponechat), nebo návrat.
-   Po smazání Pro 1PM (2. 10.) opraveno: skripty `filtrace_on`/`filtrace_off` spínají `switch.shellyproem50_841fe890fc44`
+   Po smazání Pro 1PM (2. 10.) opraveno: skripty `filtrace_on`/`filtrace_off` spínají `switch.bazen_filtrace_rele`
    (zpřístupněné v Assist), GUI šablona `sensor.filtrace` čte `sensor.bazenova_filtrace_vykon`. Při úklidu v1 rozhodnout,
    zda je ponechat (archiv je vede jako „smazat“ / „nepotřebujeme“).
 
@@ -63,7 +71,7 @@ Nové entity v HA vidí AppDaemon až po **restartu doplňku** (~4 min, watchdog
 4. **Večerní prodej z baterie:** start/konec na čtvrthodině, ráno ve VT nechybí baterie (1. 10.: prodej 19:00–20:00 OK).
 5. **Profil bojleru v plánu** se přeučuje z 16–18 h na noc (medián 8 dní, měření Shelly + PND) – do ~5. 10. plán
    nadhodnocuje večerní nákup; atribut `boiler_source` v `sensor.energy_load_forecast`.
-6. Nenastalo: 3f z plné baterie, NT nabíjení baterie před zataženým dnem, test watchdogu (jen se souhlasem).
+6. Nenastalo: 3f z plné baterie, NT nabíjení baterie před zataženým dnem. (Watchdog otestován 2. 10., viz A5.)
 7. **EV – kmitání proudu (úprava 2. 10.):** proud se mění až po 2 min trvání (nahoru i dolů); přehrání 26. 9.–1. 10.
    změn 177 → 57. Ověřit při prvním solárním nabíjení s troubou: proud drží, baterie kryje krátké poklesy.
 8. **Solcast – automatické tlumení, krok 1 (2. 10.):** zapnuto jen `get_actuals` (odhad skutečné výroby, 1 volání/den,

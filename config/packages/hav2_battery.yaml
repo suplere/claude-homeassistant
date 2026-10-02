@@ -197,7 +197,7 @@ script:
     sequence:
       - if:
           - condition: template
-            value_template: "{{ has_value('switch.shellyproem50_ece334fd2370') and is_state('switch.shellyproem50_ece334fd2370', 'on') != want }}"
+            value_template: "{{ has_value('switch.bojler_blokace_rele') and is_state('switch.bojler_blokace_rele', 'on') != want }}"
         then:
           - if:
               - condition: template
@@ -205,11 +205,11 @@ script:
             then:
               - action: switch.turn_on
                 target:
-                  entity_id: switch.shellyproem50_ece334fd2370
+                  entity_id: switch.bojler_blokace_rele
             else:
               - action: switch.turn_off
                 target:
-                  entity_id: switch.shellyproem50_ece334fd2370
+                  entity_id: switch.bojler_blokace_rele
           - action: logbook.log
             data:
               name: HAv2 bojler
@@ -292,7 +292,7 @@ automation:
     actions:
       - action: switch.turn_off
         target:
-          entity_id: switch.shellyproem50_ece334fd2370
+          entity_id: switch.bojler_blokace_rele
         continue_on_error: true
       - action: number.set_value
         target:
