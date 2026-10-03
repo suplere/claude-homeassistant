@@ -1941,7 +1941,9 @@ views:
                 color: "#ef6c00"
 
   # ================================================================== PND
-  # Data z portálu distributora (D+1); porovnání s HA je na Úspory → Kontrola proti PND.
+  # Data z portálu distributora (D+1) – integrace ČEZ PND (cez_pnd), hodinové statistiky od 1. 1. 2026
+  # (historie doplněna 3. 10. 2026, NT/VT podle HDO 22–06, ověřeno proti tarifnímu reportu PND).
+  # Porovnání s HA je na Úspory → Kontrola proti PND.
   - title: PND
     path: pnd
     icon: mdi:file-chart
@@ -1952,197 +1954,85 @@ views:
       column_span: 2
       cards:
       - type: heading
-        heading: Po dnech (14 dní)
+        heading: Včera
         icon: mdi:calendar-today
       - type: markdown
         text_only: true
-        content: Data z portálu distributora (PND), stahují se ráno za předchozí den. Čísla v záhlaví = včerejšek. Porovnání s měřením HA je na **Úspory → Kontrola proti PND**.
-      - type: custom:apexcharts-card
-        stacked: true
-        graph_span: 14d
-        span:
-          end: day
-        header:
-          show: true
-          title: Nákup a prodej
-          show_states: true
-          colorize_states: true
-        all_series_config:
-          unit: ' kWh'
-        series:
-        - entity: sensor.pnd_data
-          name: Prodej do sítě
-          attribute: production
-          type: column
-          color: '#ffa726'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            return entity.attributes.pnddate
-              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.production[i])])
-              .filter(([t]) => t < today.getTime());
-        - entity: sensor.pnd_data
-          name: Nákup ze sítě
-          attribute: consumption
-          type: column
-          color: '#e53935'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            return entity.attributes.pnddate
-              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.consumption[i])])
-              .filter(([t]) => t < today.getTime());
-          invert: true
-      - type: custom:apexcharts-card
-        stacked: true
-        graph_span: 14d
-        span:
-          end: day
-        header:
-          show: true
-          title: Nákup podle tarifu
-          show_states: true
-          colorize_states: true
-        all_series_config:
-          unit: ' kWh'
-        series:
-        - entity: sensor.pnd_tariff_data
-          name: NT
-          attribute: low_tariff
-          type: column
-          color: '#5c6bc0'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            return entity.attributes.pnddate
-              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.low_tariff[i])])
-              .filter(([t]) => t < today.getTime());
-        - entity: sensor.pnd_tariff_data
-          name: VT
-          attribute: high_tariff
-          type: column
-          color: '#e53935'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            return entity.attributes.pnddate
-              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.high_tariff[i])])
-              .filter(([t]) => t < today.getTime());
+        content: Data z portálu distributora (PND), stahují se ráno v 6:00 za předchozí den. Porovnání s měřením HA je na **Úspory → Kontrola proti PND**.
+      - type: tile
+        entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
+        name: Nákup
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: sensor.cez_elektromer_8591_0246_vcerejsi_vyroba
+        name: Prodej
+        grid_options:
+          columns: 6
+      - type: heading
+        heading: Po dnech (14 dní)
+        icon: mdi:calendar-week
+      - type: statistics-graph
+        title: Nákup a prodej (kWh)
+        chart_type: bar
+        period: day
+        days_to_show: 14
+        stat_types: [change]
+        entities:
+          - entity: cez_pnd:859182400703740246_consumption
+            name: Nákup ze sítě
+          - entity: cez_pnd:859182400703740246_production
+            name: Prodej do sítě
+      - type: statistics-graph
+        title: Nákup podle tarifu (kWh)
+        chart_type: bar
+        period: day
+        days_to_show: 14
+        stat_types: [change]
+        entities:
+          - entity: cez_pnd:859182400703740246_consumption_nt
+            name: NT
+          - entity: cez_pnd:859182400703740246_consumption_vt
+            name: VT
     - type: grid
       column_span: 2
       cards:
       - type: heading
         heading: Po měsících (12 měsíců)
         icon: mdi:calendar-month
-      - type: custom:apexcharts-card
-        stacked: true
-        graph_span: 1y
-        span:
-          end: month
-        header:
-          show: true
-          title: Nákup a prodej
-          show_states: false
-          colorize_states: true
-        all_series_config:
-          unit: ' kWh'
-        series:
-        - entity: sensor.pnd_data
-          name: Prodej do sítě
-          attribute: production
-          type: column
-          color: '#ffa726'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const sums = {};
-            entity.attributes.pnddate.forEach((d, i) => {
-              const x = new Date(d);
-              const key = x.getFullYear() + '-' + x.getMonth();
-              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
-              sums[key].value += parseFloat(entity.attributes.production[i]);
-            });
-            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
-        - entity: sensor.pnd_data
-          name: Nákup ze sítě
-          attribute: consumption
-          type: column
-          color: '#e53935'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const sums = {};
-            entity.attributes.pnddate.forEach((d, i) => {
-              const x = new Date(d);
-              const key = x.getFullYear() + '-' + x.getMonth();
-              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
-              sums[key].value += parseFloat(entity.attributes.consumption[i]);
-            });
-            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
-          invert: true
-        apex_config:
-          tooltip:
-            x:
-              formatter: |
-                EVAL: (value) => new Intl.DateTimeFormat('cs-CZ', { year: 'numeric', month: 'long' }).format(new Date(value))
-      - type: custom:apexcharts-card
-        stacked: true
-        graph_span: 1y
-        span:
-          end: month
-        header:
-          show: true
-          title: Nákup podle tarifu
-          show_states: false
-          colorize_states: true
-        all_series_config:
-          unit: ' kWh'
-        series:
-        - entity: sensor.pnd_tariff_data
-          name: NT
-          attribute: low_tariff
-          type: column
-          color: '#5c6bc0'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const sums = {};
-            entity.attributes.pnddate.forEach((d, i) => {
-              const x = new Date(d);
-              const key = x.getFullYear() + '-' + x.getMonth();
-              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
-              sums[key].value += parseFloat(entity.attributes.low_tariff[i]);
-            });
-            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
-        - entity: sensor.pnd_tariff_data
-          name: VT
-          attribute: high_tariff
-          type: column
-          color: '#e53935'
-          opacity: 0.85
-          float_precision: 2
-          data_generator: |
-            const sums = {};
-            entity.attributes.pnddate.forEach((d, i) => {
-              const x = new Date(d);
-              const key = x.getFullYear() + '-' + x.getMonth();
-              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
-              sums[key].value += parseFloat(entity.attributes.high_tariff[i]);
-            });
-            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
-        apex_config:
-          tooltip:
-            x:
-              formatter: |
-                EVAL: (value) => new Intl.DateTimeFormat('cs-CZ', { year: 'numeric', month: 'long' }).format(new Date(value))
+      - type: statistics-graph
+        title: Nákup a prodej (kWh)
+        chart_type: bar
+        period: month
+        days_to_show: 365
+        stat_types: [change]
+        entities:
+          - entity: cez_pnd:859182400703740246_consumption
+            name: Nákup ze sítě
+          - entity: cez_pnd:859182400703740246_production
+            name: Prodej do sítě
+      - type: statistics-graph
+        title: Nákup podle tarifu (kWh)
+        chart_type: bar
+        period: month
+        days_to_show: 365
+        stat_types: [change]
+        entities:
+          - entity: cez_pnd:859182400703740246_consumption_nt
+            name: NT
+          - entity: cez_pnd:859182400703740246_consumption_vt
+            name: VT
+      - type: statistics-graph
+        title: Náklady na nákup podle PND (Kč)
+        chart_type: bar
+        period: month
+        days_to_show: 365
+        stat_types: [change]
+        entities:
+          - entity: cez_pnd:859182400703740246_cost_nt
+            name: NT
+          - entity: cez_pnd:859182400703740246_cost_vt
+            name: VT
 
   # ============================================================ NASTAVENÍ
   - title: Nastavení
@@ -2207,8 +2097,8 @@ views:
                 name: HDO nízký tarif
               - entity: binary_sensor.spot_electricity_has_tomorrow_data_2
                 name: Spot ceny na zítra
-              - entity: sensor.pnd_data
-                name: PND data stažena
+              - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
+                name: PND data stažena (včerejší nákup)
                 icon: mdi:file-compare
                 secondary_info: last-updated
           - type: heading

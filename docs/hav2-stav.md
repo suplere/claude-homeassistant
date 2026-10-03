@@ -95,7 +95,7 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
      síť = `sensor.energy_buy_gross_w` (odběr GoodWe + bojler ze sítě) / `sensor.energy_sell_net_w` (prodej bez bojleru),
      dům = `sensor.house_consumption_with_boiler_w` (`hav2_data.yaml`). Karta umí spotřebiče jen jako větev z domu.
    - **3. 10. – Energie v2 jako hlavní dashboard:** přidán pohled **PND** (`/energie-v2/pnd`, před Nastavení): 14 dní
-     a 12 měsíců nákup/prodej (`sensor.pnd_data`) a nákup NT/VT (`sensor.pnd_tariff_data`). Ze starého dashboardu
+     a 12 měsíců nákup/prodej a NT/VT (od 3. 10. ze statistik `cez_pnd:*`, viz níže; dříve `sensor.pnd_data` / `pnd_tariff_data`). Ze starého dashboardu
      se nic dalšího nepřebírá (detail EV nechce, Solcast a teplota dávkovače už v2 má). Výchozí dashboard nastavuje
      uživatel v Profilu (i v mobilu); starý `lovelace` (záloha `archive/v1-2026-09-25/dashboard/lovelace-2026-10-03.json`)
      smazat po úklidu v1. HA záloha před úklidem `465189a7`.
@@ -121,9 +121,18 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
      (`binary_sensor.sklep_…_bojler_hreje_prumer`): WATTrouter při malém přetoku spíná pulzy 4–5 s/min (průměr
      35–100 W), okamžitá hodnota pak ukazuje 0 W a `binary_sensor.energy_boiler_heating` (delay_off 3 min) svítí
      pořád. Ten zůstává pro regulaci EV (jistič L3 – pulz je plný proud).
-   - **Zdroje PND (zdvojené):** AppDaemon app (HACS, Selenium, `sensor.pnd_data` / `pnd_tariff_data`, data od 1. 1. 2026,
-     automatizace Run PND + po startu AppDaemonu) → jen pohled PND; integrace `cez_pnd` (HTTP, hodinové statistiky
-     `cez_pnd:*` vč. NT/VT a nákladů, od 9/2026) → HAv2. Rozhodnout o přechodu jen na `cez_pnd` (uživatel).
+   - **PND jen z integrace `cez_pnd` (3. 10.):** dříve zdvojeno s AppDaemon app „CEZ Distribuce PND“ (Selenium,
+     `sensor.pnd_data` / `pnd_tariff_data`). Postup (HA záloha s DB `f5356db0`): `cez_pnd.fetch_data` po blocích
+     1. 1. – 15. 9. → statistiky přepočteny skriptem (souvislé součty; bloky spuštěné rychle za sebou měly skoky na
+     hranicích, protože recorder zapisuje se zpožděním → **další blok spouštět až po zápisu předchozího**); 14 hodin
+     s neúplnou čtvrthodinou v PND (+ 2 h při změně času 29. 3.) doplněno rozdílem k dennímu součtu z app A;
+     NT/VT podle HDO 22–06 (integrace bez historie HDO dává vše do VT) – **ověřeno proti tarifnímu reportu PND
+     274/274 dní** (max Δ 0,015 kWh). Pak `recalculate_costs` + `rebuild_total_costs` (10 682,37 Kč za 1. 1. – 2. 10.,
+     ceny NT 3,51 / VT 6,09 celý rok). Kontrola: nákup 1966,31 / prodej 1559,04 kWh = app A.
+     Pohled PND na dashboardu = `statistics-graph` nad `cez_pnd:*` (dny, měsíce, NT/VT, náklady); HAv2 spouští
+     `pnd_check` po konci synchronizace (`pnd_sync_entity` v `hav2.yaml`). App A vypnutá (`disable: true` v `apps.yaml`),
+     automatizace Run PND a Run actions after AppDaemon starts vypnuté. **Později smazat** (app z HACS, `apps/pnd/`,
+     obě automatizace, entity `sensor.pnd_*`) – po pár dnech běhu jen s integrací.
 
 ### B. Rozpracované – čeká na uživatele
 1. **HOTOVO 2. 10. – blokování bojleru při prodeji** (arch. §5.4): relé Pro EM-50 → LT, plán SSR3 omezit 16–22 vyp+LT, `script.hav2_boiler_block`, `input_boolean.energy_boiler_block_on_sale`. **Ověřit při prvním prodeji:** relé on po dobu `discharge`, bojler 0 W (Shelly), PND export ≈ GoodWe export; po prodeji relé off. Auto-off 2 h v Shelly nastaven (2. 10.). První prodej s blokací: 2. 10. 19:00–20:00.

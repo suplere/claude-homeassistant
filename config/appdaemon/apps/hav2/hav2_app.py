@@ -152,7 +152,10 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         # bojler a kontrola měření proti PND (data D+1, stahují se ráno)
         self.run_in(self.pnd_check, 20)
         self.run_daily(self.pnd_check, "07:30:00")
-        self.listen_state(lambda *a, **k: self.run_in(self.pnd_check, 120), "sensor.pnd_data")
+        # po dokončení synchronizace integrace ČEZ PND (statistiky cez_pnd:*); recorder zapisuje se zpožděním
+        self.listen_state(lambda *a, **k: self.run_in(self.pnd_check, 120),
+                          self.args.get("pnd_sync_entity", "binary_sensor.cez_elektromer_8591_0246_synchronizace_pnd_bezi"),
+                          new="off")
         self.pool_init(TZ)
         # odložené nabíjení (pojistka proti nákupu) a omezení přetoku při záporném výkupu
         self.run_every(self.live_loop, "now+45", 60)

@@ -5,6 +5,8 @@ hav2:
   class: Hav2
   pnd_consumption_stat: "cez_pnd:859182400703740246_consumption"
   pnd_production_stat: "cez_pnd:859182400703740246_production"
+  # konec synchronizace integrace ČEZ PND → kontrola bojleru/odchylek (dříve sensor.pnd_data z AppDaemon PND app)
+  pnd_sync_entity: binary_sensor.cez_elektromer_8591_0246_synchronizace_pnd_bezi
   # změny, po kterých se plán přepočítá hned (s 30s debounce)
   replan_on:
     - input_select.energy_system_mode
