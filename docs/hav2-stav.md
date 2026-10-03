@@ -39,7 +39,9 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
    export ≈ GoodWe export. Při úspěchu B1 uzavřít.
    **Výsledek 2. 10.:** discharge 19:00:10–20:00:10, relé on 19:01:02–20:01:02 (živá smyčka až po ~52 s) → bojler
    19:00:18–19:01:06 ~1,1–1,6 kW (~15 Wh), pak 0 W; prodej bez bojleru 3,79 kWh (baterie 5 kWh, SOC 92 → 46 %).
-   Opraveno: `_boiler_block()` se volá hned při změně plánu před `battery_apply()`. Zbývá jen PND 2. 10. (3. 10. ráno).
+   Opraveno: `_boiler_block()` se volá hned při změně plánu před `battery_apply()`.
+   **PND 2. 10. (3. 10.): B1 UZAVŘENO** – bojler v PND jen v 3/12/13/22/23 h (v 19 h nic), odchylka prodeje −1,2 %
+   (1. 10.: −9,8 %), nákupu +1,5 %. Bojler 4,38 kWh (22 h 2,29 kWh – dohřál večer nevytopené). Ráno 3. 10. SOC 20 % v 7:30.
 2. **Ranní souhrn 3. 10. 7:40** – zeptat se uživatele, jestli přišel a je čitelný (folded YAML = jeden odstavec).
 3. **Přesnost předpovědí:** první řádek `history` v `sensor.energy_forecast_accuracy` za 2. 10. (předpověď FVE 20,4 /
    Solcast 27,3 / spotřeba 9,6 kWh) proti skutečnosti; graf na Baterie & FVE.
