@@ -57,7 +57,7 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
    navíc – **artefakt nesouběžných odečtů Shelly × GoodWe** (sekundy); s průměrem 30–60 s sedí nákup na PND
    (12 h 0,03/0,03, 13 h 0,01/0,01). Logika L3 je správná; případně jen vyhladit vstupy (~60 s). Rozhodnout po víc
    hodinách s přetokem do bojleru (3. 10. slunečno → PND 4. 10.). Dopad 2. 10.: ~0,14 kWh.
-6. **Sobota 4. 10. – test sauny** (uživatel): auto-detekce „Dnes sauna“ po 5 min, přepočet plánu, konec po 20 min bez topení,
+6. **Test sauny – odložen, termín neurčen** (uživatel 3. 10.: dnes ani 4. 10. ne): auto-detekce „Dnes sauna“ po 5 min, přepočet plánu, konec po 20 min bez topení,
    nákup ve VT po sauně, teplota zásuvky Plug E; prodej v 19 h se saunou (test 2. 10.: 4,2 → 1,9 kWh, SOC 20 %, VT nákup 0,7 kWh –
    posoudit, jestli prodávat a pak kupovat ve VT dává smysl).
 7. ~~**B2 – úklid v1**~~ – hotovo 3. 10. (viz A6).
