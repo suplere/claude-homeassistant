@@ -597,3 +597,35 @@ template:
           method: >
             {{ 'měření bojleru (Shelly)' if state_attr('sensor.energy_boiler_pnd_daily', 'meas_export_pct') | is_number
                else 'model PND − GoodWe' }}
+      # Totéž v kWh (PND − HA; + = PND víc) – u malých denních součtů je % zavádějící
+      # (stálá odchylka ~5 Wh/h dá u 0,9 kWh nákupu ve VT 7 %, ověřeno 3. 10. 2026).
+      - name: Odchylka nákupu proti PND kWh
+        unique_id: hav2_energy_pnd_deviation_import_kwh
+        default_entity_id: sensor.energy_pnd_deviation_import_kwh
+        unit_of_measurement: kWh
+        state_class: measurement
+        icon: mdi:file-compare
+        availability: >
+          {{ state_attr('sensor.energy_boiler_pnd_daily', 'meas_import_kwh') | is_number
+             or state_attr('sensor.energy_boiler_pnd_daily', 'residual_import_kwh') | is_number }}
+        state: >
+          {% set m = state_attr('sensor.energy_boiler_pnd_daily', 'meas_import_kwh') %}
+          {{ (m if m | is_number else state_attr('sensor.energy_boiler_pnd_daily', 'residual_import_kwh')) | float | round(2) }}
+        attributes:
+          compared_day: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'date') }}"
+          pct: "{{ states('sensor.energy_pnd_deviation_import_pct') }}"
+      - name: Odchylka prodeje proti PND kWh
+        unique_id: hav2_energy_pnd_deviation_export_kwh
+        default_entity_id: sensor.energy_pnd_deviation_export_kwh
+        unit_of_measurement: kWh
+        state_class: measurement
+        icon: mdi:file-compare
+        availability: >
+          {{ state_attr('sensor.energy_boiler_pnd_daily', 'meas_export_kwh') | is_number
+             or state_attr('sensor.energy_boiler_pnd_daily', 'residual_export_kwh') | is_number }}
+        state: >
+          {% set m = state_attr('sensor.energy_boiler_pnd_daily', 'meas_export_kwh') %}
+          {{ (m if m | is_number else state_attr('sensor.energy_boiler_pnd_daily', 'residual_export_kwh')) | float | round(2) }}
+        attributes:
+          compared_day: "{{ state_attr('sensor.energy_boiler_pnd_daily', 'date') }}"
+          pct: "{{ states('sensor.energy_pnd_deviation_export_pct') }}"

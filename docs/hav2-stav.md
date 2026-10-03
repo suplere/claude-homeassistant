@@ -45,9 +45,18 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
 2. ~~**Ranní souhrn 3. 10. 7:40**~~ – přišel (potvrdil uživatel 3. 10.).
 3. **Přesnost předpovědí:** první řádek `history` v `sensor.energy_forecast_accuracy` za 2. 10. (předpověď FVE 20,4 /
    Solcast 27,3 / spotřeba 9,6 kWh) proti skutečnosti; graf na Baterie & FVE.
+   **Výsledek 2. 10. (zapsán správně):** FVE skutečnost 23,7 kWh → opravená předpověď −14 % (stav senzoru +16 %),
+   surový Solcast +15 %; základní spotřeba 11,1 proti 9,6 kWh (předpověď −14 %). Jeden den – nic neměnit, sbírat do C8 (~16. 10.).
 4. **Rozpad bojleru za celý 3. 10.** (`sensor.bojler_z_pretoku_energie` / `_ze_site_energie`, sankey „Celkem“ správně od 3. 10.;
    `sensor.energy_sources_total` sbírá statistiky od 2. 10. 9:29).
 5. **PND kontrola `meas_*`** poprvé za 3. 10. (PND 4. 10.) – odchylka prodeje by měla být ~0 (dosud −9,8 % kvůli bojleru).
+   **Ověřeno 3. 10. (PND × historie fází 26. 9.–2. 10.): elektroměr účtuje PO FÁZÍCH** – 13 hodin se souběhem
+   nákup/prodej na různých fázích: PND prodej 2,11 kWh, model po fázích 2,27, součtový model 1,44 (v noci 2. 10.
+   součtově 0, PND 0,05 kWh/h). Bojler na L3 v modelu po fázích sedí na PND (22 h: 2,83 / 2,84).
+   V hodinách, kdy WATTrouter topí z přetoku (1. 10. 16 h, 2. 10. 12–13 h), vychází `bojler_ze_site` 0,04–0,09 kWh/h
+   navíc – **artefakt nesouběžných odečtů Shelly × GoodWe** (sekundy); s průměrem 30–60 s sedí nákup na PND
+   (12 h 0,03/0,03, 13 h 0,01/0,01). Logika L3 je správná; případně jen vyhladit vstupy (~60 s). Rozhodnout po víc
+   hodinách s přetokem do bojleru (3. 10. slunečno → PND 4. 10.). Dopad 2. 10.: ~0,14 kWh.
 6. **Sobota 4. 10. – test sauny** (uživatel): auto-detekce „Dnes sauna“ po 5 min, přepočet plánu, konec po 20 min bez topení,
    nákup ve VT po sauně, teplota zásuvky Plug E; prodej v 19 h se saunou (test 2. 10.: 4,2 → 1,9 kWh, SOC 20 %, VT nákup 0,7 kWh –
    posoudit, jestli prodávat a pak kupovat ve VT dává smysl).
@@ -106,6 +115,15 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
      Návrat k v1 už není možný bez obnovy HA zálohy `465189a7` (nebo `81c05fcd` před testem Auto).
      Sankey 2. 10. bez větve Celkem → Bojler: `energy_sources_total` má statistiky až od 9:29, „Celkem“ je menší
      než součet spotřebičů → na bojler (poslední v pořadí) nezbyde nic. Od 3. 10. v pořádku.
+   - **3. 10. – dashboard:** odchylky proti PND v kWh (`sensor.energy_pnd_deviation_import_kwh` / `_export_kwh`,
+     PND − HA; % senzory zůstaly). Bojler „teď“ a „hřeje“ z GUI helperů – Statistika `average_step` 60 s
+     (`sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_vykon_prumer_1_min`) a Práh 300 ± 100 W
+     (`binary_sensor.sklep_…_bojler_hreje_prumer`): WATTrouter při malém přetoku spíná pulzy 4–5 s/min (průměr
+     35–100 W), okamžitá hodnota pak ukazuje 0 W a `binary_sensor.energy_boiler_heating` (delay_off 3 min) svítí
+     pořád. Ten zůstává pro regulaci EV (jistič L3 – pulz je plný proud).
+   - **Zdroje PND (zdvojené):** AppDaemon app (HACS, Selenium, `sensor.pnd_data` / `pnd_tariff_data`, data od 1. 1. 2026,
+     automatizace Run PND + po startu AppDaemonu) → jen pohled PND; integrace `cez_pnd` (HTTP, hodinové statistiky
+     `cez_pnd:*` vč. NT/VT a nákladů, od 9/2026) → HAv2. Rozhodnout o přechodu jen na `cez_pnd` (uživatel).
 
 ### B. Rozpracované – čeká na uživatele
 1. **HOTOVO 2. 10. – blokování bojleru při prodeji** (arch. §5.4): relé Pro EM-50 → LT, plán SSR3 omezit 16–22 vyp+LT, `script.hav2_boiler_block`, `input_boolean.energy_boiler_block_on_sale`. **Ověřit při prvním prodeji:** relé on po dobu `discharge`, bojler 0 W (Shelly), PND export ≈ GoodWe export; po prodeji relé off. Auto-off 2 h v Shelly nastaven (2. 10.). První prodej s blokací: 2. 10. 19:00–20:00.

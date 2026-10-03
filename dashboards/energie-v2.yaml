@@ -27,7 +27,7 @@ views:
         name: Prodej
         show_name: true
       - type: entity
-        entity: binary_sensor.energy_boiler_heating
+        entity: binary_sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_hreje_prumer
         name: Bojler
         show_name: true
       - type: entity
@@ -1569,12 +1569,12 @@ views:
             heading_style: subtitle
             icon: mdi:file-compare
           - type: tile
-            entity: sensor.energy_pnd_deviation_import_pct
+            entity: sensor.energy_pnd_deviation_import_kwh
             name: Odchylka nákupu
             grid_options:
               columns: 6
           - type: tile
-            entity: sensor.energy_pnd_deviation_export_pct
+            entity: sensor.energy_pnd_deviation_export_kwh
             name: Odchylka prodeje
             grid_options:
               columns: 6
@@ -1586,19 +1586,21 @@ views:
           - type: markdown
             text_only: true
             content: |
-              <small>Odchylka je bez bojleru (ten je mimo měření GoodWe). Při malém prodeji
-              zkresluje % rozlišení GoodWe 0,1 kWh.</small>
+              <small>Odchylka za poslední den v PND = PND − HA (+ = PND víc), bez bojleru
+              (ten je mimo měření GoodWe).</small>
           - type: heading
             heading: Bojler – měření (Shelly)
             heading_style: subtitle
             icon: mdi:water-boiler
+          # průměr 1 min a práh 400/200 W (GUI helpery): WATTrouter při malém přetoku spíná bojler
+          # pulzy 4–5 s → okamžitá hodnota ukazuje 0 W, binary_sensor.energy_boiler_heating (pro EV) svítí pořád
           - type: tile
-            entity: sensor.energy_boiler_power_w
-            name: Bojler teď
+            entity: sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_vykon_prumer_1_min
+            name: Bojler teď (průměr 1 min)
             grid_options:
               columns: 6
           - type: tile
-            entity: binary_sensor.energy_boiler_heating
+            entity: binary_sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_hreje_prumer
             name: Hřeje
             grid_options:
               columns: 6
