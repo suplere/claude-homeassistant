@@ -51,7 +51,7 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
 6. **Sobota 4. 10. – test sauny** (uživatel): auto-detekce „Dnes sauna“ po 5 min, přepočet plánu, konec po 20 min bez topení,
    nákup ve VT po sauně, teplota zásuvky Plug E; prodej v 19 h se saunou (test 2. 10.: 4,2 → 1,9 kWh, SOC 20 %, VT nákup 0,7 kWh –
    posoudit, jestli prodávat a pak kupovat ve VT dává smysl).
-7. **B2 – úklid v1** (rozhodnutí uživatele) po uzavření B1.
+7. ~~**B2 – úklid v1**~~ – hotovo 3. 10. (viz A6).
 8. EV: vynucená aktualizace Kia při připojení funguje (30. 9., 1. 10. – data do 30 s), limit 2×/den, uživatel ponechává.
 
 ### A. Hotovo 2. 10.
@@ -93,10 +93,17 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
      **Provedeno 3. 10.:** obsah Energie v2 zkopírován do hlavního dashboardu `lovelace` („Přehled“, přes
      `lovelace/config/save`, ověřeno 1:1), dashboard `energie-v2` smazán (konfigurace v `archive/energie-v2-dashboard-2026-10-03.json`).
      Cesty pohledů jsou teď `/lovelace/<path>` (prehled, plan, ev, …). Smazáno 17 automatizací v1 přes API;
-     **zbývají 2 (vypnuté):** `ev_nabijeni_zaporne_ceny_pretoky`, `ev_zastavit_velky_import` – smazání zablokovala
-     kontrola oprávnění, smaže uživatel v UI. Ještě zbývá z v1: skripty `fve_grid_export_*` (3), blueprinty `jan-trnka`,
-     `input_boolean.time_to_use_overflows` (configuration.yaml), osiřelé entity `automation.spustit_filtraci`,
-     `get_data_from_dip`, `run_pnd_2`.
+     zbylé 2 EV automatizace smazal uživatel v UI.
+   - **Úklid v1 (B2) HOTOVO 3. 10.:** smazány všechny automatizace v1 (19) + 3 osiřelé (`spustit_filtraci`,
+     `get_data_from_dip`, `run_pnd_2`), skripty `fve_grid_export_*` (3), blueprinty `jan-trnka` (7), z YAML
+     `input_boolean.time_to_use_overflows`, `input_select.season`, `input_number.winter_dod`, šablony Nighttime /
+     Base Nighttime / Final Daily House Consumption, EV denní náklady, EV nabíjí ze solárů a 7 statistik v `sensor.yaml`
+     (zůstaly Filtrace spuštěna, Base Average Daily Consumption). Uživatel v UI smazal helpery `filtrace_overrride`,
+     `fve_battery_charge_*`, `goodwe_grid_export`, `ev_nt_start_*`, `ev_nabijeni_povoleno`, `ev_nabijeni_manualni_nt`,
+     šablonu `sensor.filtrace`, utility metery Filtrace Daily, EV energie týdně/měsíčně a osiřelé entity.
+     **Ponecháno (používá HAv2/PND):** Filtrace Sum, House Consumption Sum/Daily, ECO Volter Daily Energy,
+     energy_buy/sell (+ _sum, _daily), fve_battery_charge/discharge_w, `ev_nt_*` celkem a měsíc, skripty Filtrace ON/OFF (Assist).
+     Návrat k v1 už není možný bez obnovy HA zálohy `465189a7` (nebo `81c05fcd` před testem Auto).
      Sankey 2. 10. bez větve Celkem → Bojler: `energy_sources_total` má statistiky až od 9:29, „Celkem“ je menší
      než součet spotřebičů → na bojler (poslední v pořadí) nezbyde nic. Od 3. 10. v pořádku.
 

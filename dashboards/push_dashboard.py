@@ -2,7 +2,7 @@
 
 Použití (z kořene repa):
     source venv/bin/activate && set -a && source .env && set +a
-    python dashboards/push_dashboard.py energie-v2 dashboards/energie-v2.yaml
+    python dashboards/push_dashboard.py lovelace dashboards/energie-v2.yaml   # hlavní dashboard
 
 Potřebuje HA_URL a HA_TOKEN v prostředí (.env). YAML kotvy (&/<<:) se rozbalí.
 ThreadedResolver: aiodns neumí .local (mDNS) adresy.
@@ -34,14 +34,16 @@ async def main():
                 r = await ws.receive_json()
                 if r.get("id") == n:
                     return r
+        # hlavní dashboard („lovelace“) existuje vždy a ukládá se bez url_path
+        target = {} if URL_PATH == "lovelace" else {"url_path": URL_PATH}
         dashes = (await call(type="lovelace/dashboards/list"))["result"]
-        if not any(d["url_path"] == URL_PATH for d in dashes):
+        if target and not any(d["url_path"] == URL_PATH for d in dashes):
             r = await call(type="lovelace/dashboards/create", url_path=URL_PATH, title=title,
                            icon="mdi:home-lightning-bolt", show_in_sidebar=True, require_admin=False, mode="storage")
             print("create:", r.get("success"), r.get("error"))
-        r = await call(type="lovelace/config/save", url_path=URL_PATH, config=cfg)
+        r = await call(type="lovelace/config/save", config=cfg, **target)
         print("save:", r.get("success"), r.get("error"))
-        r = await call(type="lovelace/config", url_path=URL_PATH)
+        r = await call(type="lovelace/config", **target)
         print("views:", [v.get("path") for v in r["result"]["views"]])
 
 asyncio.run(main())

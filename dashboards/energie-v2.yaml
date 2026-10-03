@@ -1,7 +1,8 @@
 # HAv2 – dashboard „Energie v2“ (docs/hav2-architektura.md §9)
-# Zdroj pravdy pro storage dashboard `energie-v2`. Do HA se nahrává přes Lovelace API
+# Zdroj pravdy pro HLAVNÍ dashboard `lovelace` („Přehled“; od 3. 10. 2026 nahradil starý
+# dashboard i samostatný `energie-v2`, který byl smazán). Do HA se nahrává přes Lovelace API
 # (lovelace/config/save), ne přes rsync. Úpravy dělat tady a znovu nahrát:
-#   python dashboards/push_dashboard.py energie-v2 dashboards/energie-v2.yaml
+#   python dashboards/push_dashboard.py lovelace dashboards/energie-v2.yaml
 # Časové řady plánu čte z atributů AppDaemon senzorů (slots_json = ISO čas).
 
 title: Energie v2
@@ -93,11 +94,13 @@ views:
               battery:
                 entity: sensor.battery_power
                 state_of_charge: sensor.battery_state_of_charge
+              # bojler je za měřením GoodWe: síť a dům přepočtené (prodej bez bojleru, dům + bojler)
               grid:
-                entity: sensor.meter_active_power_total
-                invert_state: true
+                entity:
+                  consumption: sensor.energy_buy_gross_w
+                  production: sensor.energy_sell_net_w
               home:
-                entity: sensor.house_consumption
+                entity: sensor.house_consumption_with_boiler_w
               individual:
                 - entity: sensor.ecovolter_revcr01c00002056_actual_power
                   name: EV
@@ -106,6 +109,10 @@ views:
                 - entity: sensor.bazenova_filtrace_vykon
                   name: Bazén
                   icon: mdi:pool
+                  display_zero: true
+                - entity: sensor.bojler_vykon
+                  name: Bojler
+                  icon: mdi:water-boiler
                   display_zero: true
           - type: heading
             heading: Fáze (+ prodej / − nákup)
@@ -1930,6 +1937,210 @@ views:
               - entity: sensor.sauna_energy
                 name: Sauna
                 color: "#ef6c00"
+
+  # ================================================================== PND
+  # Data z portálu distributora (D+1); porovnání s HA je na Úspory → Kontrola proti PND.
+  - title: PND
+    path: pnd
+    icon: mdi:file-chart
+    type: sections
+    max_columns: 2
+    sections:
+    - type: grid
+      column_span: 2
+      cards:
+      - type: heading
+        heading: Po dnech (14 dní)
+        icon: mdi:calendar-today
+      - type: markdown
+        text_only: true
+        content: Data z portálu distributora (PND), stahují se ráno za předchozí den. Čísla v záhlaví = včerejšek. Porovnání s měřením HA je na **Úspory → Kontrola proti PND**.
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 14d
+        span:
+          end: day
+        header:
+          show: true
+          title: Nákup a prodej
+          show_states: true
+          colorize_states: true
+        all_series_config:
+          unit: ' kWh'
+        series:
+        - entity: sensor.pnd_data
+          name: Prodej do sítě
+          attribute: production
+          type: column
+          color: '#ffa726'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return entity.attributes.pnddate
+              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.production[i])])
+              .filter(([t]) => t < today.getTime());
+        - entity: sensor.pnd_data
+          name: Nákup ze sítě
+          attribute: consumption
+          type: column
+          color: '#e53935'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return entity.attributes.pnddate
+              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.consumption[i])])
+              .filter(([t]) => t < today.getTime());
+          invert: true
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 14d
+        span:
+          end: day
+        header:
+          show: true
+          title: Nákup podle tarifu
+          show_states: true
+          colorize_states: true
+        all_series_config:
+          unit: ' kWh'
+        series:
+        - entity: sensor.pnd_tariff_data
+          name: NT
+          attribute: low_tariff
+          type: column
+          color: '#5c6bc0'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return entity.attributes.pnddate
+              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.low_tariff[i])])
+              .filter(([t]) => t < today.getTime());
+        - entity: sensor.pnd_tariff_data
+          name: VT
+          attribute: high_tariff
+          type: column
+          color: '#e53935'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return entity.attributes.pnddate
+              .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.high_tariff[i])])
+              .filter(([t]) => t < today.getTime());
+    - type: grid
+      column_span: 2
+      cards:
+      - type: heading
+        heading: Po měsících (12 měsíců)
+        icon: mdi:calendar-month
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 1y
+        span:
+          end: month
+        header:
+          show: true
+          title: Nákup a prodej
+          show_states: false
+          colorize_states: true
+        all_series_config:
+          unit: ' kWh'
+        series:
+        - entity: sensor.pnd_data
+          name: Prodej do sítě
+          attribute: production
+          type: column
+          color: '#ffa726'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const sums = {};
+            entity.attributes.pnddate.forEach((d, i) => {
+              const x = new Date(d);
+              const key = x.getFullYear() + '-' + x.getMonth();
+              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
+              sums[key].value += parseFloat(entity.attributes.production[i]);
+            });
+            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
+        - entity: sensor.pnd_data
+          name: Nákup ze sítě
+          attribute: consumption
+          type: column
+          color: '#e53935'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const sums = {};
+            entity.attributes.pnddate.forEach((d, i) => {
+              const x = new Date(d);
+              const key = x.getFullYear() + '-' + x.getMonth();
+              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
+              sums[key].value += parseFloat(entity.attributes.consumption[i]);
+            });
+            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
+          invert: true
+        apex_config:
+          tooltip:
+            x:
+              formatter: |
+                EVAL: (value) => new Intl.DateTimeFormat('cs-CZ', { year: 'numeric', month: 'long' }).format(new Date(value))
+      - type: custom:apexcharts-card
+        stacked: true
+        graph_span: 1y
+        span:
+          end: month
+        header:
+          show: true
+          title: Nákup podle tarifu
+          show_states: false
+          colorize_states: true
+        all_series_config:
+          unit: ' kWh'
+        series:
+        - entity: sensor.pnd_tariff_data
+          name: NT
+          attribute: low_tariff
+          type: column
+          color: '#5c6bc0'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const sums = {};
+            entity.attributes.pnddate.forEach((d, i) => {
+              const x = new Date(d);
+              const key = x.getFullYear() + '-' + x.getMonth();
+              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
+              sums[key].value += parseFloat(entity.attributes.low_tariff[i]);
+            });
+            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
+        - entity: sensor.pnd_tariff_data
+          name: VT
+          attribute: high_tariff
+          type: column
+          color: '#e53935'
+          opacity: 0.85
+          float_precision: 2
+          data_generator: |
+            const sums = {};
+            entity.attributes.pnddate.forEach((d, i) => {
+              const x = new Date(d);
+              const key = x.getFullYear() + '-' + x.getMonth();
+              if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };
+              sums[key].value += parseFloat(entity.attributes.high_tariff[i]);
+            });
+            return Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);
+        apex_config:
+          tooltip:
+            x:
+              formatter: |
+                EVAL: (value) => new Intl.DateTimeFormat('cs-CZ', { year: 'numeric', month: 'long' }).format(new Date(value))
 
   # ============================================================ NASTAVENÍ
   - title: Nastavení
