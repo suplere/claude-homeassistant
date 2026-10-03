@@ -85,6 +85,12 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
    - **Přehled → tok energie:** přidán uzel „Bojler“ (`sensor.bojler_vykon`, individual v power-flow-card-plus);
      síť = `sensor.energy_buy_gross_w` (odběr GoodWe + bojler ze sítě) / `sensor.energy_sell_net_w` (prodej bez bojleru),
      dům = `sensor.house_consumption_with_boiler_w` (`hav2_data.yaml`). Karta umí spotřebiče jen jako větev z domu.
+   - **3. 10. – Energie v2 jako hlavní dashboard:** přidán pohled **PND** (`/energie-v2/pnd`, před Nastavení): 14 dní
+     a 12 měsíců nákup/prodej (`sensor.pnd_data`) a nákup NT/VT (`sensor.pnd_tariff_data`). Ze starého dashboardu
+     se nic dalšího nepřebírá (detail EV nechce, Solcast a teplota dávkovače už v2 má). Výchozí dashboard nastavuje
+     uživatel v Profilu (i v mobilu); starý `lovelace` (záloha `archive/v1-2026-09-25/dashboard/lovelace-2026-10-03.json`)
+     smazat po úklidu v1. HA záloha před úklidem `465189a7`. Smazání 19 automatizací v1 z `automations.yaml`
+     zablokovala kontrola oprávnění – čeká na souhlas uživatele.
      Sankey 2. 10. bez větve Celkem → Bojler: `energy_sources_total` má statistiky až od 9:29, „Celkem“ je menší
      než součet spotřebičů → na bojler (poslední v pořadí) nezbyde nic. Od 3. 10. v pořádku.
 
