@@ -183,7 +183,8 @@ Ceny a parametry baterie jsou už z kroku A (`energy_price_vt/nt`, `energy_sell_
 |---|---|---|
 | NT, simulace ukazuje deficit ve VT | Deficit = Σ VT slotů max(0, spotřeba − FVE_konzerv.) − (SOC − min) × kapacita > 0 **a** 4,90 < 6,10 | `charge_battery` výkonem, aby cílové SOC bylo dosaženo do 06:00. Cíl = min SOC + deficit, **max. tak, aby zbylo místo pro očekávaný přetok z FVE**. |
 | NT, zítra FVE baterii nabije | Simulace: SOC zítra dosáhne ≥ 95 % z FVE | `auto` (baterie smí vybíjet i v NT, dům jede z baterie) |
-| NT, EV nabíjí ze sítě | Vždy | `battery_standby`, aby baterie nevybíjela do auta (dvojí cyklus) |
+| NT, baterie by ráno ve VT došla | Simulace `auto` kupuje ve VT do 12 h | noc `auto`, na konci NT `charge_battery` jen to, co chybí (VT nákup / účinnost + 0,1 kWh); přednost před nákupem ve VT i při ceně o ≤ 0,3 Kč horší (doplněno 3. 10. 2026) |
+| EV nabíjí ze sítě (plán NT/VT, Rychle, ručně „Nabíjet teď“) | Vždy | `battery_standby` místo `auto` i prodeje, aby baterie nevybíjela do auta (implementováno až 3. 10. 2026, `hav2_app._ev_grid_hold_check`; solární nabíjení s dotováním beze změny) |
 | VT, běžný den | – | `auto` (vlastní spotřeba) |
 | VT, spot špička | spot ≥ `energy_sell_min_spot` **a** simulace: baterie se do večera dobije z FVE na plán | `discharge_battery` (výkon podle rezervy), nejvýš do plánovaného SOC |
 | Záporná / velmi nízká cena | spot × 0,85 < `energy_export_block_below` | limit přetoku = 0 W **až po** vyčerpání spotřebičů: EV → bazén → baterie (+ experiment bojler) |

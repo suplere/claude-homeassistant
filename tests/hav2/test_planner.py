@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "config/appdaemon/a
 
 from hav2_planner import (  # noqa: E402
     MODE_AUTO,
+    Action,
     MODE_CHARGE,
     MODE_DEFER,
     MODE_DISCHARGE,
@@ -295,7 +296,8 @@ def test_force_full_skipped_when_sun_fills_next_day():
     now = datetime(2026, 6, 10, 21, 0, tzinfo=TZ)
     batt = BatteryParams(capacity_kwh=10.0, soc_pct=60.0, min_soc_pct=20.0)
     plan = plan_battery(make_slots(now, 0, 6.0), batt, Prices(), force_full=True)
-    assert not plan.full_charge and plan.grid_charge_kwh == 0
+    # bez nabití na 100 %; jen dobití na konci NT, aby ráno ve VT nedošla baterie
+    assert not plan.full_charge and plan.grid_charge_kwh <= 0.5
 
 
 def test_nt_charge_needs_minimum_gain_per_kwh():
@@ -304,7 +306,9 @@ def test_nt_charge_needs_minimum_gain_per_kwh():
     now = datetime(2026, 9, 28, 21, 0, tzinfo=TZ)
     batt = BatteryParams(capacity_kwh=10.0, soc_pct=60.0, min_soc_pct=20.0)
     marginal = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 4.4, 8: 4.4, 9: 4.4}), batt, Prices())
-    assert marginal.grid_charge_kwh == 0
+    # žádná arbitráž, jen dobití na ranní VT (noc v režimu auto, ne držet)
+    assert marginal.grid_charge_kwh <= 0.5
+    assert all(a.mode != MODE_STANDBY for a in marginal.actions)
     clear = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 5.0, 8: 5.0, 9: 5.0}), batt, Prices())
     assert clear.grid_charge_kwh > 3
 
@@ -343,3 +347,17 @@ def test_extra_load_battery_keeps_energy_for_sauna():
     assert sold(base) > 0
     assert sold(sauna) < sold(base)
     assert min(r.soc_pct for r in sauna.results) >= 20.0 - 1e-6
+
+
+def test_low_soc_tops_up_at_end_of_nt_instead_of_vt_purchase():
+    """3. 10. 2026: baterie vybitá do EV (41 % ve 23 h) → noc vlastní spotřeba, na konci NT
+    dobít, co chybí na ranní VT (model dřív znal jen „držet celou noc“ → nákup ve VT)."""
+    now = datetime(2026, 10, 3, 23, 0, tzinfo=TZ)
+    batt = BatteryParams(capacity_kwh=10.0, soc_pct=41.0, min_soc_pct=20.0)
+    slots = make_slots(now, 0, 6.0)
+    plan = plan_battery(slots, batt, Prices())
+    auto = simulate(slots, [Action() for _ in slots], batt, Prices())[0]
+    vt_import = lambda res: sum(r.grid_import_kwh for r, s in zip(res, slots) if not s.is_nt and s.start.hour < 12)
+    # buď noc auto + dobití na konci NT, nebo držet (dům v NT ze sítě) – hlavně ne nákup ve VT
+    assert plan.candidates["auto+0.5"] < plan.candidates["auto"]
+    assert vt_import(plan.results) < 0.05 < vt_import(auto)

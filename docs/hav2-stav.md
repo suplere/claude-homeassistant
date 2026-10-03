@@ -105,7 +105,11 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
    obě její automatizace vypnuté – smazání viz 0/5.
 8. **EV bez termínu jen z přetoku (3. 10. večer):** auto připojené ve 22:15 bez požadavku nabilo v NT ~3 kWh (72 → 76 %,
    plán „NT jen na to, co nepokryje slunce do zítřka 18:00“ se každých 15 min přepočítával a NT rostlo; zastavil SOC baterie
-   ≤ 60 %). Uživatel: bez požadavku jen přetok FVE → `plan_ev` plánuje NT/VT jen se zadaným termínem `input_datetime.ev_deadline`.
+   ≤ 60 %). Ve skutečnosti šlo z baterie domu (vybíjela 5,2 kW, SOC 75 → 42 %) – pravidlo §5.2 „EV ze sítě → standby“ nebylo
+   naprogramované. Opraveno: (a) bez požadavku jen přetok FVE – `plan_ev` plánuje NT/VT jen se zadaným termínem
+   `input_datetime.ev_deadline`; (b) EV ze sítě (Plán, Rychle, Ručně) → baterie `battery_standby` (i místo prodeje);
+   (c) plánovač baterie zná variantu „noc auto + dobití na konci NT“ a dobije přesně to, co by se ráno koupilo ve VT
+   (noc 3./4. 10.: 0,47 kWh v 5 h místo 0,34 kWh VT). **Ověřit 4. 10. ráno:** dobití v 5 h proběhlo, ve VT nákup ~0.
 9. **Dřívější (1.–2. 10.):** souběh EV a bojleru v noci OK (EV staženo na 8 A ve 3f, rezerva jističe min. 7,5 A);
    jednorázový cíl EV nad limitem auta OK; watchdog otestován (restart AppDaemonu); Shelly Pro EM-50 přejmenovány
    (`switch.bazen_filtrace_rele`, `sensor.bazen_cerpadlo_*`, `switch.bojler_blokace_rele`, `sensor.bojler_*`; v jsonl starší

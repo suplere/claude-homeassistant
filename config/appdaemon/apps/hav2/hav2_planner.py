@@ -233,18 +233,19 @@ def _first_nt_block(slots: Sequence[Slot]) -> List[int]:
 
 
 def _actions_for_charge(slots: Sequence[Slot], nt_idx: List[int], energy_kwh: Optional[float],
-                        batt: BatteryParams) -> List[Action]:
+                        batt: BatteryParams, hold: bool = True) -> List[Action]:
     """Varianty chování v prvním NT bloku.
 
     energy_kwh None → auto (baterie smí v NT vybíjet do domu),
     0 → baterie v NT stojí (drží energii na VT),
-    > 0 → stojí a na konci NT se nabije `energy_kwh` (AC) ze sítě.
+    > 0 → stojí (hold=False: vybíjí do domu) a na konci NT se nabije `energy_kwh` (AC) ze sítě.
     """
     actions = [Action() for _ in slots]
     if energy_kwh is None or not nt_idx:
         return actions
-    for i in nt_idx:
-        actions[i] = Action(MODE_STANDBY, 0.0)
+    if hold:
+        for i in nt_idx:
+            actions[i] = Action(MODE_STANDBY, 0.0)
     remaining = energy_kwh
     for i in reversed(nt_idx):
         if remaining <= 1e-6:
@@ -274,21 +275,27 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
     worth = prices.nt / batt.efficiency + batt.wear_cost < prices.vt
     candidates: Dict[str, float] = {}
     best: Optional[Tuple[Optional[float], float, List[Action], List[SlotResult]]] = None
-    # pořadí = preference při téměř stejné ceně: auto → držet → menší nabití
-    steps: List[Optional[float]] = [None]
+    # pořadí = preference při téměř stejné ceně: auto → držet → menší nabití; nabití ve dvou
+    # variantách: baterie v NT drží, nebo jede do domu a na konci NT se dobije jen to, co chybí
+    # na ranní VT (3. 10. 2026: po vybití do EV model znal jen „držet celou noc“ → ráno nákup ve VT)
+    steps: List[Tuple[Optional[float], bool]] = [(None, True)]
     if nt_idx:
-        steps.append(0.0)
+        steps.append((0.0, True))
     if worth and nt_idx:
+        energies: List[float] = []
         e = step_kwh
         while e < max_e - 1e-6:
-            steps.append(round(e, 3))
+            energies.append(round(e, 3))
             e += step_kwh
         if max_e > 0:
-            steps.append(round(max_e, 3))
-    for e in steps:
-        acts = _actions_for_charge(slots, nt_idx, e, batt)
+            energies.append(round(max_e, 3))
+        for e in energies:
+            steps += [(e, False), (e, True)]
+    for e, hold in steps:
+        acts = _actions_for_charge(slots, nt_idx, e, batt, hold)
         res, cost = simulate(slots, acts, batt, prices)
-        candidates["auto" if e is None else f"{e:g}"] = round(cost, 2)
+        key = "auto" if e is None else f"{e:g}" if hold else f"auto+{e:g}"
+        candidates[key] = round(cost, 2)
         # nabíjení ze sítě jen se ziskem aspoň NT_CHARGE_MIN_GAIN na každou kWh navíc
         # (rozdíl v řádu desetníků je pod přesností modelu – předpověď FVE, ceny zítřka)
         extra = (e or 0.0) - ((best[0] or 0.0) if best else 0.0)
@@ -296,6 +303,19 @@ def plan_battery(slots: Sequence[Slot], batt: BatteryParams, prices: Prices,
         if best is None or cost < best[1] - margin:
             best = (e, cost, acts, res)
     assert best is not None
+    # dobití přesně na ranní VT: noc auto, na konci NT jen to, co by se ráno (do 12 h) koupilo ve VT;
+    # při skoro stejné ceně má přednost před nákupem ve VT (uživatel 3. 10. 2026)
+    if worth and nt_idx and (best[0] or 0.0) == 0.0:
+        auto_res, _ = simulate(slots, _actions_for_charge(slots, nt_idx, None, batt), batt, prices)
+        vt_morning = sum(r.grid_import_kwh for r, s in zip(auto_res[nt_idx[-1] + 1:], slots[nt_idx[-1] + 1:])
+                         if not s.is_nt and s.start.hour < 12 and s.start.date() == slots[nt_idx[-1]].start.date())
+        if vt_morning > 0.1:
+            e = round(min(max_e, vt_morning / batt.efficiency + 0.1), 2)
+            acts_t = _actions_for_charge(slots, nt_idx, e, batt, hold=False)
+            res_t, cost_t = simulate(slots, acts_t, batt, prices)
+            candidates[f"auto+{e:g} (ranní VT)"] = round(cost_t, 2)
+            if cost_t <= best[1] + VT_TOPUP_TOLERANCE_KC:
+                best = (e, cost_t, acts_t, res_t)
     e_best, cost_best, acts, res = best
     e_best = e_best or 0.0
 
@@ -359,6 +379,7 @@ def _sun_fills_after_nt(results: Sequence[SlotResult], slots: Sequence[Slot], nt
                if r.start.date() == day and r.start.hour < 18)
 
 
+VT_TOPUP_TOLERANCE_KC = 0.3  # dobití na ranní VT smí podle modelu stát až o 0,3 Kč víc než nákup ve VT
 NT_CHARGE_MIN_GAIN_KC_KWH = 0.3  # nabití ze sítě v NT jen se ziskem ≥ 0,3 Kč na nabitou kWh navíc
 EVENING_SELL_FROM_H = 17  # prodej od této hodiny: stačí dobití slunce následující den
 SELL_MIN_GAIN_KC_KWH = 0.5  # prodej z baterie jen se ziskem aspoň 0,5 Kč na prodanou kWh
@@ -441,6 +462,8 @@ def explain(plan: Plan, slots: Sequence[Slot], batt: BatteryParams, prices: Pric
             parts.append("NT nabíjení se nevyplatí (NT/účinnost + opotřebení ≥ VT)")
         elif plan.grid_charge_kwh == 0:
             parts.append(f"NT bez nabíjení, FVE zítra {pv_tomorrow:.1f} kWh baterii dobije")
+        else:
+            parts.append(f"na konci NT dobití {plan.grid_charge_kwh:.1f} kWh na ranní VT")
     elif plan.grid_charge_kwh > 0:
         parts.append(f"v NT plánováno nabití {plan.grid_charge_kwh:.1f} kWh")
     if plan.full_charge:
