@@ -89,8 +89,14 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
      a 12 měsíců nákup/prodej (`sensor.pnd_data`) a nákup NT/VT (`sensor.pnd_tariff_data`). Ze starého dashboardu
      se nic dalšího nepřebírá (detail EV nechce, Solcast a teplota dávkovače už v2 má). Výchozí dashboard nastavuje
      uživatel v Profilu (i v mobilu); starý `lovelace` (záloha `archive/v1-2026-09-25/dashboard/lovelace-2026-10-03.json`)
-     smazat po úklidu v1. HA záloha před úklidem `465189a7`. Smazání 19 automatizací v1 z `automations.yaml`
-     zablokovala kontrola oprávnění – čeká na souhlas uživatele.
+     smazat po úklidu v1. HA záloha před úklidem `465189a7`.
+     **Provedeno 3. 10.:** obsah Energie v2 zkopírován do hlavního dashboardu `lovelace` („Přehled“, přes
+     `lovelace/config/save`, ověřeno 1:1), dashboard `energie-v2` smazán (konfigurace v `archive/energie-v2-dashboard-2026-10-03.json`).
+     Cesty pohledů jsou teď `/lovelace/<path>` (prehled, plan, ev, …). Smazáno 17 automatizací v1 přes API;
+     **zbývají 2 (vypnuté):** `ev_nabijeni_zaporne_ceny_pretoky`, `ev_zastavit_velky_import` – smazání zablokovala
+     kontrola oprávnění, smaže uživatel v UI. Ještě zbývá z v1: skripty `fve_grid_export_*` (3), blueprinty `jan-trnka`,
+     `input_boolean.time_to_use_overflows` (configuration.yaml), osiřelé entity `automation.spustit_filtraci`,
+     `get_data_from_dip`, `run_pnd_2`.
      Sankey 2. 10. bez větve Celkem → Bojler: `energy_sources_total` má statistiky až od 9:29, „Celkem“ je menší
      než součet spotřebičů → na bojler (poslední v pořadí) nezbyde nic. Od 3. 10. v pořádku.
 

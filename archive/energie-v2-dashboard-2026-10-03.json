@@ -1,0 +1,3542 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "lovelace.energie_v2",
+  "data": {
+    "config": {
+      "title": "Energie v2",
+      "views": [
+        {
+          "title": "Přehled",
+          "path": "prehled",
+          "icon": "mdi:home-lightning-bolt",
+          "type": "sections",
+          "max_columns": 3,
+          "badges": [
+            {
+              "type": "entity",
+              "entity": "binary_sensor.cez_hdo_lowtariffactive_dum",
+              "name": "NT",
+              "show_name": true
+            },
+            {
+              "type": "entity",
+              "entity": "sensor.energy_price_buy_now",
+              "name": "Nákup",
+              "show_name": true
+            },
+            {
+              "type": "entity",
+              "entity": "sensor.energy_price_sell_now",
+              "name": "Prodej",
+              "show_name": true
+            },
+            {
+              "type": "entity",
+              "entity": "binary_sensor.energy_boiler_heating",
+              "name": "Bojler",
+              "show_name": true
+            },
+            {
+              "type": "entity",
+              "entity": "sensor.energy_breaker_headroom_a",
+              "name": "Rezerva jističe",
+              "show_name": true
+            }
+          ],
+          "sections": [
+            {
+              "type": "grid",
+              "column_span": 3,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Dnes",
+                  "icon": "mdi:calendar-today"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.today_s_pv_generation",
+                  "name": "FVE",
+                  "icon": "mdi:solar-power",
+                  "grid_options": {
+                    "columns": 4
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.today_load",
+                  "name": "Spotřeba (GoodWe)",
+                  "icon": "mdi:home-lightning-bolt",
+                  "grid_options": {
+                    "columns": 4
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy",
+                  "name": "EV",
+                  "icon": "mdi:car-electric",
+                  "grid_options": {
+                    "columns": 4
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_buy_daily",
+                  "name": "Nákup",
+                  "icon": "mdi:transmission-tower-import",
+                  "grid_options": {
+                    "columns": 4
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_sell_daily",
+                  "name": "Prodej",
+                  "icon": "mdi:transmission-tower-export",
+                  "grid_options": {
+                    "columns": 4
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_net_cost_daily",
+                  "name": "Náklady netto",
+                  "icon": "mdi:scale-balance",
+                  "grid_options": {
+                    "columns": 4
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Toky energie",
+                  "icon": "mdi:transmission-tower"
+                },
+                {
+                  "type": "custom:power-flow-card-plus",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "watt_threshold": 1000,
+                  "kw_decimals": 2,
+                  "entities": {
+                    "solar": {
+                      "entity": "sensor.pv_power"
+                    },
+                    "battery": {
+                      "entity": "sensor.battery_power",
+                      "state_of_charge": "sensor.battery_state_of_charge"
+                    },
+                    "grid": {
+                      "entity": {
+                        "consumption": "sensor.energy_buy_gross_w",
+                        "production": "sensor.energy_sell_net_w"
+                      }
+                    },
+                    "home": {
+                      "entity": "sensor.house_consumption_with_boiler_w"
+                    },
+                    "individual": [
+                      {
+                        "entity": "sensor.ecovolter_revcr01c00002056_actual_power",
+                        "name": "EV",
+                        "icon": "mdi:car-electric",
+                        "display_zero": true
+                      },
+                      {
+                        "entity": "sensor.bazenova_filtrace_vykon",
+                        "name": "Bazén",
+                        "icon": "mdi:pool",
+                        "display_zero": true
+                      },
+                      {
+                        "entity": "sensor.bojler_vykon",
+                        "name": "Bojler",
+                        "icon": "mdi:water-boiler",
+                        "display_zero": true
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "heading",
+                  "heading": "Fáze (+ prodej / − nákup)",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:sine-wave"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.meter_active_power_l1",
+                  "name": "L1",
+                  "vertical": true,
+                  "grid_options": {
+                    "columns": 4,
+                    "rows": 2
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.meter_active_power_l2",
+                  "name": "L2",
+                  "vertical": true,
+                  "grid_options": {
+                    "columns": 4,
+                    "rows": 2
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.meter_active_power_l3",
+                  "name": "L3",
+                  "vertical": true,
+                  "grid_options": {
+                    "columns": 4,
+                    "rows": 2
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Garáž",
+                  "icon": "mdi:garage"
+                },
+                {
+                  "type": "tile",
+                  "entity": "cover.garage_door_dvere",
+                  "name": "Garáž",
+                  "vertical": false,
+                  "tap_action": {
+                    "action": "toggle",
+                    "confirmation": {
+                      "text": "Opravdu pohnout garážovými vraty?"
+                    }
+                  },
+                  "grid_options": {
+                    "columns": 12
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Světla",
+                  "icon": "mdi:lightbulb-group"
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.policka_2",
+                  "state_content": [
+                    "state",
+                    "color_mode",
+                    "brightness"
+                  ],
+                  "grid_options": {
+                    "columns": 12
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.policka",
+                  "state_content": [
+                    "state",
+                    "color_mode",
+                    "brightness"
+                  ],
+                  "grid_options": {
+                    "columns": 12
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Sauna",
+                  "icon": "mdi:sauna"
+                },
+                {
+                  "type": "tile",
+                  "entity": "switch.sauna",
+                  "name": "Sauna",
+                  "state_content": [
+                    "state",
+                    "last_changed"
+                  ],
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.sauna_power",
+                  "name": "Výkon",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_boolean.energy_sauna_today",
+                  "name": "Dnes sauna (pro plán baterie)",
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "toggle"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_datetime.energy_sauna_start",
+                  "name": "Od",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "input_boolean.energy_sauna_today",
+                      "state": "on"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "date-set"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_number.energy_sauna_duration_h",
+                  "name": "Délka vč. nahřátí",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "input_boolean.energy_sauna_today",
+                      "state": "on"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "numeric-input",
+                      "style": "buttons"
+                    }
+                  ]
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set a = state_attr('sensor.energy_plan', 'sauna') %} {% if is_state('input_boolean.energy_sauna_today', 'on') %} Plán baterie počítá se saunou: **{{ a if a and a != 'ne' else 'čeká na přepočet' }}** ({{ states('input_number.energy_sauna_power_kw') }} kW, po skončení se přepínač vypne sám). {% else %}<small>Zapni „Dnes sauna“, když večer půjdeš do sauny – plán pak neprodá baterii, kterou sauna spotřebuje. Když zapomeneš, HAv2 ho zapne samo po 5 min topení a po 20 min bez topení zase vypne. Příkon {{ states('input_number.energy_sauna_power_kw') }} kW (změřeno 2. 10.).</small>{% endif %} {% if is_state('binary_sensor.sauna_overpowering', 'on') %}⚠️ **Zásuvka hlásí přetížení!**{% endif %}\n"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Systém",
+                  "icon": "mdi:robot"
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_select.energy_system_mode",
+                  "name": "Režim",
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "select-options"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "title": "HAv2 řídí",
+                  "state_color": true,
+                  "entities": [
+                    {
+                      "entity": "input_boolean.energy_battery_control",
+                      "name": "Baterii"
+                    },
+                    {
+                      "entity": "input_boolean.ev_control",
+                      "name": "Nabíjení EV"
+                    },
+                    {
+                      "entity": "input_boolean.pool_control",
+                      "name": "Filtraci"
+                    }
+                  ]
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set m = states('input_select.energy_system_mode') %}\n{% if m != 'Auto' %}**Režim {{ m }}** – HAv2 nic nezapisuje, jen doporučuje.{% endif %}\n{% set ev = states('input_select.ev_manual') %}{% set pool = states('input_select.pool_manual') %}\n{% if ev != 'Auto' %}🚗 **EV ručně: {{ ev }}** ({{ states('input_select.ev_manual_until') }}){% endif %}\n{% if pool != 'Auto' %}🏊 **Filtrace ručně: {{ pool }}** (na {{ states('input_number.pool_manual_duration_h') | float(0) }} h){% endif %}\n{% set o = states('input_datetime.energy_override_until') | as_datetime(none) %}\n{% if o and o | as_local > now() %}✋ **Ruční zásah platí do {{ (o | as_local).strftime('%H:%M') }}**{% endif %}\n{% if m == 'Auto' and ev == 'Auto' and pool == 'Auto' and not (o and o | as_local > now()) %}✅ Vše běží automaticky, žádný ruční zásah.{% endif %}\n"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Rozhodnutí",
+                  "icon": "mdi:lightbulb-on-outline"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "Baterie",
+                      "icon": "mdi:home-battery",
+                      "secondary_info": "last-changed"
+                    },
+                    {
+                      "entity": "sensor.ev_regulator",
+                      "name": "EV",
+                      "icon": "mdi:car-electric",
+                      "secondary_info": "last-changed"
+                    },
+                    {
+                      "entity": "sensor.pool_controller",
+                      "name": "Bazén",
+                      "icon": "mdi:pool",
+                      "secondary_info": "last-changed"
+                    }
+                  ]
+                },
+                {
+                  "type": "markdown",
+                  "content": "**Baterie:** {{ states('input_text.energy_last_decision') }}\n\n**EV:** {{ states('input_text.ev_last_decision') }}\n\n**Bazén:** {{ states('input_text.pool_last_decision') }}\n"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.battery_state_of_charge",
+                  "name": "Baterie SOC",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_net_cost_daily",
+                  "name": "Náklady dnes (netto)",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Plán",
+          "path": "plan",
+          "icon": "mdi:chart-timeline-variant",
+          "type": "sections",
+          "max_columns": 2,
+          "sections": [
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Plán baterie a FVE (dnes a zítra)",
+                  "icon": "mdi:chart-timeline-variant"
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "visibility": [
+                    {
+                      "condition": "screen",
+                      "media_query": "(min-width: 768px)"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "graph_span": "32h",
+                  "span": {
+                    "start": "hour"
+                  },
+                  "now": {
+                    "show": true,
+                    "label": "Teď"
+                  },
+                  "header": {
+                    "show": true,
+                    "show_states": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 340
+                    },
+                    "legend": {
+                      "show": true
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "id": "kw",
+                      "min": -8,
+                      "max": 8,
+                      "decimals": 1,
+                      "apex_config": {
+                        "title": {
+                          "text": "kW"
+                        }
+                      }
+                    },
+                    {
+                      "id": "soc",
+                      "opposite": true,
+                      "min": 0,
+                      "max": 100,
+                      "decimals": 0,
+                      "apex_config": {
+                        "title": {
+                          "text": "SOC %"
+                        }
+                      }
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "name": "FVE opravená",
+                      "unit": "kW",
+                      "type": "area",
+                      "color": "#f5a623",
+                      "opacity": 0.3,
+                      "yaxis_id": "kw",
+                      "data_generator": "return (entity.attributes.slots || []).map(s => [new Date(s[0]).getTime(), s[1]]);\n"
+                    },
+                    {
+                      "entity": "sensor.solcast_pv_forecast_forecast_today",
+                      "name": "Solcast p50",
+                      "unit": "kW",
+                      "type": "line",
+                      "color": "#bdbdbd",
+                      "stroke_width": 1,
+                      "yaxis_id": "kw",
+                      "data_generator": "const t = hass.states['sensor.solcast_pv_forecast_forecast_tomorrow'];\nconst a = [...(entity.attributes.detailedForecast || []), ...((t && t.attributes.detailedForecast) || [])];\nreturn a.map(s => [new Date(s.period_start).getTime(), s.pv_estimate]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "Nákup (plán)",
+                      "unit": "kW",
+                      "type": "column",
+                      "color": "#e53935",
+                      "yaxis_id": "kw",
+                      "data_generator": "return JSON.parse(entity.attributes.slots_json || '[]').map(r => [new Date(r[0]).getTime(), -r[4] * 4]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "Prodej (plán)",
+                      "unit": "kW",
+                      "type": "column",
+                      "color": "#43a047",
+                      "yaxis_id": "kw",
+                      "data_generator": "return JSON.parse(entity.attributes.slots_json || '[]').map(r => [new Date(r[0]).getTime(), r[5] * 4]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "SOC (plán)",
+                      "unit": "%",
+                      "type": "line",
+                      "color": "#1e88e5",
+                      "stroke_width": 3,
+                      "yaxis_id": "soc",
+                      "data_generator": "return JSON.parse(entity.attributes.slots_json || '[]').map(r => [new Date(r[0]).getTime(), r[3]]);\n"
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "visibility": [
+                    {
+                      "condition": "screen",
+                      "media_query": "(max-width: 767px)"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "graph_span": "12h",
+                  "span": {
+                    "start": "hour"
+                  },
+                  "now": {
+                    "show": true,
+                    "label": "Teď"
+                  },
+                  "header": {
+                    "show": true,
+                    "show_states": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 280
+                    },
+                    "legend": {
+                      "show": true,
+                      "fontSize": "11px"
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "id": "kw",
+                      "min": -8,
+                      "max": 8,
+                      "decimals": 1,
+                      "apex_config": {
+                        "title": {
+                          "text": "kW"
+                        }
+                      }
+                    },
+                    {
+                      "id": "soc",
+                      "opposite": true,
+                      "min": 0,
+                      "max": 100,
+                      "decimals": 0,
+                      "apex_config": {
+                        "title": {
+                          "text": "SOC %"
+                        }
+                      }
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "name": "FVE opravená",
+                      "unit": "kW",
+                      "type": "area",
+                      "color": "#f5a623",
+                      "opacity": 0.3,
+                      "yaxis_id": "kw",
+                      "data_generator": "return (entity.attributes.slots || []).map(s => [new Date(s[0]).getTime(), s[1]]);\n"
+                    },
+                    {
+                      "entity": "sensor.solcast_pv_forecast_forecast_today",
+                      "name": "Solcast p50",
+                      "unit": "kW",
+                      "type": "line",
+                      "color": "#bdbdbd",
+                      "stroke_width": 1,
+                      "yaxis_id": "kw",
+                      "data_generator": "const t = hass.states['sensor.solcast_pv_forecast_forecast_tomorrow'];\nconst a = [...(entity.attributes.detailedForecast || []), ...((t && t.attributes.detailedForecast) || [])];\nreturn a.map(s => [new Date(s.period_start).getTime(), s.pv_estimate]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "Nákup (plán)",
+                      "unit": "kW",
+                      "type": "column",
+                      "color": "#e53935",
+                      "yaxis_id": "kw",
+                      "data_generator": "return JSON.parse(entity.attributes.slots_json || '[]').map(r => [new Date(r[0]).getTime(), -r[4] * 4]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "Prodej (plán)",
+                      "unit": "kW",
+                      "type": "column",
+                      "color": "#43a047",
+                      "yaxis_id": "kw",
+                      "data_generator": "return JSON.parse(entity.attributes.slots_json || '[]').map(r => [new Date(r[0]).getTime(), r[5] * 4]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "SOC (plán)",
+                      "unit": "%",
+                      "type": "line",
+                      "color": "#1e88e5",
+                      "stroke_width": 3,
+                      "yaxis_id": "soc",
+                      "data_generator": "return JSON.parse(entity.attributes.slots_json || '[]').map(r => [new Date(r[0]).getTime(), r[3]]);\n"
+                    }
+                  ]
+                },
+                {
+                  "type": "heading",
+                  "heading": "Ceny (dnes a zítra)",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:cash"
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "visibility": [
+                    {
+                      "condition": "screen",
+                      "media_query": "(min-width: 768px)"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "graph_span": "48h",
+                  "span": {
+                    "start": "day"
+                  },
+                  "now": {
+                    "show": true,
+                    "label": "Teď"
+                  },
+                  "header": {
+                    "show": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 260
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "decimals": 1,
+                      "apex_config": {
+                        "title": {
+                          "text": "Kč/kWh"
+                        }
+                      }
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.current_spot_electricity_price",
+                      "name": "Prodej (spot × koef.)",
+                      "type": "line",
+                      "curve": "stepline",
+                      "color": "#43a047",
+                      "data_generator": "const k = parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.85;\nreturn Object.entries(entity.attributes).filter(([t]) => t.includes('T'))\n  .map(([t, v]) => [new Date(t).getTime(), v * k]);\n"
+                    },
+                    {
+                      "entity": "sensor.cez_hdo_schedule_dum",
+                      "name": "Nákup (NT/VT)",
+                      "type": "line",
+                      "curve": "stepline",
+                      "color": "#e53935",
+                      "data_generator": "const nt = parseFloat(hass.states['input_number.energy_price_nt'].state);\nconst vt = parseFloat(hass.states['input_number.energy_price_vt'].state);\nreturn (entity.attributes.schedule || []).flatMap(s => {\n  const p = s.tariff === 'NT' ? nt : vt;\n  return [[new Date(s.start).getTime(), p], [new Date(s.end).getTime(), p]];\n});\n"
+                    },
+                    {
+                      "entity": "input_number.energy_sell_min_spot",
+                      "name": "Prodej z baterie od",
+                      "type": "line",
+                      "color": "#8e24aa",
+                      "stroke_width": 1,
+                      "data_generator": "const v = parseFloat(entity.state) * (parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.85);\nconst d = new Date(); d.setHours(0, 0, 0, 0);\nreturn [[d.getTime(), v], [d.getTime() + 48 * 3600e3, v]];\n"
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "visibility": [
+                    {
+                      "condition": "screen",
+                      "media_query": "(max-width: 767px)"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "graph_span": "24h",
+                  "span": {
+                    "start": "hour"
+                  },
+                  "now": {
+                    "show": true,
+                    "label": "Teď"
+                  },
+                  "header": {
+                    "show": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 260
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "decimals": 1,
+                      "apex_config": {
+                        "title": {
+                          "text": "Kč/kWh"
+                        }
+                      }
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.current_spot_electricity_price",
+                      "name": "Prodej (spot × koef.)",
+                      "type": "line",
+                      "curve": "stepline",
+                      "color": "#43a047",
+                      "data_generator": "const k = parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.85;\nreturn Object.entries(entity.attributes).filter(([t]) => t.includes('T'))\n  .map(([t, v]) => [new Date(t).getTime(), v * k]);\n"
+                    },
+                    {
+                      "entity": "sensor.cez_hdo_schedule_dum",
+                      "name": "Nákup (NT/VT)",
+                      "type": "line",
+                      "curve": "stepline",
+                      "color": "#e53935",
+                      "data_generator": "const nt = parseFloat(hass.states['input_number.energy_price_nt'].state);\nconst vt = parseFloat(hass.states['input_number.energy_price_vt'].state);\nreturn (entity.attributes.schedule || []).flatMap(s => {\n  const p = s.tariff === 'NT' ? nt : vt;\n  return [[new Date(s.start).getTime(), p], [new Date(s.end).getTime(), p]];\n});\n"
+                    },
+                    {
+                      "entity": "input_number.energy_sell_min_spot",
+                      "name": "Prodej z baterie od",
+                      "type": "line",
+                      "color": "#8e24aa",
+                      "stroke_width": 1,
+                      "data_generator": "const v = parseFloat(entity.state) * (parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.85);\nconst d = new Date(); d.setHours(0, 0, 0, 0);\nreturn [[d.getTime(), v], [d.getTime() + 48 * 3600e3, v]];\n"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Baterie – plán",
+                  "icon": "mdi:home-battery"
+                },
+                {
+                  "type": "markdown",
+                  "text_only": true,
+                  "content": "**{{ state_attr('sensor.energy_plan', 'reason') }}**\n{{ '' if state_attr('sensor.energy_plan', 'executing') == 'ano' else '· jen doporučení' }}\n"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "sensor.energy_plan",
+                      "name": "Režim teď",
+                      "secondary_info": "last-updated"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "grid_charge_kwh",
+                      "name": "Nabití ze sítě v NT",
+                      "icon": "mdi:transmission-tower-import",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "sell_slots",
+                      "name": "Prodejní sloty (15 min)",
+                      "icon": "mdi:cash-fast"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "soc_min_plan",
+                      "name": "Nejnižší SOC v plánu",
+                      "icon": "mdi:battery-low",
+                      "suffix": "%"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "pv_rest_today_kwh",
+                      "name": "FVE zbytek dnes",
+                      "icon": "mdi:solar-power",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "pv_tomorrow_kwh",
+                      "name": "FVE zítra",
+                      "icon": "mdi:solar-power-variant",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "load_tomorrow_kwh",
+                      "name": "Spotřeba domu zítra",
+                      "icon": "mdi:home-lightning-bolt",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "cost_today_rest",
+                      "name": "Náklady zbytek dne",
+                      "icon": "mdi:cash",
+                      "suffix": "Kč"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "cost_tomorrow",
+                      "name": "Náklady zítra",
+                      "icon": "mdi:cash-clock",
+                      "suffix": "Kč"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "forecast_ok",
+                      "name": "Předpověď FVE platná",
+                      "icon": "mdi:weather-sunny-alert"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "EV a bazén – plán",
+                  "icon": "mdi:calendar-clock"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "sensor.ev_plan",
+                      "name": "EV",
+                      "icon": "mdi:car-electric"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.ev_plan",
+                      "attribute": "solar_kwh",
+                      "name": "EV ze slunce",
+                      "icon": "mdi:solar-power",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.ev_plan",
+                      "attribute": "nt_kwh",
+                      "name": "EV ze sítě v NT",
+                      "icon": "mdi:weather-night",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.ev_plan",
+                      "attribute": "vt_kwh",
+                      "name": "EV ze sítě ve VT",
+                      "icon": "mdi:white-balance-sunny",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.ev_plan",
+                      "attribute": "est_grid_cost",
+                      "name": "EV odhad nákladů ze sítě",
+                      "icon": "mdi:cash",
+                      "suffix": "Kč"
+                    },
+                    {
+                      "entity": "sensor.pool_plan",
+                      "name": "Bazén",
+                      "icon": "mdi:pool"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Plán po hodinách (24 h)",
+                  "icon": "mdi:table-clock"
+                },
+                {
+                  "type": "custom:flex-table-card",
+                  "visibility": [
+                    {
+                      "condition": "screen",
+                      "media_query": "(min-width: 768px)"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "entities": {
+                    "include": "sensor.energy_plan"
+                  },
+                  "columns": [
+                    {
+                      "name": "Čas",
+                      "data": "table.t"
+                    },
+                    {
+                      "name": "Baterie",
+                      "data": "table.rezim"
+                    },
+                    {
+                      "name": "kW",
+                      "data": "table.kw",
+                      "align": "right"
+                    },
+                    {
+                      "name": "SOC",
+                      "data": "table.soc",
+                      "align": "right"
+                    },
+                    {
+                      "name": "Nákup kWh",
+                      "data": "table.nakup",
+                      "align": "right"
+                    },
+                    {
+                      "name": "Prodej kWh",
+                      "data": "table.prodej",
+                      "align": "right"
+                    },
+                    {
+                      "name": "Tarif",
+                      "data": "table.tarif",
+                      "align": "center"
+                    },
+                    {
+                      "name": "Výkup Kč/kWh",
+                      "data": "table.spot",
+                      "align": "right"
+                    }
+                  ],
+                  "css": {
+                    "table+": "width: 100%; border-collapse: collapse;",
+                    "tbody tr:nth-child(odd)": "background-color: rgba(127, 127, 127, 0.07);"
+                  }
+                },
+                {
+                  "type": "custom:flex-table-card",
+                  "visibility": [
+                    {
+                      "condition": "screen",
+                      "media_query": "(max-width: 767px)"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "entities": {
+                    "include": "sensor.energy_plan"
+                  },
+                  "columns": [
+                    {
+                      "name": "Čas",
+                      "data": "table.t"
+                    },
+                    {
+                      "name": "Baterie",
+                      "data": "table.rezim"
+                    },
+                    {
+                      "name": "SOC",
+                      "data": "table.soc",
+                      "align": "right"
+                    },
+                    {
+                      "name": "Nákup",
+                      "data": "table.nakup",
+                      "align": "right"
+                    },
+                    {
+                      "name": "Prodej",
+                      "data": "table.prodej",
+                      "align": "right"
+                    }
+                  ],
+                  "css": {
+                    "table+": "width: 100%; border-collapse: collapse; font-size: 0.9em;",
+                    "tbody tr:nth-child(odd)": "background-color: rgba(127, 127, 127, 0.07);"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "EV",
+          "path": "ev",
+          "icon": "mdi:car-electric",
+          "type": "sections",
+          "max_columns": 3,
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Aktuální session",
+                  "icon": "mdi:ev-plug-type2"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_session_energy",
+                  "name": "Nabito",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_session_cost",
+                  "name": "Cena",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_session_avg_price",
+                  "name": "Průměr",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_soc_estimate",
+                  "name": "SOC",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set e = 'sensor.ev_session_energy' %}\n{% set st = state_attr('sensor.ev_session_cost', 'started') %}\n{% set r = 'sensor.ev_regulator' %}\n{% set conn = is_state('binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected', 'on') %}\n{% if not conn %}<small>Auto nepřipojeno – údaje poslední session.</small>\n\n{% elif st %}{% set m = ((now() - as_datetime(st)).total_seconds() / 60) | int %}\nPřipojeno {{ as_local(as_datetime(st)).strftime('%-d. %-m. %H:%M') }} ({{ m // 60 }} h {{ m % 60 }} min)\n· SOC {{ states('sensor.ev_soc_estimate') | int(0) }} → {{ states('input_number.ev_target_soc') | int(0) }} %\n{% endif %}\n\n**Teď:** {{ 'nabíjí ' ~ state_attr(r, 'current_a') ~ ' A ' ~ state_attr(r, 'phases') if state_attr(r, 'enable') == 'ano' else 'nenabíjí' }} – {{ states(r) }}\n\n{% set src = [('☀️ Slunce', 'solar'), ('🔋 Baterie', 'battery'), ('🌙 Síť NT', 'grid_nt'), ('⚡ Síť VT', 'grid_vt')] %}\n{% set tot = states(e) | float(0) %}\n{% if state_attr(e, 'solar') is not none %}\n| Zdroj | kWh | podíl |\n|:--|--:|--:|\n{% for label, k in src %}| {{ label }} | {{ '%.2f' | format(state_attr(e, k) | float(0)) }} | {{ (state_attr(e, k) | float(0) / tot * 100) | round(0) | int if tot > 0 else 0 }} % |\n{% endfor %}\n{% else %}<small>Rozpad podle zdroje se zobrazí od příštího připojení auta.</small>{% endif %}\n"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Ruční ovládání",
+                  "icon": "mdi:hand-back-right"
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_select.ev_manual",
+                  "name": "Nabíjení",
+                  "features": [
+                    {
+                      "type": "select-options"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_number.ev_manual_current",
+                  "name": "Proud",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "input_select.ev_manual",
+                      "state": "Nabíjet teď"
+                    }
+                  ],
+                  "features": [
+                    {
+                      "type": "numeric-input",
+                      "style": "buttons"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_select.ev_manual_phases",
+                  "name": "Fáze",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "input_select.ev_manual",
+                      "state": "Nabíjet teď"
+                    }
+                  ],
+                  "features": [
+                    {
+                      "type": "select-options"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_select.ev_manual_until",
+                  "name": "Platí",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "input_select.ev_manual",
+                      "state_not": "Auto"
+                    }
+                  ],
+                  "features": [
+                    {
+                      "type": "select-options"
+                    }
+                  ]
+                },
+                {
+                  "type": "markdown",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "input_boolean.ev_control",
+                      "state": "off"
+                    }
+                  ],
+                  "content": "<small>Řízení EV v HAv2 je vypnuté – ruční volba se zatím jen zaznamená\ndo doporučení, wallbox neovládá.</small>\n"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Požadavek",
+                  "icon": "mdi:target"
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_select.ev_mode",
+                  "name": "Režim",
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "select-options"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_number.ev_target_soc",
+                  "name": "Cílový SOC",
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "numeric-input",
+                      "style": "slider"
+                    }
+                  ]
+                },
+                {
+                  "type": "markdown",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "sensor.ev_target_status",
+                      "state_not": "OK"
+                    },
+                    {
+                      "condition": "state",
+                      "entity": "sensor.ev_target_status",
+                      "state_not": "unavailable"
+                    }
+                  ],
+                  "content": "{% set s = 'sensor.ev_target_status' %}\n{{ '⚠️ **Varování:**' if is_state(s, 'Varování') else 'ℹ️' }} {{ state_attr(s, 'message') }}\n"
+                },
+                {
+                  "type": "tile",
+                  "entity": "number.ev6_ac_charging_limit",
+                  "name": "Limit v autě (AC)",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_number.ev_target_soc_default",
+                  "name": "Standardní cíl",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_datetime.ev_deadline",
+                  "name": "Nabito do",
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "date-set"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_boolean.ev_deadline_hard",
+                  "name": "Za každou cenu (i VT)",
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "toggle"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_soc_estimate",
+                  "name": "SOC (odhad)",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_energy_needed_kwh",
+                  "name": "Chybí do cíle",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_deadline_slack_h",
+                  "name": "Rezerva do termínu",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "sensor.ev_deadline_slack_h",
+                      "state_not": "unavailable"
+                    }
+                  ],
+                  "grid_options": {
+                    "columns": 12
+                  }
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set e = 'sensor.ev_plan' %}\n**Plán:** {{ states(e) }}\n\nSlunce {{ state_attr(e, 'solar_kwh') }} · NT {{ state_attr(e, 'nt_kwh') }} · VT {{ state_attr(e, 'vt_kwh') }} kWh\n{% if state_attr(e, 'shortfall_kwh') | float(0) > 0 %} · **chybí {{ state_attr(e, 'shortfall_kwh') }} kWh**{% endif %}\n"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Regulátor",
+                  "icon": "mdi:current-ac"
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set r = 'sensor.ev_regulator' %}\n**{{ states(r) }}** – {{ 'nabíjet ' ~ state_attr(r, 'current_a') ~ ' A ' ~ state_attr(r, 'phases') if state_attr(r, 'enable') == 'ano' else 'stop' }}\n{{ '' if state_attr(r, 'executing') == 'ano' else '(jen doporučení)' }}\n\n{{ state_attr(r, 'reason') }}\n\nPřebytek pro EV {{ state_attr(r, 'surplus_for_ev_w') }} W · rezerva baterie {{ state_attr(r, 'battery_reserve_w') }} W\n· nejzatíženější fáze {{ state_attr(r, 'worst_phase_a') }} A · slunce se vrátí: {{ state_attr(r, 'sun_returns') }}\n"
+                },
+                {
+                  "type": "tile",
+                  "entity": "binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected",
+                  "name": "Připojeno",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ecovolter_revcr01c00002056_actual_power",
+                  "name": "Výkon",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "number.ecovolter_revcr01c00002056_target_current",
+                  "name": "Proud wallboxu",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "switch.ecovolter_revcr01c00002056_is_three_phase_mode_enable",
+                  "name": "3 fáze",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "history-graph",
+                  "title": "Výkon EV a přebytek (6 h)",
+                  "hours_to_show": 6,
+                  "entities": [
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_actual_power",
+                      "name": "EV kW"
+                    },
+                    {
+                      "entity": "sensor.energy_surplus_smoothed_w",
+                      "name": "Přebytek W"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Kia EV6",
+                  "icon": "mdi:car-info"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev6_ev_battery_level",
+                  "name": "SOC z auta",
+                  "state_content": [
+                    "state",
+                    "last_changed"
+                  ],
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev6_ev_range",
+                  "name": "Dojezd",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "lock.ev6_door_lock",
+                  "name": "Zámek",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "icon_tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "binary_sensor.ev6_ev_charge_port",
+                  "name": "Nabíjecí port",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "climate.ev6_climate_control",
+                  "name": "Předtopení",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "icon_tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev6_odometer",
+                  "name": "Najeto",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "button.ev6_force_refresh",
+                  "name": "Aktualizovat z auta",
+                  "icon": "mdi:car-connected",
+                  "state_content": "last_changed",
+                  "tap_action": {
+                    "action": "perform-action",
+                    "perform_action": "button.press",
+                    "target": {
+                      "entity_id": "button.ev6_force_refresh"
+                    },
+                    "confirmation": {
+                      "text": "Probudit auto a stáhnout aktuální data? (Kia má denní limit dotazů)"
+                    }
+                  },
+                  "icon_tap_action": {
+                    "action": "none"
+                  },
+                  "grid_options": {
+                    "columns": 12
+                  }
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set t = states('sensor.ev6_last_updated_at') | as_datetime %} {% set m = ((now() - t).total_seconds() / 60) | int if t else none %} <small>Data z auta: {{ as_local(t).strftime('%-d. %-m. %H:%M') if t else '?' }} {% if m is not none %}({{ (m // 60 ~ ' h ' if m >= 60 else '') ~ (m % 60) ~ ' min' }} zpět){% endif %} · HAv2 odhad SOC {{ states('sensor.ev_soc_estimate') | int(0) }} % ({{ state_attr('sensor.ev_soc_estimate', 'source') }})</small>\n"
+                },
+                {
+                  "type": "map",
+                  "entities": [
+                    {
+                      "entity": "device_tracker.ev6_location"
+                    }
+                  ],
+                  "default_zoom": 14,
+                  "hours_to_show": 0,
+                  "grid_options": {
+                    "columns": "full",
+                    "rows": 4
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Parametry regulace",
+                  "icon": "mdi:tune"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "input_number.ev_current_min"
+                    },
+                    {
+                      "entity": "input_number.ev_current_max"
+                    },
+                    {
+                      "entity": "input_number.ev_regulation_interval_s"
+                    },
+                    {
+                      "entity": "input_boolean.ev_allow_1f"
+                    },
+                    {
+                      "entity": "input_number.ev_support_min_soc"
+                    },
+                    {
+                      "entity": "input_number.ev_support_max_min"
+                    },
+                    {
+                      "entity": "input_number.ev_support_max_kwh"
+                    },
+                    {
+                      "entity": "input_number.ev_resume_after_min"
+                    },
+                    {
+                      "entity": "input_number.ev_battery_capacity_kwh"
+                    },
+                    {
+                      "entity": "input_number.ev_charge_efficiency"
+                    },
+                    {
+                      "entity": "input_number.ev_target_soc_default"
+                    },
+                    {
+                      "entity": "input_number.ev_car_limit_default"
+                    },
+                    {
+                      "entity": "input_number.ev_high_soc_window_h"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "EV náklady",
+          "path": "ev-naklady",
+          "icon": "mdi:cash-multiple",
+          "type": "sections",
+          "max_columns": 3,
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Vyúčtování – EV ze sítě v NT",
+                  "icon": "mdi:file-document-outline"
+                },
+                {
+                  "type": "custom:flex-table-card",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "entities": {
+                    "include": "sensor.ev_nt_billing"
+                  },
+                  "columns": [
+                    {
+                      "name": "Měsíc",
+                      "data": "table.mesic"
+                    },
+                    {
+                      "name": "kWh",
+                      "data": "table.kwh",
+                      "align": "right"
+                    },
+                    {
+                      "name": "Kč",
+                      "data": "table.kc",
+                      "align": "right"
+                    },
+                    {
+                      "name": "Kč/kWh",
+                      "data": "table.cena",
+                      "align": "right"
+                    }
+                  ],
+                  "css": {
+                    "table+": "width: 100%; border-collapse: collapse;",
+                    "tbody tr:nth-child(odd)": "background-color: rgba(127, 127, 127, 0.07);",
+                    "tbody tr:first-child": "font-weight: 500;",
+                    "tbody tr:last-child": "font-weight: 700; border-top: 2px solid var(--divider-color);"
+                  }
+                },
+                {
+                  "type": "markdown",
+                  "content": "<small>EV odebrané ze sítě v NT × cena NT ({{ states('input_number.energy_price_nt') }} Kč/kWh).\nDo 25. 9. 2026 ruční NT nabíjení (v1), potom HAv2. Ze sítě ve VT navíc\n{{ states('sensor.ev_energy_grid_vt_total') | float(0) | round(1) }} kWh /\n{{ states('sensor.ev_charging_cost_grid_vt_total') | float(0) | round(0) | int }} Kč (od 25. 9.).\nAktualizace 1× za hodinu.</small>\n"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Souhrn",
+                  "icon": "mdi:cash"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_charging_cost_monthly",
+                  "name": "Tento měsíc",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_charging_cost_yearly",
+                  "name": "Tento rok",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_charging_avg_price",
+                  "name": "Průměrná cena",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_cost_per_100km",
+                  "name": "Na 100 km",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_own_energy_share_pct",
+                  "name": "Slunce + baterie",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_saving_vs_vt_monthly",
+                  "name": "Úspora proti VT (měsíc)",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_charging_energy_total",
+                  "name": "Nabito od 25. 9.",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_charging_cost_total",
+                  "name": "Náklady od 25. 9.",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Denní náklady podle zdroje",
+                  "icon": "mdi:chart-bar-stacked"
+                },
+                {
+                  "type": "statistics-graph",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 30,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.ev_charging_cost_solar_total",
+                      "name": "Slunce",
+                      "color": "#f5a623"
+                    },
+                    {
+                      "entity": "sensor.ev_charging_cost_battery_total",
+                      "name": "Baterie",
+                      "color": "#1e88e5"
+                    },
+                    {
+                      "entity": "sensor.ev_charging_cost_grid_nt_total",
+                      "name": "Síť NT",
+                      "color": "#43a047"
+                    },
+                    {
+                      "entity": "sensor.ev_charging_cost_grid_vt_total",
+                      "name": "Síť VT",
+                      "color": "#e53935"
+                    }
+                  ]
+                },
+                {
+                  "type": "heading",
+                  "heading": "Denní energie podle zdroje",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:lightning-bolt"
+                },
+                {
+                  "type": "statistics-graph",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 30,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.ev_energy_solar_total",
+                      "name": "Slunce",
+                      "color": "#f5a623"
+                    },
+                    {
+                      "entity": "sensor.ev_energy_battery_total",
+                      "name": "Baterie",
+                      "color": "#1e88e5"
+                    },
+                    {
+                      "entity": "sensor.ev_energy_grid_nt_total",
+                      "name": "Síť NT",
+                      "color": "#43a047"
+                    },
+                    {
+                      "entity": "sensor.ev_energy_grid_vt_total",
+                      "name": "Síť VT",
+                      "color": "#e53935"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Historie v1 (ruční NT nabíjení)",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:history"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_nt_energie_celkem",
+                  "name": "Energie NT celkem",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.ev_nt_naklady_celkem",
+                  "name": "Náklady NT celkem",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Bazén",
+          "path": "bazen",
+          "icon": "mdi:pool",
+          "type": "sections",
+          "max_columns": 3,
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Ruční ovládání",
+                  "icon": "mdi:hand-back-right"
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_select.pool_manual",
+                  "name": "Filtrace",
+                  "features": [
+                    {
+                      "type": "select-options"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_number.pool_manual_duration_h",
+                  "name": "Platí",
+                  "visibility": [
+                    {
+                      "condition": "state",
+                      "entity": "input_select.pool_manual",
+                      "state_not": "Auto"
+                    }
+                  ],
+                  "features": [
+                    {
+                      "type": "numeric-input",
+                      "style": "buttons"
+                    }
+                  ]
+                },
+                {
+                  "type": "tile",
+                  "entity": "switch.bazen_filtrace_rele",
+                  "name": "Čerpadlo",
+                  "tap_action": {
+                    "action": "more-info"
+                  }
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set c = 'sensor.pool_controller' %}\n**{{ states(c) }}** – {{ 'zapnout' if state_attr(c, 'pump_on') == 'ano' else 'vypnout' }}\n{{ '' if state_attr(c, 'executing') == 'ano' else '(jen doporučení)' }}\n\n{{ state_attr(c, 'reason') }}\n\nSolární starty dnes: {{ state_attr(c, 'solar_starts_today') }} / 4\n"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Hodiny (den 06–06)",
+                  "icon": "mdi:timer-outline"
+                },
+                {
+                  "type": "markdown",
+                  "content": "{% set p = 'sensor.pool_plan' %}\n**{{ state_attr(p, 'done_h') | float(0) | round(1) }} / {{ state_attr(p, 'target_h') }} h**\n· slunce ~{{ state_attr(p, 'solar_hours_left') | float(0) | round(1) }} h\n· NT ~{{ state_attr(p, 'nt_hours_expected') | float(0) | round(1) }} h\n"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.pool_hours_done",
+                  "name": "Odběhnuto",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.pool_hours_recommended",
+                  "name": "Doporučeno",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_number.pool_hours_required",
+                  "name": "Požadováno",
+                  "grid_options": {
+                    "columns": 12
+                  },
+                  "features_position": "inline",
+                  "features": [
+                    {
+                      "type": "numeric-input",
+                      "style": "buttons"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "state_color": true,
+                  "entities": [
+                    {
+                      "entity": "input_boolean.pool_season",
+                      "name": "Sezóna bazénu"
+                    },
+                    {
+                      "entity": "input_boolean.pool_use_recommendation",
+                      "name": "Filtrovat podle doporučení"
+                    }
+                  ]
+                },
+                {
+                  "type": "statistics-graph",
+                  "title": "Filtrace hodiny za den (14 dní)",
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 14,
+                  "stat_types": [
+                    "max"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.filtrace_spustena",
+                      "name": "Hodiny"
+                    }
+                  ]
+                },
+                {
+                  "type": "statistics-graph",
+                  "title": "Filtrace kWh za den (14 dní)",
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 14,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.bazen_cerpadlo_energie",
+                      "name": "Filtrace"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Voda",
+                  "icon": "mdi:water"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.davkovac_ph",
+                  "name": "pH",
+                  "vertical": true,
+                  "grid_options": {
+                    "columns": 4,
+                    "rows": 2
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.davkovac_orp",
+                  "name": "ORP",
+                  "vertical": true,
+                  "grid_options": {
+                    "columns": 4,
+                    "rows": 2
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.pool_water_temperature",
+                  "name": "Teplota",
+                  "vertical": true,
+                  "grid_options": {
+                    "columns": 4,
+                    "rows": 2
+                  }
+                },
+                {
+                  "type": "history-graph",
+                  "title": "pH a ORP (48 h)",
+                  "hours_to_show": 48,
+                  "entities": [
+                    {
+                      "entity": "sensor.davkovac_ph"
+                    },
+                    {
+                      "entity": "sensor.davkovac_orp"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Parametry",
+                  "icon": "mdi:tune"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "input_number.pool_hours_min"
+                    },
+                    {
+                      "entity": "input_number.pool_hours_max"
+                    },
+                    {
+                      "entity": "input_number.pool_min_run_min"
+                    },
+                    {
+                      "entity": "input_number.filtrace_vykon_w"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Baterie & FVE",
+          "path": "baterie",
+          "icon": "mdi:home-battery",
+          "type": "sections",
+          "max_columns": 3,
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Baterie",
+                  "icon": "mdi:home-battery"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.battery_state_of_charge",
+                  "name": "SOC",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.battery_power",
+                  "name": "Výkon (+ vybíjení)",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.battery_state_of_health",
+                  "name": "SOH",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_battery_stored_cost",
+                  "name": "Pořizovací cena",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "select.goodwe_ems_mode",
+                  "name": "EMS režim",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "number.goodwe_ems_power_limit",
+                  "name": "EMS výkon",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "number.goodwe_maximum_vybiti_v_siti",
+                  "name": "DoD",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "number.goodwe_limit_dodavky_do_site",
+                  "name": "Limit přetoku",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "FVE",
+                  "icon": "mdi:solar-power-variant"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.pv_power",
+                  "name": "Výroba teď"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "name": "Zbytek dnes (opraveno)"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "attribute": "today_kwh",
+                      "name": "Dnes celkem (opraveno)",
+                      "icon": "mdi:solar-power",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "attribute": "solcast_raw_today_kwh",
+                      "name": "Dnes Solcast",
+                      "icon": "mdi:weather-sunny",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "attribute": "tomorrow_kwh",
+                      "name": "Zítra (opraveno)",
+                      "icon": "mdi:solar-power-variant",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "attribute": "solcast_raw_tomorrow_kwh",
+                      "name": "Zítra Solcast",
+                      "icon": "mdi:weather-partly-cloudy",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "attribute": "tomorrow_conservative_kwh",
+                      "name": "Zítra konzervativně",
+                      "icon": "mdi:weather-cloudy",
+                      "suffix": "kWh"
+                    }
+                  ]
+                },
+                {
+                  "type": "history-graph",
+                  "title": "SOC, FVE a baterie (24 h)",
+                  "hours_to_show": 24,
+                  "entities": [
+                    {
+                      "entity": "sensor.battery_state_of_charge"
+                    },
+                    {
+                      "entity": "sensor.pv_power"
+                    },
+                    {
+                      "entity": "sensor.battery_power"
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "graph_span": "7d",
+                  "span": {
+                    "start": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Předpověď FVE na 7 dní (kWh)",
+                    "show_states": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 240
+                    },
+                    "legend": {
+                      "show": true
+                    },
+                    "plotOptions": {
+                      "bar": {
+                        "columnWidth": "75%"
+                      }
+                    },
+                    "dataLabels": {
+                      "enabled": true,
+                      "enabledOnSeries": [
+                        1
+                      ],
+                      "formatter": "EVAL:function(v) { return v ? v.toFixed(0) : ''; }\n"
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "min": 0,
+                      "decimals": 0
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "name": "Solcast",
+                      "type": "column",
+                      "color": "#ffe082",
+                      "data_generator": "return (entity.attributes.week || []).map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[1]]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "name": "HAv2 (opraveno)",
+                      "type": "column",
+                      "color": "#f4b400",
+                      "data_generator": "return (entity.attributes.week || []).map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[2]]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_pv_forecast_corrected",
+                      "name": "Pesimisticky (p10)",
+                      "type": "line",
+                      "color": "#8d6e63",
+                      "stroke_width": 2,
+                      "data_generator": "return (entity.attributes.week || []).map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[3]]);\n"
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "graph_span": "14d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Přesnost předpovědí (předpověď z 6:00 × skutečnost)",
+                    "show_states": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 260
+                    },
+                    "legend": {
+                      "show": true
+                    },
+                    "stroke": {
+                      "dashArray": [
+                        0,
+                        0,
+                        4,
+                        0,
+                        4
+                      ]
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "min": 0,
+                      "decimals": 0,
+                      "apex_config": {
+                        "title": {
+                          "text": "kWh"
+                        }
+                      }
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.energy_forecast_accuracy",
+                      "name": "FVE skutečnost",
+                      "type": "column",
+                      "color": "#f4b400",
+                      "data_generator": "return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[2]]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_forecast_accuracy",
+                      "name": "FVE předpověď HAv2",
+                      "type": "line",
+                      "color": "#e65100",
+                      "stroke_width": 3,
+                      "data_generator": "return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[1]]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_forecast_accuracy",
+                      "name": "Solcast surová",
+                      "type": "line",
+                      "color": "#ffcc80",
+                      "stroke_width": 2,
+                      "data_generator": "return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[3]]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_forecast_accuracy",
+                      "name": "Spotřeba skutečnost",
+                      "type": "column",
+                      "color": "#90a4ae",
+                      "data_generator": "return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[5]]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_forecast_accuracy",
+                      "name": "Spotřeba předpověď",
+                      "type": "line",
+                      "color": "#455a64",
+                      "stroke_width": 2,
+                      "data_generator": "return (entity.attributes.history || []).map(r => [new Date(r[0] + 'T12:00:00').getTime(), r[4]]);\n"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Fáze a jistič",
+                  "icon": "mdi:sine-wave"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "sensor.meter_active_power_l1",
+                      "name": "L1 (+ prodej / − nákup)"
+                    },
+                    {
+                      "entity": "sensor.meter_active_power_l2",
+                      "name": "L2"
+                    },
+                    {
+                      "entity": "sensor.meter_active_power_l3",
+                      "name": "L3"
+                    },
+                    {
+                      "entity": "sensor.energy_breaker_headroom_a"
+                    },
+                    {
+                      "entity": "sensor.energy_grid_cross_w"
+                    },
+                    {
+                      "entity": "binary_sensor.energy_boiler_heating"
+                    },
+                    {
+                      "entity": "sensor.energy_boiler_voltage_index_5min",
+                      "name": "Napěťový index bojleru (5 min)"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Parametry baterie a cen",
+                  "icon": "mdi:tune"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "input_number.energy_battery_min_soc"
+                    },
+                    {
+                      "entity": "input_number.energy_battery_max_grid_charge_w"
+                    },
+                    {
+                      "entity": "input_number.energy_sell_min_spot"
+                    },
+                    {
+                      "entity": "input_number.energy_export_block_below"
+                    },
+                    {
+                      "entity": "input_number.energy_battery_efficiency"
+                    },
+                    {
+                      "entity": "input_number.energy_battery_wear_cost"
+                    },
+                    {
+                      "entity": "input_number.energy_price_vt"
+                    },
+                    {
+                      "entity": "input_number.energy_price_nt"
+                    },
+                    {
+                      "entity": "input_number.energy_sell_coefficient"
+                    },
+                    {
+                      "entity": "input_boolean.energy_boiler_preheat"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Úspory",
+          "path": "uspory",
+          "icon": "mdi:piggy-bank",
+          "type": "sections",
+          "max_columns": 3,
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Náklady netto",
+                  "icon": "mdi:cash"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_net_cost_daily",
+                  "name": "Dnes",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_net_cost_monthly",
+                  "name": "Měsíc",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_import_cost_total",
+                  "name": "Nákup celkem",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_export_revenue_total",
+                  "name": "Prodej celkem",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "heading",
+                  "heading": "Kontrola proti PND",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:file-compare"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_pnd_deviation_import_pct",
+                  "name": "Odchylka nákupu",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_pnd_deviation_export_pct",
+                  "name": "Odchylka prodeje",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_grid_cross_energy",
+                  "name": "Souběžný nákup+prodej",
+                  "grid_options": {
+                    "columns": 12
+                  }
+                },
+                {
+                  "type": "markdown",
+                  "text_only": true,
+                  "content": "<small>Odchylka je bez bojleru (ten je mimo měření GoodWe). Při malém prodeji\nzkresluje % rozlišení GoodWe 0,1 kWh.</small>\n"
+                },
+                {
+                  "type": "heading",
+                  "heading": "Bojler – měření (Shelly)",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:water-boiler"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_boiler_power_w",
+                  "name": "Bojler teď",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "binary_sensor.energy_boiler_heating",
+                  "name": "Hřeje",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_boolean.energy_boiler_block_on_sale",
+                  "name": "Blokovat při prodeji",
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "switch.bojler_blokace_rele",
+                  "name": "Bojler blokován",
+                  "icon": "mdi:water-boiler-off",
+                  "tap_action": {
+                    "action": "more-info"
+                  },
+                  "grid_options": {
+                    "columns": 6
+                  }
+                },
+                {
+                  "type": "statistics-graph",
+                  "title": "Sauna kWh za den (14 dní)",
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 14,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.sauna_energy",
+                      "name": "Sauna"
+                    }
+                  ]
+                },
+                {
+                  "type": "statistics-graph",
+                  "title": "Bojler kWh za den (14 dní)",
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 14,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.bojler_energie",
+                      "name": "Bojler"
+                    }
+                  ]
+                },
+                {
+                  "type": "heading",
+                  "heading": "Bojler podle PND (D+1)",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:water-boiler"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.energy_boiler_pnd_daily",
+                  "name": "Bojler za poslední den",
+                  "grid_options": {
+                    "columns": 12
+                  }
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "attribute": "date",
+                      "name": "Den",
+                      "icon": "mdi:calendar"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "attribute": "cost_kc",
+                      "name": "Náklady (nákup ze sítě)",
+                      "icon": "mdi:cash",
+                      "suffix": "Kč"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "attribute": "export_loss_kwh",
+                      "name": "Z toho z přetoků",
+                      "icon": "mdi:solar-power",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "attribute": "month_cost_kc",
+                      "name": "Tento měsíc (do včerejška)",
+                      "icon": "mdi:calendar-month",
+                      "suffix": "Kč"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "attribute": "month_kwh",
+                      "name": "Tento měsíc energie",
+                      "icon": "mdi:lightning-bolt",
+                      "suffix": "kWh"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "attribute": "avg_kwh_14d",
+                      "name": "Průměr 14 dní",
+                      "icon": "mdi:chart-bell-curve",
+                      "suffix": "kWh/den"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "attribute": "avg_cost_14d",
+                      "name": "Průměrné náklady 14 dní",
+                      "icon": "mdi:cash-multiple",
+                      "suffix": "Kč/den"
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "graph_span": "14d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Bojler po dnech (PND)",
+                    "show_states": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 220
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "id": "kwh",
+                      "min": 0,
+                      "decimals": 1
+                    },
+                    {
+                      "id": "kc",
+                      "opposite": true,
+                      "min": 0,
+                      "decimals": 0
+                    }
+                  ],
+                  "series": [
+                    {
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "name": "kWh",
+                      "type": "column",
+                      "color": "#ef6c00",
+                      "yaxis_id": "kwh",
+                      "data_generator": "return JSON.parse(entity.attributes.days_json || '[]').map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[1]]);\n"
+                    },
+                    {
+                      "entity": "sensor.energy_boiler_pnd_daily",
+                      "name": "Kč",
+                      "type": "line",
+                      "color": "#e53935",
+                      "yaxis_id": "kc",
+                      "data_generator": "return JSON.parse(entity.attributes.days_json || '[]').map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[2]]);\n"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Denní náklady a výnosy",
+                  "icon": "mdi:chart-bar"
+                },
+                {
+                  "type": "statistics-graph",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 30,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.energy_import_cost_total",
+                      "name": "Nákup Kč",
+                      "color": "#e53935"
+                    },
+                    {
+                      "entity": "sensor.energy_export_revenue_total",
+                      "name": "Prodej Kč",
+                      "color": "#43a047"
+                    }
+                  ]
+                },
+                {
+                  "type": "heading",
+                  "heading": "Nákup a prodej – HA proti PND (kWh/den)",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:transmission-tower"
+                },
+                {
+                  "type": "statistics-graph",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "chart_type": "bar",
+                  "period": "day",
+                  "days_to_show": 14,
+                  "stat_types": [
+                    "change"
+                  ],
+                  "entities": [
+                    {
+                      "entity": "sensor.energy_buy_sum",
+                      "name": "Nákup HA",
+                      "color": "#ef9a9a"
+                    },
+                    {
+                      "entity": "cez_pnd:859182400703740246_consumption",
+                      "name": "Nákup PND",
+                      "color": "#c62828"
+                    },
+                    {
+                      "entity": "sensor.energy_sell_sum",
+                      "name": "Prodej HA",
+                      "color": "#a5d6a7"
+                    },
+                    {
+                      "entity": "cez_pnd:859182400703740246_production",
+                      "name": "Prodej PND",
+                      "color": "#2e7d32"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Toky energie dnes",
+                  "icon": "mdi:chart-sankey"
+                },
+                {
+                  "type": "custom:sankey-chart",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "time_period_from": "now/d",
+                  "show_names": true,
+                  "round": 1,
+                  "min_state": 0.05,
+                  "height": 320,
+                  "ignore_missing_entities": true,
+                  "nodes": [
+                    {
+                      "id": "sensor.total_pv_generation",
+                      "section": 0,
+                      "name": "FVE",
+                      "color": "#f4b400"
+                    },
+                    {
+                      "id": "sensor.energy_import_nt_total",
+                      "section": 0,
+                      "name": "Síť NT",
+                      "color": "#5c6bc0"
+                    },
+                    {
+                      "id": "sensor.energy_import_vt_total",
+                      "section": 0,
+                      "name": "Síť VT",
+                      "color": "#e53935"
+                    },
+                    {
+                      "id": "sensor.total_battery_discharge",
+                      "section": 0,
+                      "name": "Baterie (vybíjení)",
+                      "color": "#43a047"
+                    },
+                    {
+                      "id": "sensor.bojler_ze_site_energie",
+                      "section": 0,
+                      "name": "Síť (bojler)",
+                      "color": "#8d6e63"
+                    },
+                    {
+                      "id": "sensor.energy_sources_total",
+                      "section": 1,
+                      "name": "Celkem (GoodWe)",
+                      "color": "#78909c"
+                    },
+                    {
+                      "id": "boiler_pass",
+                      "type": "passthrough",
+                      "section": 1
+                    },
+                    {
+                      "id": "sensor.energy_base_house_energy",
+                      "section": 2,
+                      "name": "Dům",
+                      "color": "#90a4ae"
+                    },
+                    {
+                      "id": "sensor.ecovolter_revcr01c00002056_total_charged_energy",
+                      "section": 2,
+                      "name": "EV",
+                      "color": "#26a69a"
+                    },
+                    {
+                      "id": "sensor.bazen_cerpadlo_energie",
+                      "section": 2,
+                      "name": "Filtrace",
+                      "color": "#29b6f6"
+                    },
+                    {
+                      "id": "sensor.sauna_energy",
+                      "section": 2,
+                      "name": "Sauna",
+                      "color": "#ef6c00"
+                    },
+                    {
+                      "id": "sensor.total_battery_charge",
+                      "section": 2,
+                      "name": "Baterie (nabíjení)",
+                      "color": "#66bb6a"
+                    },
+                    {
+                      "id": "sensor.energy_sell_net_energie",
+                      "section": 2,
+                      "name": "Prodej do sítě",
+                      "color": "#ffa726"
+                    },
+                    {
+                      "id": "rest",
+                      "type": "remaining_parent_state",
+                      "section": 2,
+                      "name": "Ostatní / ztráty",
+                      "color": "#bdbdbd"
+                    },
+                    {
+                      "id": "sensor.bojler_energie",
+                      "section": 2,
+                      "name": "Bojler",
+                      "color": "#8d6e63"
+                    }
+                  ],
+                  "links": [
+                    {
+                      "source": "sensor.total_pv_generation",
+                      "target": "sensor.energy_sources_total"
+                    },
+                    {
+                      "source": "sensor.energy_import_nt_total",
+                      "target": "sensor.energy_sources_total"
+                    },
+                    {
+                      "source": "sensor.energy_import_vt_total",
+                      "target": "sensor.energy_sources_total"
+                    },
+                    {
+                      "source": "sensor.total_battery_discharge",
+                      "target": "sensor.energy_sources_total"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "sensor.energy_base_house_energy"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "sensor.ecovolter_revcr01c00002056_total_charged_energy"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "sensor.bazen_cerpadlo_energie"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "sensor.sauna_energy"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "sensor.total_battery_charge"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "sensor.energy_sell_net_energie"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "sensor.bojler_energie",
+                      "value": "sensor.bojler_z_pretoku_energie"
+                    },
+                    {
+                      "source": "sensor.energy_sources_total",
+                      "target": "rest"
+                    },
+                    {
+                      "source": "sensor.bojler_ze_site_energie",
+                      "target": "boiler_pass"
+                    },
+                    {
+                      "source": "boiler_pass",
+                      "target": "sensor.bojler_energie"
+                    }
+                  ]
+                },
+                {
+                  "type": "markdown",
+                  "content": "<small>Od půlnoci, kWh. Levá část a „Celkem“ je bilance měřená GoodWe (nákup a prodej po fázích). Bojler je zapojený mimo měření GoodWe (jen L3): z „Celkem“ dostává část přetoku, kterou GoodWe na L3 exportoval (min. z příkonu bojleru a exportu L3), zbytek bere přímo ze sítě. „Prodej do sítě“ = export bez bojleru (≈ PND). „Ostatní / ztráty“ = ztráty střídače a baterie a nepřesnosti měření. Rozpad bojleru od 2. 10. 2026.</small>\n"
+                },
+                {
+                  "type": "heading",
+                  "heading": "Spotřeba po dnech",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:chart-bar-stacked"
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "graph_span": "14d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "stacked": true,
+                  "header": {
+                    "show": true,
+                    "title": "Spotřeba kWh za den (14 dní)",
+                    "show_states": false
+                  },
+                  "apex_config": {
+                    "chart": {
+                      "height": 300
+                    },
+                    "legend": {
+                      "show": true
+                    },
+                    "plotOptions": {
+                      "bar": {
+                        "columnWidth": "70%"
+                      }
+                    }
+                  },
+                  "yaxis": [
+                    {
+                      "min": 0,
+                      "decimals": 0,
+                      "apex_config": {
+                        "title": {
+                          "text": "kWh"
+                        }
+                      }
+                    }
+                  ],
+                  "all_series_config": {
+                    "type": "column",
+                    "float_precision": 1,
+                    "statistics": {
+                      "type": "change",
+                      "period": "day",
+                      "align": "start"
+                    }
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.energy_base_house_energy",
+                      "name": "Dům",
+                      "color": "#90a4ae"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_total_charged_energy",
+                      "name": "EV",
+                      "color": "#26a69a"
+                    },
+                    {
+                      "entity": "sensor.bazen_cerpadlo_energie",
+                      "name": "Filtrace",
+                      "color": "#29b6f6"
+                    },
+                    {
+                      "entity": "sensor.bojler_energie",
+                      "name": "Bojler",
+                      "color": "#8d6e63"
+                    },
+                    {
+                      "entity": "sensor.sauna_energy",
+                      "name": "Sauna",
+                      "color": "#ef6c00"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "PND",
+          "path": "pnd",
+          "icon": "mdi:file-chart",
+          "type": "sections",
+          "max_columns": 2,
+          "sections": [
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Po dnech (14 dní)",
+                  "icon": "mdi:calendar-today"
+                },
+                {
+                  "type": "markdown",
+                  "text_only": true,
+                  "content": "Data z portálu distributora (PND), stahují se ráno za předchozí den. Čísla v záhlaví = včerejšek. Porovnání s měřením HA je na **Úspory → Kontrola proti PND**."
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "14d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Nákup a prodej",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "all_series_config": {
+                    "unit": " kWh"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Prodej do sítě",
+                      "attribute": "production",
+                      "type": "column",
+                      "color": "#ffa726",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.production[i])])\n  .filter(([t]) => t < today.getTime());\n"
+                    },
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Nákup ze sítě",
+                      "attribute": "consumption",
+                      "type": "column",
+                      "color": "#e53935",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.consumption[i])])\n  .filter(([t]) => t < today.getTime());\n",
+                      "invert": true
+                    }
+                  ]
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "14d",
+                  "span": {
+                    "end": "day"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Nákup podle tarifu",
+                    "show_states": true,
+                    "colorize_states": true
+                  },
+                  "all_series_config": {
+                    "unit": " kWh"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "NT",
+                      "attribute": "low_tariff",
+                      "type": "column",
+                      "color": "#5c6bc0",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.low_tariff[i])])\n  .filter(([t]) => t < today.getTime());\n"
+                    },
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "VT",
+                      "attribute": "high_tariff",
+                      "type": "column",
+                      "color": "#e53935",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const today = new Date();\ntoday.setHours(0, 0, 0, 0);\nreturn entity.attributes.pnddate\n  .map((d, i) => [new Date(d).getTime(), parseFloat(entity.attributes.high_tariff[i])])\n  .filter(([t]) => t < today.getTime());\n"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "column_span": 2,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Po měsících (12 měsíců)",
+                  "icon": "mdi:calendar-month"
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "1y",
+                  "span": {
+                    "end": "month"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Nákup a prodej",
+                    "show_states": false,
+                    "colorize_states": true
+                  },
+                  "all_series_config": {
+                    "unit": " kWh"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Prodej do sítě",
+                      "attribute": "production",
+                      "type": "column",
+                      "color": "#ffa726",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((d, i) => {\n  const x = new Date(d);\n  const key = x.getFullYear() + '-' + x.getMonth();\n  if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };\n  sums[key].value += parseFloat(entity.attributes.production[i]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);\n"
+                    },
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "Nákup ze sítě",
+                      "attribute": "consumption",
+                      "type": "column",
+                      "color": "#e53935",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((d, i) => {\n  const x = new Date(d);\n  const key = x.getFullYear() + '-' + x.getMonth();\n  if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };\n  sums[key].value += parseFloat(entity.attributes.consumption[i]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);\n",
+                      "invert": true
+                    }
+                  ],
+                  "apex_config": {
+                    "tooltip": {
+                      "x": {
+                        "formatter": "EVAL: (value) => new Intl.DateTimeFormat('cs-CZ', { year: 'numeric', month: 'long' }).format(new Date(value))\n"
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "custom:apexcharts-card",
+                  "stacked": true,
+                  "graph_span": "1y",
+                  "span": {
+                    "end": "month"
+                  },
+                  "header": {
+                    "show": true,
+                    "title": "Nákup podle tarifu",
+                    "show_states": false,
+                    "colorize_states": true
+                  },
+                  "all_series_config": {
+                    "unit": " kWh"
+                  },
+                  "series": [
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "NT",
+                      "attribute": "low_tariff",
+                      "type": "column",
+                      "color": "#5c6bc0",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((d, i) => {\n  const x = new Date(d);\n  const key = x.getFullYear() + '-' + x.getMonth();\n  if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };\n  sums[key].value += parseFloat(entity.attributes.low_tariff[i]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);\n"
+                    },
+                    {
+                      "entity": "sensor.pnd_tariff_data",
+                      "name": "VT",
+                      "attribute": "high_tariff",
+                      "type": "column",
+                      "color": "#e53935",
+                      "opacity": 0.85,
+                      "float_precision": 2,
+                      "data_generator": "const sums = {};\nentity.attributes.pnddate.forEach((d, i) => {\n  const x = new Date(d);\n  const key = x.getFullYear() + '-' + x.getMonth();\n  if (!sums[key]) sums[key] = { time: new Date(x.getFullYear(), x.getMonth(), 2).getTime(), value: 0 };\n  sums[key].value += parseFloat(entity.attributes.high_tariff[i]);\n});\nreturn Object.values(sums).sort((a, b) => a.time - b.time).map(s => [s.time, Math.round(s.value * 10) / 10]);\n"
+                    }
+                  ],
+                  "apex_config": {
+                    "tooltip": {
+                      "x": {
+                        "formatter": "EVAL: (value) => new Intl.DateTimeFormat('cs-CZ', { year: 'numeric', month: 'long' }).format(new Date(value))\n"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Nastavení",
+          "path": "nastaveni",
+          "icon": "mdi:cog",
+          "type": "sections",
+          "max_columns": 3,
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Řízení",
+                  "icon": "mdi:robot"
+                },
+                {
+                  "type": "tile",
+                  "entity": "input_select.energy_system_mode",
+                  "name": "Režim systému",
+                  "features": [
+                    {
+                      "type": "select-options"
+                    }
+                  ]
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "input_boolean.energy_battery_control"
+                    },
+                    {
+                      "entity": "input_boolean.ev_control"
+                    },
+                    {
+                      "entity": "input_boolean.pool_control"
+                    },
+                    {
+                      "entity": "input_datetime.energy_override_until"
+                    },
+                    {
+                      "entity": "input_boolean.energy_morning_summary",
+                      "name": "Ranní souhrn do mobilu (7:40)"
+                    },
+                    {
+                      "entity": "input_number.energy_sauna_power_kw",
+                      "name": "Sauna příkon (pro plán)"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Zdraví zdrojů dat",
+                  "icon": "mdi:heart-pulse"
+                },
+                {
+                  "type": "entities",
+                  "state_color": true,
+                  "entities": [
+                    {
+                      "entity": "input_datetime.hav2_heartbeat",
+                      "name": "AppDaemon heartbeat (max. 3 min)",
+                      "secondary_info": "last-changed"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_plan",
+                      "attribute": "generated",
+                      "name": "Plán baterie přepočten",
+                      "icon": "mdi:calendar-refresh",
+                      "format": "relative"
+                    },
+                    {
+                      "type": "attribute",
+                      "entity": "sensor.energy_load_forecast",
+                      "attribute": "source",
+                      "name": "Profil spotřeby",
+                      "icon": "mdi:chart-bell-curve"
+                    },
+                    {
+                      "entity": "binary_sensor.energy_forecast_valid",
+                      "name": "Solcast předpověď"
+                    },
+                    {
+                      "entity": "sensor.solcast_pv_forecast_api_used",
+                      "name": "Solcast API použito (limit 9 + 1 odhad)",
+                      "icon": "mdi:api"
+                    },
+                    {
+                      "entity": "binary_sensor.ecovolter_revcr01c00002056_is_vehicle_connected",
+                      "name": "EcoVolter (auto připojeno)"
+                    },
+                    {
+                      "entity": "sensor.ev6_last_updated_at",
+                      "name": "Kia data aktualizována",
+                      "icon": "mdi:car-clock"
+                    },
+                    {
+                      "entity": "binary_sensor.cez_hdo_lowtariffactive_dum",
+                      "name": "HDO nízký tarif"
+                    },
+                    {
+                      "entity": "binary_sensor.spot_electricity_has_tomorrow_data_2",
+                      "name": "Spot ceny na zítra"
+                    },
+                    {
+                      "entity": "sensor.pnd_data",
+                      "name": "PND data stažena",
+                      "icon": "mdi:file-compare",
+                      "secondary_info": "last-updated"
+                    }
+                  ]
+                },
+                {
+                  "type": "heading",
+                  "heading": "Diagnostika zařízení",
+                  "heading_style": "subtitle",
+                  "icon": "mdi:thermometer"
+                },
+                {
+                  "type": "entities",
+                  "entities": [
+                    {
+                      "entity": "sensor.inverter_temperature_radiator",
+                      "name": "Střídač – chladič"
+                    },
+                    {
+                      "entity": "sensor.inverter_temperature_air",
+                      "name": "Střídač – vzduch"
+                    },
+                    {
+                      "entity": "sensor.battery_temperature",
+                      "name": "Baterie – teplota"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_temperature_internal",
+                      "name": "EcoVolter – uvnitř"
+                    },
+                    {
+                      "entity": "sensor.ecovolter_revcr01c00002056_temperature_relay1",
+                      "name": "EcoVolter – relé"
+                    },
+                    {
+                      "type": "section",
+                      "label": "Napětí sítě (GoodWe)"
+                    },
+                    {
+                      "entity": "sensor.on_grid_l1_voltage",
+                      "name": "L1"
+                    },
+                    {
+                      "entity": "sensor.on_grid_l2_voltage",
+                      "name": "L2"
+                    },
+                    {
+                      "entity": "sensor.on_grid_l3_voltage",
+                      "name": "L3"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Log rozhodnutí (24 h)",
+                  "icon": "mdi:text-box-outline"
+                },
+                {
+                  "type": "logbook",
+                  "hours_to_show": 24,
+                  "target": {
+                    "entity_id": [
+                      "input_text.energy_last_decision",
+                      "input_text.ev_last_decision",
+                      "input_text.pool_last_decision"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "column_span": 3,
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Všechny entity HAv2 (štítek hav2)",
+                  "icon": "mdi:label"
+                },
+                {
+                  "type": "custom:auto-entities",
+                  "grid_options": {
+                    "columns": "full"
+                  },
+                  "show_empty": false,
+                  "card": {
+                    "type": "entities"
+                  },
+                  "filter": {
+                    "include": [
+                      {
+                        "label": "hav2",
+                        "domain": "input_*"
+                      }
+                    ],
+                    "exclude": [
+                      {
+                        "entity_id": "input_datetime.hav2_heartbeat"
+                      }
+                    ]
+                  },
+                  "sort": {
+                    "method": "name"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
