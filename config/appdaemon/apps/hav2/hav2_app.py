@@ -133,6 +133,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         self.export_published = None
         self.neg_boiler = BO.NegPriceBoiler()
         self.boiler_block_sent: Optional[bool] = None
+        self.ev_grid_hold = False  # baterie drží kvůli plánovanému síťovému slotu EV
         self.sauna_on_since: Optional[datetime] = None
         self.sauna_off_since: Optional[datetime] = None
         self.sauna_seen = False  # sauna v této session „Dnes sauna“ opravdu běžela
@@ -585,10 +586,15 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         if act is None:
             return
         mode = act.mode
+        reason = self.plan_reason
         if mode == P.MODE_DEFER:
             mode = "standby" if self.defer_live == "standby" else "auto"
+        # EV v plánovaném síťovém slotu (NT/VT) má jít ze sítě, ne z baterie domu
+        # (3. 10. 2026: „NT“ nabíjení EV 22:15–23:00 vybilo baterii 75 → 42 %)
+        if mode == "auto" and self.ev_grid_hold:
+            mode, reason = "standby", "EV nabíjí ze sítě (plánovaný slot) – baterie drží"
         self.call_service("script/hav2_battery_set", mode=mode,
-                          power_w=int(round(act.power_kw * 1000)), reason=self.plan_reason[:200])
+                          power_w=int(round(act.power_kw * 1000)), reason=reason[:200])
 
     def battery_executing(self) -> bool:
         return (self.get_state("input_select.energy_system_mode") == "Auto"
@@ -600,8 +606,20 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         need = self.ev_needed_now()  # omezeno limitem nabíjení v autě
         return True if need is None else need > 0.05  # SOC auta neznámý → počítat s tím, že nabíjí
 
+    def _ev_grid_hold_check(self) -> None:
+        """Plánovaný síťový slot EV začal / skončil → přepsat režim baterie (auto ↔ standby)."""
+        now = datetime.now(TZ)
+        slot = self.ev_plan.slot_now(now) if getattr(self, "ev_plan", None) else None
+        hold = bool(slot and self.get_state("input_select.ev_manual") == "Auto" and self.ev_wants_energy())
+        if hold != self.ev_grid_hold:
+            self.ev_grid_hold = hold
+            self.log(f"baterie: {'držet' if hold else 'konec držení'} (síťový slot EV {slot or '–'})")
+            if self.battery_executing():
+                self.battery_apply()
+
     def live_loop(self, kwargs: Dict[str, Any]) -> None:
         try:
+            self._ev_grid_hold_check()
             self._defer_guard()
             self._export_control()
             self._boiler_block()

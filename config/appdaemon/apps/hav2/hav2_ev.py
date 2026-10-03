@@ -99,8 +99,8 @@ class EvPlan:
 def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
     """Rozdělí potřebnou energii: slunce → NT → (VT jen při „za každou cenu“).
 
-    Bez termínu je horizont do zítřka 18:00: v NT se nabije jen to, co do té doby
-    nepokryje předpovězený přebytek (odjezdy jsou nepravidelné, termín zadává uživatel).
+    Bez termínu je horizont do zítřka 18:00 a nabíjí se jen z přetoku FVE – síť (NT/VT)
+    až na požadavek uživatele, tj. se zadaným termínem (uživatel 3. 10. 2026).
     NT se plánuje v posledním NT bloku před termínem (dřív může nabíjet slunce), v bloku
     od začátku (baterie domu se nabíjí na jeho konci), VT co nejpozději.
     """
@@ -116,7 +116,8 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
         empty.reason = "režim Rychle: hned, max. proud"
         return empty
 
-    if p.deadline and p.deadline > now:
+    has_deadline = bool(p.deadline and p.deadline > now)
+    if has_deadline:
         horizon = p.deadline
     else:
         horizon = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
@@ -145,7 +146,7 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
         rest_normal -= e_normal
         return e_high + e_normal
 
-    if p.mode == "Solár+NT" and rest_high + rest_normal > 0.05:
+    if p.mode == "Solár+NT" and has_deadline and rest_high + rest_normal > 0.05:
         later_high = min(rest_high, max(0.0, p.later_nt_high_kwh))
         later_normal = min(rest_normal, max(0.0, p.later_nt_kwh - later_high))
         rest_high -= later_high
@@ -192,7 +193,7 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
         if shortfall > 0.05:
             parts.append(f"CHYBÍ {shortfall:.1f} kWh")
     elif p.mode == "Solár+NT":
-        parts.append("bez termínu (NT jen na to, co nepokryje slunce do zítřka 18:00)")
+        parts.append("bez termínu – jen přetok FVE (NT až se zadaným termínem)")
     else:
         parts.append("jen slunce")
     cost = (nt_kwh + later_kwh) * p.nt_price + vt_kwh * p.vt_price

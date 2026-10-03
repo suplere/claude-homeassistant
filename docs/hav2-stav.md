@@ -103,7 +103,10 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
    Pohled PND = `statistics-graph` nad `cez_pnd:*` (včera, 14 dní, 12 měsíců, NT/VT, náklady); HAv2 spouští `pnd_check`
    po konci synchronizace (`pnd_sync_entity` v `hav2.yaml`), dál i v 7:30. App A vypnutá (`disable: true` v `apps.yaml`),
    obě její automatizace vypnuté – smazání viz 0/5.
-8. **Dřívější (1.–2. 10.):** souběh EV a bojleru v noci OK (EV staženo na 8 A ve 3f, rezerva jističe min. 7,5 A);
+8. **EV bez termínu jen z přetoku (3. 10. večer):** auto připojené ve 22:15 bez požadavku nabilo v NT ~3 kWh (72 → 76 %,
+   plán „NT jen na to, co nepokryje slunce do zítřka 18:00“ se každých 15 min přepočítával a NT rostlo; zastavil SOC baterie
+   ≤ 60 %). Uživatel: bez požadavku jen přetok FVE → `plan_ev` plánuje NT/VT jen se zadaným termínem `input_datetime.ev_deadline`.
+9. **Dřívější (1.–2. 10.):** souběh EV a bojleru v noci OK (EV staženo na 8 A ve 3f, rezerva jističe min. 7,5 A);
    jednorázový cíl EV nad limitem auta OK; watchdog otestován (restart AppDaemonu); Shelly Pro EM-50 přejmenovány
    (`switch.bazen_filtrace_rele`, `sensor.bazen_cerpadlo_*`, `switch.bojler_blokace_rele`, `sensor.bojler_*`; v jsonl starší
    ID `shellyproem50_<MAC>_energy_meter_0_*`); smazán `sensor.pool_hours_done_legacy` a Shelly Pro 1PM; ranní souhrn

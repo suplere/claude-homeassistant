@@ -220,7 +220,8 @@ a watchdog baterie vrací 10 000 W.
 1. **Při připojení auta:** `kia_uvo.force_update` (max. 2× denně). SOC → `ev_soc_estimate`, spočítá se `ev_energy_needed_kwh`.
 2. **Rozdělení energie do slotů podle režimu:**
    - **Solár:** jen sloty s očekávaným přebytkem ≥ 1,3 kW (1f) nebo ≥ 4,2 kW (3f).
-   - **Solár+NT:** nejdřív FVE sloty do termínu, zbytek NT (22–06) – v **posledním** NT bloku před termínem
+   - **Solár+NT bez termínu:** jen přetok FVE jako Solár – síť jen na požadavek, tj. se zadaným termínem (uživatel 3. 10. 2026).
+   - **Solár+NT s termínem:** nejdřív FVE sloty do termínu, zbytek NT (22–06) – v **posledním** NT bloku před termínem
      (dřív může nabíjet slunce). NT za koncem předpovědi (sloty do zítřka 24:00) a před termínem se jen rezervuje
      („NT později“) a naplánuje se, až bude v horizontu. V NT 3f 11 A ≈ 7 kW (auto bere méně, než je nastaveno), pozor na jistič (§7).
    - **Rychle:** hned, max. proud, jakákoli cena.

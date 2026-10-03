@@ -227,10 +227,22 @@ def test_plan_solar_covers_everything():
     assert plan.nt_kwh == 0 and plan.solar_kwh == 10
 
 
+def test_plan_without_deadline_no_grid():
+    """Bez požadavku (termínu) jen přetok FVE, žádné NT (uživatel 3. 10. 2026)."""
+    now = datetime(2026, 9, 25, 20, 0, tzinfo=TZ)
+    plan = plan_ev(ev_slots(now, 28, 1.0), EvPlanParams(needed_kwh=20, mode="Solár+NT"), now)
+    assert plan.grid_slots == {} and plan.nt_kwh == 0 and plan.shortfall_kwh == 0
+    assert abs(plan.solar_kwh - 4.9) < 0.01
+    past = plan_ev(ev_slots(now, 28, 1.0), EvPlanParams(needed_kwh=20, mode="Solár+NT",
+                                                       deadline=now - timedelta(days=1)), now)
+    assert past.grid_slots == {}
+
+
 def test_plan_nt_fills_rest_from_start_of_block():
     now = datetime(2026, 9, 25, 20, 0, tzinfo=TZ)
+    deadline = datetime(2026, 9, 27, 0, 0, tzinfo=TZ)
     slots = ev_slots(now, 28, 1.0)  # 7 h × 1 kW × 0,7 = 4,9 kWh slunce
-    plan = plan_ev(slots, EvPlanParams(needed_kwh=20, mode="Solár+NT"), now)
+    plan = plan_ev(slots, EvPlanParams(needed_kwh=20, mode="Solár+NT", deadline=deadline), now)
     assert abs(plan.solar_kwh - 4.9) < 0.01
     assert abs(plan.nt_kwh - 15.1) < 0.01
     first = min(plan.grid_slots)
@@ -264,7 +276,8 @@ def test_plan_deadline_soft_reports_shortfall():
 
 def test_plan_slot_now_lookup():
     now = datetime(2026, 9, 25, 22, 7, tzinfo=TZ)
-    plan = plan_ev(ev_slots(now.replace(minute=0), 10), EvPlanParams(needed_kwh=5, mode="Solár+NT"), now)
+    plan = plan_ev(ev_slots(now.replace(minute=0), 10),
+                   EvPlanParams(needed_kwh=5, mode="Solár+NT", deadline=datetime(2026, 9, 26, 6, 0, tzinfo=TZ)), now)
     assert plan.slot_now(now) == "NT"
 
 
