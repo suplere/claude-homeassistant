@@ -42,7 +42,7 @@ Lokální `.storage` je po přejmenování entit zastaralý → před `make push
    Opraveno: `_boiler_block()` se volá hned při změně plánu před `battery_apply()`.
    **PND 2. 10. (3. 10.): B1 UZAVŘENO** – bojler v PND jen v 3/12/13/22/23 h (v 19 h nic), odchylka prodeje −1,2 %
    (1. 10.: −9,8 %), nákupu +1,5 %. Bojler 4,38 kWh (22 h 2,29 kWh – dohřál večer nevytopené). Ráno 3. 10. SOC 20 % v 7:30.
-2. **Ranní souhrn 3. 10. 7:40** – zeptat se uživatele, jestli přišel a je čitelný (folded YAML = jeden odstavec).
+2. ~~**Ranní souhrn 3. 10. 7:40**~~ – přišel (potvrdil uživatel 3. 10.).
 3. **Přesnost předpovědí:** první řádek `history` v `sensor.energy_forecast_accuracy` za 2. 10. (předpověď FVE 20,4 /
    Solcast 27,3 / spotřeba 9,6 kWh) proti skutečnosti; graf na Baterie & FVE.
 4. **Rozpad bojleru za celý 3. 10.** (`sensor.bojler_z_pretoku_energie` / `_ze_site_energie`, sankey „Celkem“ správně od 3. 10.;
