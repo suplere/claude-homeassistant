@@ -1,0 +1,71 @@
+# Mrazák ve sklepě – měřená zásuvka Shelly Plug E (od 4. 10. 2026, dřív zásuvka sauny).
+# Mrazák se neovládá, jen hlídá: zásuvka musí být pořád zapnutá. V Plug E: stav po výpadku = zapnuto, bez auto-off.
+# Mrazák patří do základní spotřeby domu (sensor.base_house_consumption ho neodečítá).
+
+automation:
+  - id: mrazak_watchdog
+    alias: Mrazák – hlídání zásuvky
+    description: >
+      Vypnutou zásuvku mrazáku hned zapne a pošle upozornění; upozorní i na výpadek spojení (30 min)
+      a na dlouho nulový odběr (6 h – kompresor nespíná, mrazák možná nechladí).
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: switch.mrazak
+        to: "off"
+        for: "00:00:10"
+        id: vypnuto
+      - trigger: homeassistant
+        event: start
+        id: start
+      - trigger: state
+        entity_id: switch.mrazak
+        to: unavailable
+        for: "00:30:00"
+        id: nedostupna
+      - trigger: numeric_state
+        entity_id: sensor.mrazak_power
+        below: 1
+        for: "06:00:00"
+        id: bez_odberu
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: [vypnuto, start]
+              - condition: state
+                entity_id: switch.mrazak
+                state: "off"
+            sequence:
+              - action: switch.turn_on
+                target:
+                  entity_id: switch.mrazak
+              - action: notify.mobile_app_evzen_iphone
+                data:
+                  title: "🧊 Mrazák byl vypnutý"
+                  message: >
+                    Zásuvka mrazáku byla vypnutá, zapnul jsem ji zpátky
+                    ({{ 'po startu HA' if trigger.id == 'start' else now().strftime('%-d. %-m. %H:%M') }}).
+          - conditions:
+              - condition: trigger
+                id: nedostupna
+            sequence:
+              - action: notify.mobile_app_evzen_iphone
+                data:
+                  title: "🧊 Mrazák – zásuvka nedostupná"
+                  message: >
+                    Zásuvka mrazáku nekomunikuje 30 min (Wi-Fi ve sklepě nebo výpadek proudu).
+                    Zkontroluj, jestli mrazák běží.
+          - conditions:
+              - condition: trigger
+                id: bez_odberu
+              - condition: state
+                entity_id: switch.mrazak
+                state: "on"
+            sequence:
+              - action: notify.mobile_app_evzen_iphone
+                data:
+                  title: "🧊 Mrazák – 6 h bez odběru"
+                  message: >
+                    Zásuvka je zapnutá, ale mrazák 6 h nic neodebírá – kompresor nespíná.
+                    Zkontroluj, jestli je zapojený a chladí.

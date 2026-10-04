@@ -74,7 +74,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
    `automation.run_pnd` a `automation.run_actions_after_appdaemon_starts` (obě vypnuté), entity `sensor.pnd_*`.
    `init_helper` (událost APPDAEMON_READY) nechat, dokud ho něco používá – ověřit.
 6. **Test sauny – odložen, termín neurčen** (uživatel 3. 10.). Až proběhne: auto-detekce „Dnes sauna“ po 5 min, přepočet
-   plánu, konec po 20 min bez topení, nákup ve VT po sauně, teplota zásuvky Plug E; prodej v 19 h se saunou (test 2. 10.:
+   plánu, konec po 20 min bez topení, nákup ve VT po sauně, teplota Shelly Pro 1PM (`sensor.sauna_device_temperature`); prodej v 19 h se saunou (test 2. 10.:
    4,2 → 1,9 kWh, SOC 20 %, VT nákup 0,7 kWh – posoudit, jestli prodávat a pak kupovat ve VT dává smysl).
 7. **Přesnost předpovědí** – jen sbírat (`sensor.energy_forecast_accuracy`, atribut `history`) do C8 (~16. 10.).
    2. 10.: FVE 23,7 kWh, opravená předpověď 20,4 (−14 %), surový Solcast 27,3 (+15 %); spotřeba 11,1 proti 9,6 kWh.
@@ -163,8 +163,12 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 9. FVE ranní stín: od listopadu přepočítat hodinový tvar (`hav2.jinja`, poměr `sensor.pv_power` / Solcast this_hour).
 
 ### D. Nápady / později
-- Energy dashboard: bojler záměrně ne (je mimo měření GoodWe → nesmyslná spotřeba domu); místo toho na Energie v2
-  grafy kWh/den (Bazén, Úspory) a od 2. 10. sankey + skládaný graf spotřeby na Úsporách.
+- Energy dashboard (od 4. 10.): síť = elektroměr distributora – nákup `sensor.energy_buy_gross_energie` (nový
+  Riemann z `energy_buy_gross_w`, tj. GoodWe nákup + bojler ze sítě), prodej `sensor.energy_sell_net_energie` (bez
+  přetoku do bojleru) → spotřeba domu vč. bojleru, odpovídá PND. Historie sítě a nákladů v Energy dashboardu proto
+  začíná 4. 10. (dřív `energy_buy_daily` / `energy_sell_daily`, statistiky zůstaly). Spotřebiče: EV, Filtrace
+  (`filtrace_sum` = Riemann z měřeného výkonu), Sauna, Mrazák, Bojler; baterie se SOC. Na Energie v2 navíc grafy
+  kWh/den (Bazén, Úspory), sankey a skládaný graf spotřeby na Úsporách.
 - Druhý kanál (IB) obou Pro EM-50 volný.
 - **Infrasauna – hotovo 2. 10.:** Shelly Plug E (16 A) = `switch.sauna`, `sensor.sauna_power`, `sensor.sauna_energy`
   (zařízení „Sauna (Shelly Plug E)“, entity přejmenovány z „Zásuvka řízená/Filtrace“ se souhlasem uživatele). Test 2. 10.:
@@ -172,8 +176,18 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   a z profilu plánovače (`STAT_SAUNA`); „Dnes sauna“ (`input_boolean.energy_sauna_today`, `input_datetime.energy_sauna_start`,
   `input_number.energy_sauna_duration_h`, `..._power_kw` = 2,3) přičte zátěž do slotů plánu (`hav2_planner.add_extra_load`,
   baterie ji může krýt) a po konci se sama vypne; atribut `sauna` v `sensor.energy_plan`. Dashboard: Přehled → Sauna,
-  sankey a skládaný graf. Později možná Shelly Pro 1PM v rozvaděči bazénu (L2, B16, chybí místo na liště – elektrikář);
-  pak nové entity přejmenovat na stejná `sauna_*` ID.
+  sankey a skládaný graf.
+- **Sauna na Shelly Pro 1PM – od 4. 10.:** nová podružná skříň SRN 6 vedle bazénového rozvaděče (fáze ze svorky 2
+  chrániče F7-25/30 mA, tj. pod proudovým chráničem), B16 → Pro 1PM I → O → pevná zásuvka 16 A u sauny. Jistič B10
+  ve skříni = ruční vypínač na SW1 (vstup `switch`, `in_mode: follow` → sauna jde zapnout i bez HA). Pro 1PM
+  (192.168.68.121): `initial_state: off`, auto-off 3 h, `current_limit` 12 A, `power_limit` 3000 W. Entity
+  přejmenovány na stejná ID (`switch.sauna`, `sensor.sauna_power`, `sensor.sauna_energy`,
+  `binary_sensor.sauna_overpowering`, + `binary_sensor.sauna_vypinac_b10`, `sensor.sauna_current`, …), zařízení
+  „Sauna (Shelly Pro 1PM)“. Zapnutá zásuvka ≠ sauna běží (saunu je nutné pustit ručně), detekce jede z výkonu.
+  Filtrace a sauna nikdy nepoběží zároveň (uživatel).
+- **Plug E → mrazák ve sklepě (4. 10.):** `switch.mrazak`, `sensor.mrazak_power`, `sensor.mrazak_energy`, zařízení
+  „Měřená zásuvka mrazák (Shelly Plug E)“; statistiky sauny z testu 2. 10. přešly přejmenováním k mrazáku. Mrazák
+  patří do základní spotřeby, nic se neodečítá. V Plug E ověřit: stav po výpadku = zapnuto, žádný auto-off.
 
 ## 2. Mapa systému
 

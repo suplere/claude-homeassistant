@@ -82,6 +82,15 @@ sensor:
     round: 3
     unit_prefix: k
     unit_time: h
+  # nákup vč. bojleru ze sítě (≈ elektroměr distributora) – síť v dashboardu Energie od 4. 10. 2026
+  - platform: integration
+    name: energy_buy_gross_energie
+    unique_id: hav2_energy_buy_gross_energie
+    source: sensor.energy_buy_gross_w
+    method: left
+    round: 3
+    unit_prefix: k
+    unit_time: h
   - platform: integration
     name: energy_base_house_energy
     unique_id: hav2_energy_base_house_energy

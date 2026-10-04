@@ -114,6 +114,10 @@ views:
                   name: Bojler
                   icon: mdi:water-boiler
                   display_zero: true
+                - entity: sensor.mrazak_power
+                  name: Mrazák
+                  icon: mdi:fridge-industrial
+                  display_zero: true
           - type: heading
             heading: Fáze (+ prodej / − nákup)
             heading_style: subtitle
@@ -239,6 +243,47 @@ views:
               a po 20 min bez topení zase vypne. Příkon {{ states('input_number.energy_sauna_power_kw') }} kW
               (změřeno 2. 10.).</small>{% endif %}
               {% if is_state('binary_sensor.sauna_overpowering', 'on') %}⚠️ **Zásuvka hlásí přetížení!**{% endif %}
+      # mrazák ve sklepě (Shelly Plug E od 4. 10. 2026) – jen měření, neovládá se; vypnutí hlídá automation.mrazak_watchdog
+      - type: grid
+        cards:
+          - type: heading
+            heading: Mrazák
+            icon: mdi:fridge-industrial
+          - type: tile
+            entity: switch.mrazak
+            name: Zásuvka
+            state_content:
+              - state
+              - last_changed
+            tap_action:
+              action: more-info
+            icon_tap_action:
+              action: none
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.mrazak_power
+            name: Výkon
+            grid_options:
+              columns: 6
+          - type: statistic
+            entity: sensor.mrazak_energy
+            name: Dnes
+            period:
+              calendar:
+                period: day
+            stat_type: change
+            grid_options:
+              columns: 6
+          - type: statistic
+            entity: sensor.mrazak_energy
+            name: Tento měsíc
+            period:
+              calendar:
+                period: month
+            stat_type: change
+            grid_options:
+              columns: 6
       - type: grid
         cards:
           - type: heading
@@ -1630,6 +1675,16 @@ views:
               - entity: sensor.sauna_energy
                 name: Sauna
           - type: statistics-graph
+            title: Mrazák kWh za den (14 dní)
+            chart_type: bar
+            period: day
+            days_to_show: 14
+            stat_types:
+              - change
+            entities:
+              - entity: sensor.mrazak_energy
+                name: Mrazák
+          - type: statistics-graph
             title: Bojler kWh za den (14 dní)
             chart_type: bar
             period: day
@@ -1781,8 +1836,10 @@ views:
             grid_options:
               columns: full
             time_period_from: now/d
+            # bez pevného prefixu karta po přidání mrazáku (4. 10. 2026) zobrazovala Wh
+            unit_prefix: k
             show_names: true
-            round: 1
+            round: 0
             min_state: 0.05
             height: 320
             ignore_missing_entities: true
@@ -1850,6 +1907,16 @@ views:
                 section: 2
                 name: Bojler
                 color: "#8d6e63"
+              # 3 – rozpad domu (mrazák je součást základní spotřeby, Plug E od 4. 10. 2026)
+              - id: sensor.mrazak_energy
+                section: 3
+                name: Mrazák
+                color: "#7e57c2"
+              - id: house_rest
+                type: remaining_parent_state
+                section: 3
+                name: Dům ostatní
+                color: "#90a4ae"
             links:
               - source: sensor.total_pv_generation
                 target: sensor.energy_sources_total
@@ -1876,17 +1943,21 @@ views:
                 value: sensor.bojler_z_pretoku_energie
               - source: sensor.energy_sources_total
                 target: rest
+              - source: sensor.energy_base_house_energy
+                target: sensor.mrazak_energy
+              - source: sensor.energy_base_house_energy
+                target: house_rest
               - source: sensor.bojler_ze_site_energie
                 target: boiler_pass
               - source: boiler_pass
                 target: sensor.bojler_energie
           - type: markdown
             content: >
-              <small>Od půlnoci, kWh. Levá část a „Celkem“ je bilance měřená GoodWe (nákup a prodej po fázích).
+              <small>Od půlnoci, kWh zaokrouhlené na celé číslo. Levá část a „Celkem“ je bilance měřená GoodWe (nákup a prodej po fázích).
               Bojler je zapojený mimo měření GoodWe (jen L3): z „Celkem“ dostává část přetoku, kterou GoodWe na L3
               exportoval (min. z příkonu bojleru a exportu L3), zbytek bere přímo ze sítě. „Prodej do sítě“ = export
               bez bojleru (≈ PND). „Ostatní / ztráty“ = ztráty střídače a baterie a nepřesnosti měření.
-              Rozpad bojleru od 2. 10. 2026.</small>
+              Rozpad bojleru od 2. 10. 2026. „Dům“ = základní spotřeba (bez EV, filtrace a sauny), vpravo z ní mrazák (od 4. 10. 2026).</small>
           - type: heading
             heading: Spotřeba po dnech
             heading_style: subtitle

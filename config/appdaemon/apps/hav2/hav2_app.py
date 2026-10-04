@@ -42,7 +42,7 @@ STAT_SELL = "sensor.energy_sell_sum"
 STAT_BOILER = "sensor.bojler_energie"  # měření bojleru od 1. 10. 2026
 STAT_SELL_NET = "sensor.energy_sell_net_energie"  # prodej bez bojleru (od 2. 10. 2026)
 STAT_BOILER_GRID = "sensor.bojler_ze_site_energie"  # bojler ze sítě (od 2. 10. 2026)
-STAT_SAUNA = "sensor.sauna_energy"  # Shelly Plug E od 2. 10. 2026 (v profilu ne, plánuje se přes „Dnes sauna“)
+STAT_SAUNA = "sensor.sauna_energy"  # Shelly Pro 1PM od 4. 10. 2026 (v profilu ne, plánuje se přes „Dnes sauna“)
 SAUNA_TODAY = "input_boolean.energy_sauna_today"
 SAUNA_ON_W = 1000  # nad tímto výkonem sauna topí (2,3 kW; termostat spíná celým výkonem)
 BOILER_POWER = "sensor.energy_boiler_power_w"  # atribut source == "měření" → Shelly, jinak odhad
