@@ -41,12 +41,15 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   sama neopakuje (retry jen po hlášené údržbě) → entity `cez_elektromer_*` unavailable. Ručně `cez_pnd.fetch_data` v 7:41
   OK: součty navazují (náklady 10 682,37 → 10 718,57 Kč), NT 6,83 / VT 2,00 kWh přesně podle HDO 22–06, `pnd_check`
   v 7:43 po synchronizaci (listener funguje). Ranní souhrn 7:40 ale ještě měl bojler za 2. 10.
-  → **Návrh: pojistka opakování** (např. automatizace: v 6:30/7:15 sync neúspěšná nebo entity unavailable → `fetch_data`);
-  bez ní nemazat AppDaemon PND app (0/5).
+  → **Pojistka (4. 10., `packages/hav2_pnd.yaml`, `automation.hav2_opakovat_stazeni_pnd`):** v 6:30, 7:15, 8:30 a 10:00,
+  když atribut `date` včerejší spotřeby není včerejšek a synchronizace neběží → `cez_pnd.fetch_data`; v 10:00 při
+  neúspěchu notifikace. Ověřit při příštím výpadku portálu (logbook „HAv2 PND“).
 - **Odchylky 3. 10. (měřený bojler):** nákup −0,14 kWh (−1,6 %), prodej −0,34 kWh (−4,6 %).
 - **Bojler ze sítě v hodinách s přetokem – potvrzeno:** 12–16 h HA „ze sítě“ 0,25 kWh, PND nákup − GoodWe nákup 0,008 kWh;
   prodej PND o 0,26 kWh nižší než GoodWe − „z přetoku“ → HA přesouvá ~0,25 kWh/den z přetoku do sítě (pulzy WATTrouteru
-  × okamžitý export L3). Návrh: `sensor.bojler_z_pretoku_w` = min(průměr 60 s příkonu, průměr 60 s exportu L3).
+  × okamžitý export L3). **Opraveno 4. 10. 7:55:** `sensor.bojler_z_pretoku_w` = min(průměr 60 s příkonu, průměr 60 s
+  výkonu L3 ≥ 0), `_ze_site_w` z průměru příkonu; nový GUI helper Statistika `sensor.sklep_goodwe_sit_l3_vykon_prumer_1_min`
+  (štítky hav2/hav2_system). **Ověřit 5. 10.** (PND za 4. 10.): ze sítě v hodinách s přetokem ≈ PND, odchylky ~0.
 - **Rozpad bojleru 3. 10.:** Shelly 7,59 kWh = z přetoku 2,27 + ze sítě 5,31 (po korekci ~2,5 / ~5,1); PND odhad 7,26 kWh.
 - **Baterie v noci 3./4. 10.:** dobití na konci NT nebylo potřeba – noc spotřebovala méně (~0,2 kWh/h), plán od 1:00 bez
   nabíjení, SOC 6:00 26 %, VT nákup ~0. Bez nabíjení EV v NT.

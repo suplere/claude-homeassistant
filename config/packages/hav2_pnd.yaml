@@ -1,0 +1,55 @@
+# HAv2 – pojistka stahování PND (4. 10. 2026)
+# Integrace cez_pnd stahuje včerejšek v 6:00; po timeoutu portálu ČEZ sama neopakuje (retry jen
+# po hlášené údržbě) – 4. 10. 6:00 PndTimeoutError, entity unavailable až do ručního fetch_data.
+# Úspěch = atribut `date` včerejší spotřeby je včerejší den. HAv2 pnd_check se spustí sám po konci
+# synchronizace (pnd_sync_entity v hav2.yaml).
+
+automation:
+  - id: hav2_pnd_retry
+    alias: HAv2 – opakovat stažení PND
+    description: Když ranní synchronizace PND neproběhla, zkusí ji znovu; v 10:00 při neúspěchu upozorní.
+    mode: single
+    triggers:
+      - trigger: time
+        at: "06:30:00"
+      - trigger: time
+        at: "07:15:00"
+      - trigger: time
+        at: "08:30:00"
+      - trigger: time
+        at: "10:00:00"
+        id: last
+    conditions:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: binary_sensor.cez_elektromer_8591_0246_synchronizace_pnd_bezi
+            state: "on"
+      - condition: template
+        value_template: >
+          {{ state_attr('sensor.cez_elektromer_8591_0246_vcerejsi_spotreba', 'date')
+             != (now() - timedelta(days=1)).date() | string }}
+    actions:
+      - action: logbook.log
+        data:
+          name: HAv2 PND
+          message: "PND za včerejšek chybí – opakuji stažení ({{ now().strftime('%H:%M') }})"
+      - action: cez_pnd.fetch_data
+      - if:
+          - condition: trigger
+            id: last
+        then:
+          - wait_template: >
+              {{ state_attr('sensor.cez_elektromer_8591_0246_vcerejsi_spotreba', 'date')
+                 == (now() - timedelta(days=1)).date() | string }}
+            timeout: "00:05:00"
+          - if:
+              - condition: template
+                value_template: "{{ not wait.completed }}"
+            then:
+              - action: notify.mobile_app_evzen_iphone
+                data:
+                  title: HAv2 – PND
+                  message: >
+                    PND za včerejšek se ani na 4. pokus nestáhlo (portál ČEZ?). Bojler podle PND a
+                    kontrola odchylek čekají; zkusit ručně „Stáhnout data z PND“.

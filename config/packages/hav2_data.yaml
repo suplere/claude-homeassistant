@@ -49,6 +49,9 @@ template:
       # ----------------------------------------------------------- bojler (L3)
       # Bojler je mezi elektroměrem a měřením GoodWe, jen na L3: co GoodWe na L3 právě exportuje,
       # spotřebuje nejdřív bojler → z přetoku = min(příkon bojleru, export L3), zbytek ze sítě.
+      # Z minutových průměrů (GUI Statistika average_step 60 s): WATTrouter spíná při malém přetoku
+      # pulzy 4–5 s a okamžité hodnoty Shelly × GoodWe nejsou souběžné → HA dával ~0,25 kWh/den
+      # „ze sítě“ navíc proti PND (2. a 3. 10. 2026); elektroměr pulzy v rámci periody vyrovná.
       - name: Bojler z přetoku
         unique_id: hav2_bojler_z_pretoku_w
         default_entity_id: sensor.bojler_z_pretoku_w
@@ -56,9 +59,12 @@ template:
         device_class: power
         state_class: measurement
         icon: mdi:water-boiler-auto
-        availability: "{{ has_value('sensor.bojler_vykon') and has_value('sensor.meter_active_power_l3') }}"
+        availability: >
+          {{ has_value('sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_vykon_prumer_1_min')
+             and has_value('sensor.sklep_goodwe_sit_l3_vykon_prumer_1_min') }}
         state: >
-          {{ [states('sensor.bojler_vykon') | float, [states('sensor.meter_active_power_l3') | float, 0] | max] | min | round(0) }}
+          {{ [states('sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_vykon_prumer_1_min') | float,
+              [states('sensor.sklep_goodwe_sit_l3_vykon_prumer_1_min') | float, 0] | max] | min | round(0) }}
       - name: Bojler ze sítě
         unique_id: hav2_bojler_ze_site_w
         default_entity_id: sensor.bojler_ze_site_w
@@ -66,9 +72,12 @@ template:
         device_class: power
         state_class: measurement
         icon: mdi:transmission-tower-import
-        availability: "{{ has_value('sensor.bojler_vykon') and has_value('sensor.bojler_z_pretoku_w') }}"
+        availability: >
+          {{ has_value('sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_vykon_prumer_1_min')
+             and has_value('sensor.bojler_z_pretoku_w') }}
         state: >
-          {{ [states('sensor.bojler_vykon') | float - states('sensor.bojler_z_pretoku_w') | float, 0] | max | round(0) }}
+          {{ [states('sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_vykon_prumer_1_min') | float
+              - states('sensor.bojler_z_pretoku_w') | float, 0] | max | round(0) }}
       - name: Prodej do sítě (bez bojleru)
         unique_id: hav2_energy_sell_net_w
         default_entity_id: sensor.energy_sell_net_w
