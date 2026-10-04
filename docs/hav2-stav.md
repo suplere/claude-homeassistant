@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 3. 10. 2026)
+# HAv2 – stav a předávka (k 4. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -22,7 +22,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 **Data:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní, stáhne `make pull`, mimo git)
 + historie HA + PND D+1 (integrace `cez_pnd`, statistiky `cez_pnd:*` od 1. 1. 2026).
 
-## 1b. Pro novou session (stav 3. 10. 2026 dopoledne)
+## 1b. Pro novou session (stav 4. 10. 2026 odpoledne)
 
 **Pracovní postupy:**
 - Kontroly: `config/appdaemon/hav2_data/*.jsonl` (klíče `DATA_STATES`/`DATA_ATTRS` v `hav2_app.py`), PND v
@@ -54,6 +54,32 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Baterie v noci 3./4. 10.:** dobití na konci NT nebylo potřeba – noc spotřebovala méně (~0,2 kWh/h), plán od 1:00 bez
   nabíjení, SOC 6:00 26 %, VT nákup ~0. Bez nabíjení EV v NT.
 - **Předpověď 3. 10.:** FVE opravená 25,0 / skutečnost 26,4 kWh (−5 %), Solcast 33,4 (+27 %); spotřeba 14,3 proti 11,5 kWh.
+
+### 0b. Ověřit po změnách 4. 10. odpoledne (sauna Pro 1PM, mrazák, Energy dashboard; commit 84fc43f)
+1. **Energy dashboard – síť podle elektroměru** (přepnuto 4. 10. v 16:50, po restartu HA): 4. 10. je neúplný (nákup jen
+   od 16:50). **6. 10. (PND za 5. 10.):** denní změna `sensor.energy_buy_gross_energie` ≈ PND nákup a
+   `sensor.energy_sell_net_energie` ≈ PND prodej (cíl jako u `meas_*`, odchylka do ~0,2 kWh); spotřeba domu v Energy
+   dashboardu ≈ dům + bojler; náklady se počítají (statistika `sensor.energy_buy_gross_energie_cost` existuje a roste).
+   `energy/validate` bez chyb (4. 10. 16:58 čisté). Pokud odchylka nákupu > PND, prověřit metodu `left` u Riemannu
+   z `energy_buy_gross_w` (součet dvou template senzorů s různým okamžikem aktualizace).
+2. **Sauna na Pro 1PM – při prvním použití:** páčka B10 nahoru → `switch.sauna` on a `binary_sensor.sauna_vypinac_b10`
+   on, dolů → off; zapnutí/vypnutí z HA funguje i při páčce nahoře; 9,6 A nevypne limit 12 A
+   (`binary_sensor.sauna_overcurrent`); `sensor.sauna_device_temperature` během delší sauny (modul v zavřené skříni,
+   pozor nad ~70 °C); auto-off 3 h. Zapnutá zásuvka ≠ sauna topí (saunu pouští uživatel ručně) – detekce „Dnes sauna“
+   je z výkonu > 1000 W po 5 min. Plus body z checklistu 0/6.
+3. **Mrazák:** automatizace `automation.mrazak_hlidani_zasuvky` zatím nikdy nespustila. Volitelně test: ručně vypnout
+   `switch.mrazak` → do ~10 s zapnuto + notifikace. Sledovat falešné poplachy „6 h bez odběru“ (studený sklep) a
+   „nedostupná 30 min“ (Plug E ve sklepě má ping ~100 ms, RSSI entita vypnutá) – případně prodloužit limity.
+   Typický odběr při chodu kompresoru ~64 W; po pár dnech doplnit denní kWh.
+4. **Dashboard Energie v2:** mrazák v sankey (Dům → Mrazák + Dům ostatní) se objeví od 5. 10. (dnes pod `min_state`);
+   sankey má `unit_prefix: k` a `round: 0` – po přidání mrazáku se karta sama přepnula na Wh, příčina nezjištěna
+   (`sensor.mrazak_energy` je v kWh).
+5. **Statistiky sauny a mrazáku** smazány 4. 10. ~16:00 (`recorder/clear_statistics`), plní se od té doby – grafy
+   kWh/den 14 dní budou do ~18. 10. neúplné. Profil plánovače (`STAT_SAUNA`, medián 14 dní) to neovlivní.
+6. **Zbývá ručně v UI (uživatel):** přejmenovat `update.shellypro1pm_2cbcbba45344_beta_firmware` →
+   `update.sauna_beta_firmware_update` (klasifikátor přejmenování zamítl), případně oblast Sklep pro mrazák.
+7. Poučení: 4. 10. jsem spustil `make pull` až po úpravách → přepsal lokální YAML (nový `mrazak.yaml` smazal) – viz
+   pracovní postupy výše, před úpravami vždy nejdřív stáhnout.
 
 ### 0. Hned v nové session (checklist)
 1. **PND za 3. 10. (stáhne se 4. 10. v 6:00) – první den jen přes integraci `cez_pnd`:**
