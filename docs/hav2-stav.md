@@ -36,6 +36,22 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
 
+### 0a. Kontrola 4. 10. ráno (výsledky)
+- **PND 3. 10.:** plánovaná synchronizace 6:00 **selhala** (timeout portálu ČEZ, `PndTimeoutError`); integrace po timeoutu
+  sama neopakuje (retry jen po hlášené údržbě) → entity `cez_elektromer_*` unavailable. Ručně `cez_pnd.fetch_data` v 7:41
+  OK: součty navazují (náklady 10 682,37 → 10 718,57 Kč), NT 6,83 / VT 2,00 kWh přesně podle HDO 22–06, `pnd_check`
+  v 7:43 po synchronizaci (listener funguje). Ranní souhrn 7:40 ale ještě měl bojler za 2. 10.
+  → **Návrh: pojistka opakování** (např. automatizace: v 6:30/7:15 sync neúspěšná nebo entity unavailable → `fetch_data`);
+  bez ní nemazat AppDaemon PND app (0/5).
+- **Odchylky 3. 10. (měřený bojler):** nákup −0,14 kWh (−1,6 %), prodej −0,34 kWh (−4,6 %).
+- **Bojler ze sítě v hodinách s přetokem – potvrzeno:** 12–16 h HA „ze sítě“ 0,25 kWh, PND nákup − GoodWe nákup 0,008 kWh;
+  prodej PND o 0,26 kWh nižší než GoodWe − „z přetoku“ → HA přesouvá ~0,25 kWh/den z přetoku do sítě (pulzy WATTrouteru
+  × okamžitý export L3). Návrh: `sensor.bojler_z_pretoku_w` = min(průměr 60 s příkonu, průměr 60 s exportu L3).
+- **Rozpad bojleru 3. 10.:** Shelly 7,59 kWh = z přetoku 2,27 + ze sítě 5,31 (po korekci ~2,5 / ~5,1); PND odhad 7,26 kWh.
+- **Baterie v noci 3./4. 10.:** dobití na konci NT nebylo potřeba – noc spotřebovala méně (~0,2 kWh/h), plán od 1:00 bez
+  nabíjení, SOC 6:00 26 %, VT nákup ~0. Bez nabíjení EV v NT.
+- **Předpověď 3. 10.:** FVE opravená 25,0 / skutečnost 26,4 kWh (−5 %), Solcast 33,4 (+27 %); spotřeba 14,3 proti 11,5 kWh.
+
 ### 0. Hned v nové session (checklist)
 1. **PND za 3. 10. (stáhne se 4. 10. v 6:00) – první den jen přes integraci `cez_pnd`:**
    - synchronizace proběhla (`binary_sensor.cez_elektromer_8591_0246_synchronizace_pnd_bezi`, `sensor.cez_elektromer_…_vcerejsi_spotreba`),
