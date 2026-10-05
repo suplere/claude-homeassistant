@@ -61,6 +61,16 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   v `hav2_planner.Prices`, `hav2_app`, šabloně ceny prodeje a na dashboardu; test arbitráže NT drží 0,85 explicitně.
   Atribut `initial` ukazuje do restartu HA ještě 0,85 (reload ho neobnovil), stav je 0,75. Spotové ceny OTE jdou
   stáhnout jen z HA (z Macu timeout): SOAP `GetDamPricePeriodE` (PT15M, EUR/MWh) na `https://www.ote-cr.cz/services/PublicDataService`.
+- **Historie přepočtena na 0,75 (5. 10. 15:02, souhlas uživatele, HA záloha s DB `982d67d5`):** koeficient byl 0,85 od
+  25. 9. 14:53 do 5. 10. 14:27:41 → hodinové přírůstky × 0,75/0,85 (hodina 14 podle 5min statistik do 14:27:41),
+  `recorder/import_statistics` s navazujícími součty pro `energy_export_revenue_total` (−20,93 Kč),
+  `ev_charging_cost_solar_total` / `_total` / `_monthly` / `_yearly` (−5,08), `energy_net_cost_total` / `_daily` /
+  `_monthly` (+20,93) a Energy dashboard `energy_sell_net_energie_compensation` (−1,76) + `energy_sell_daily_compensation`
+  (−18,85). Stavy: 3 součtové senzory přes `POST /api/states` (trigger šablony pokračují z `this.state`), utility metery
+  `utility_meter.calibrate`, 5min součty od 15:00 `recorder/adjust_sum_statistics` (o Δ − skok stavu). Poučení: posun
+  5min součtů od začátku hodiny funguje až poté, co existuje první 5min řádek té hodiny (jinak se nic neposune a další
+  řádek naváže na starý součet). Září po opravě: výnos 53,41 Kč (25.–30. 9.), EV 95,37 Kč, netto 49,84 Kč.
+  Neopraveno: 5min grafy před 15:00 (HA je smaže do 10 dní), pořizovací cena energie v baterii (dorovná se cykly).
 - **EV září 2026:** EcoVolter 207,7 kWh – NT 70,5 kWh za ~247 Kč (1.–24. 9. ruční záznam 193,26 Kč, HAv2 54,11 Kč),
   den 137,1 kWh (hlavně slunce) ≈ 173 Kč ušlého výkupu (0,75 × spot) → ekonomicky ~425 Kč (~2,05 Kč/kWh; vše ve VT by
   bylo 1 267 Kč). Rozpad podle zdroje jen od 25. 9. (HAv2); ~3,8 kWh 25.–30. 9. bez přiřazeného zdroje.
