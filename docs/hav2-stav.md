@@ -54,6 +54,16 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   spotřeba, VT nákup 6–10 h ~0,28 kWh. Plán to volí o ~0,26 Kč levněji (výkup ráno ~2,2–2,7 Kč × ztráta přetoku + opotřebení
   1 Kč/kWh ≈ úspora NT 3,51) – správně podle modelu, těsné rozhodnutí. Bez EV.
 - **Profil bojleru (C5) – hotovo:** `boiler_kwh_by_hour` 22 h 2,0 / 23 h 0,6 kWh, odpoledne jen ~0,15 kWh/h z přetoku.
+- **Faktura výkupu Yello 9/2026 (106,9 kWh, 2 228,44 Kč/MWh, 238,22 Kč) – ověřeno:** množství = PND 106,90 kWh (denně
+  max Δ 0,05); cena = **0,75 × vážený spot OTE** (2 971,74 Kč/MWh z hodinových přetoků PND × `HourlyPrice` OTE × kurz ČNB,
+  poměr 0,7499). GoodWe 137,9 kWh – rozdíl = bojler z přetoku. **Koeficient výkupu změněn 0,85 → 0,75** (5. 10.,
+  souhlas uživatele): `input_number.energy_sell_coefficient` (YAML `initial`, nastaveno službou), výchozí hodnoty
+  v `hav2_planner.Prices`, `hav2_app`, šabloně ceny prodeje a na dashboardu; test arbitráže NT drží 0,85 explicitně.
+  Atribut `initial` ukazuje do restartu HA ještě 0,85 (reload ho neobnovil), stav je 0,75. Spotové ceny OTE jdou
+  stáhnout jen z HA (z Macu timeout): SOAP `GetDamPricePeriodE` (PT15M, EUR/MWh) na `https://www.ote-cr.cz/services/PublicDataService`.
+- **EV září 2026:** EcoVolter 207,7 kWh – NT 70,5 kWh za ~247 Kč (1.–24. 9. ruční záznam 193,26 Kč, HAv2 54,11 Kč),
+  den 137,1 kWh (hlavně slunce) ≈ 173 Kč ušlého výkupu (0,75 × spot) → ekonomicky ~425 Kč (~2,05 Kč/kWh; vše ve VT by
+  bylo 1 267 Kč). Rozpad podle zdroje jen od 25. 9. (HAv2); ~3,8 kWh 25.–30. 9. bez přiřazeného zdroje.
 - Log HA bez chyb HAv2 (jen Chromecasty nedostupné, Apple TV reconnect, HACS: `bar-card` vyřazený z HACS – nepoužívaný, odinstalován 5. 10. včetně resource; použitý byl jen ve starém v1 dashboardu v archivu).
 
 ### 0a. Kontrola 4. 10. ráno (výsledky)

@@ -494,7 +494,7 @@ views:
                 curve: stepline
                 color: "#43a047"
                 data_generator: |
-                  const k = parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.85;
+                  const k = parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.75;
                   return Object.entries(entity.attributes).filter(([t]) => t.includes('T'))
                     .map(([t, v]) => [new Date(t).getTime(), v * k]);
               - entity: sensor.cez_hdo_schedule_dum
@@ -515,7 +515,7 @@ views:
                 color: "#8e24aa"
                 stroke_width: 1
                 data_generator: |
-                  const v = parseFloat(entity.state) * (parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.85);
+                  const v = parseFloat(entity.state) * (parseFloat(hass.states['input_number.energy_sell_coefficient'].state) || 0.75);
                   const d = new Date(); d.setHours(0, 0, 0, 0);
                   return [[d.getTime(), v], [d.getTime() + 48 * 3600e3, v]];
           - <<: *price_chart

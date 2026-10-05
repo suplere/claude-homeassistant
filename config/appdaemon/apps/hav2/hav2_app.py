@@ -476,7 +476,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         prices = P.Prices(
             vt=self.fnum("input_number.energy_price_vt", 6.1),
             nt=self.fnum("input_number.energy_price_nt", 3.51),
-            sell_coef=self.fnum("input_number.energy_sell_coefficient", 0.85),
+            sell_coef=self.fnum("input_number.energy_sell_coefficient", 0.75),
             sell_min_spot=self.fnum("input_number.energy_sell_min_spot", 7.2),
             export_block_below=self.fnum("input_number.energy_export_block_below", 0.0),
         )

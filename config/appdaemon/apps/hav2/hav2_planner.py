@@ -44,7 +44,7 @@ class BatteryParams:
 class Prices:
     vt: float = 6.10
     nt: float = 3.51
-    sell_coef: float = 0.85
+    sell_coef: float = 0.75  # Yello: 75 % spotu (ověřeno fakturou za 9/2026)
     sell_min_spot: float = 7.2
     export_block_below: float = 0.0  # pod touto výkupní cenou se přetok neplatí (limit 0 W)
 

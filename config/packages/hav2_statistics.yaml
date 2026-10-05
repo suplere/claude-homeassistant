@@ -30,7 +30,7 @@ input_number:
     min: 0
     max: 1
     step: 0.01
-    initial: 0.85
+    initial: 0.75
   energy_battery_efficiency:
     name: Účinnost cyklu baterie
     icon: mdi:battery-sync
@@ -131,7 +131,7 @@ template:
         availability: "{{ has_value('sensor.current_spot_electricity_price') }}"
         state: >
           {{ (states('sensor.current_spot_electricity_price') | float
-              * states('input_number.energy_sell_coefficient') | float(0.85)) | round(4) }}
+              * states('input_number.energy_sell_coefficient') | float(0.75)) | round(4) }}
 
       - name: Nejslabší fázová bilance
         unique_id: hav2_energy_phase_balance_min_w

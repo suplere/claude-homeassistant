@@ -305,11 +305,12 @@ def test_nt_charge_needs_minimum_gain_per_kwh():
     # při výrazně dražším ránu se nabití vyplatí
     now = datetime(2026, 9, 28, 21, 0, tzinfo=TZ)
     batt = BatteryParams(capacity_kwh=10.0, soc_pct=60.0, min_soc_pct=20.0)
-    marginal = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 4.4, 8: 4.4, 9: 4.4}), batt, Prices())
+    prices = Prices(sell_coef=0.85)  # scénář je postavený na výkupu 0,85 × spot (4,4 → 3,74, 5,0 → 4,25 Kč)
+    marginal = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 4.4, 8: 4.4, 9: 4.4}), batt, prices)
     # žádná arbitráž, jen dobití na ranní VT (noc v režimu auto, ne držet)
     assert marginal.grid_charge_kwh <= 0.5
     assert all(a.mode != MODE_STANDBY for a in marginal.actions)
-    clear = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 5.0, 8: 5.0, 9: 5.0}), batt, Prices())
+    clear = plan_battery(make_slots(now, 0.0, 6.0, spot={7: 5.0, 8: 5.0, 9: 5.0}), batt, prices)
     assert clear.grid_charge_kwh > 3
 
 
