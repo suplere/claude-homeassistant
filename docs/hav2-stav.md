@@ -70,7 +70,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   `utility_meter.calibrate`, 5min součty od 15:00 `recorder/adjust_sum_statistics` (o Δ − skok stavu). Poučení: posun
   5min součtů od začátku hodiny funguje až poté, co existuje první 5min řádek té hodiny (jinak se nic neposune a další
   řádek naváže na starý součet). Září po opravě: výnos 53,41 Kč (25.–30. 9.), EV 95,37 Kč, netto 49,84 Kč.
-  Neopraveno: 5min grafy před 15:00 (HA je smaže do 10 dní), pořizovací cena energie v baterii (dorovná se cykly).
+  Ověřeno po 16:00: hodina 15–16 bez skoku (výnos +3,11 Kč, netto −3,09 Kč, Energy dashboard +3,04 Kč). Neopraveno: 5min grafy před 15:00 (HA je smaže do 10 dní), pořizovací cena energie v baterii (dorovná se cykly).
 - **EV září 2026:** EcoVolter 207,7 kWh – NT 70,5 kWh za ~247 Kč (1.–24. 9. ruční záznam 193,26 Kč, HAv2 54,11 Kč),
   den 137,1 kWh (hlavně slunce) ≈ 173 Kč ušlého výkupu (0,75 × spot) → ekonomicky ~425 Kč (~2,05 Kč/kWh; vše ve VT by
   bylo 1 267 Kč). Rozpad podle zdroje jen od 25. 9. (HAv2); ~3,8 kWh 25.–30. 9. bez přiřazeného zdroje.
@@ -175,7 +175,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
    „Hřeje“ a odznak na Přehledu. `binary_sensor.energy_boiler_heating` beze změny – používá regulace EV (jistič L3, pulz =
    plný proud) a `hav2_ev.BoilerGate`. Dlouhá ID helperů vygeneroval HA podle zařízení; přejmenování jen se souhlasem.
 7. **PND jen z integrace `cez_pnd` (3. 10.):** dříve zdvojeno s AppDaemon app „CEZ Distribuce PND“ (Selenium, CSV,
-   `sensor.pnd_data` / `pnd_tariff_data`, vlastní opravy přepisované aktualizací HACS). Postup (HA záloha s DB `f5356db0`):
+   `sensor.pnd_data` / `pnd_tariff_data`, vlastní opravy přepisované aktualizací HACS). Postup (HA záloha s DB `f5356db0`, smazána 5. 10.):
    `cez_pnd.fetch_data` (max 60 dní na volání) 1. 1. – 15. 9.; integrace při zpětném importu posouvá součty následných
    hodin, ale bloky spuštěné rychle za sebou četly výchozí součet před zápisem předchozího → skoky na hranicích; opraveno
    přepočtem všech hodin od 1. 1. (hodnota hodiny = `state`) a zápisem `recorder/import_statistics` se souvislými součty.
