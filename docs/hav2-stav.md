@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 4. 10. 2026)
+# HAv2 – stav a předávka (k 5. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -35,6 +35,26 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   na auto – předem říct uživateli). Změny `.py`/`hav2.yaml` se načtou samy.
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
+
+### 0c. Kontrola 5. 10. dopoledne (výsledky)
+- **PND za 4. 10.:** synchronizace v 6:00 OK (skončila 6:00:13, bez zásahu), `pnd_check` v 6:02 po synchronizaci,
+  ranní souhrn 7:40 už s bojlerem za 4. 10. Pojistka `automation.hav2_opakovat_stazeni_pnd` nebyla potřeba (podmínky
+  nesplněny) – ověřit při příštím výpadku portálu. Bezchybných dnů přes integraci zatím 1 (3. a 4. 10. ručně) → smazání
+  PND app (0/5) nejdřív 7. 10.
+- **Oprava rozpadu bojleru (4. 10. 7:55) – potvrzeno:** v hodinách s přetokem 12–16 h HA „ze sítě“ 0,037 kWh, PND nákup −
+  GoodWe nákup 0,008 kWh (3. 10.: 0,25 / 0,008). Rozpad 4. 10.: Shelly 4,27 kWh = z přetoku 0,66 + ze sítě 3,61; PND odhad 3,96.
+- **Odchylky 4. 10. (`meas_*`):** nákup +0,13 kWh (+2,1 %, stálý offset ~5 Wh/h), prodej −0,17 kWh (−6,6 %; 3. 10. −0,34).
+  Zbytek prodeje: ~−0,08 v hodinách s pulzy bojleru 14–16 h, ~−0,04 v 10–11 h (bojler skoro nic) a ~−0,05 rozprostřeno
+  → GoodWe počítá export o ~3 % víc než elektroměr, s bojlerem to nesouvisí. Sledovat, nic neměnit.
+- **Energy dashboard:** `energy/validate` bez chyb; `sensor.energy_buy_gross_energie_cost` roste se správnou cenou
+  (NT 3,51, VT 6,10 Kč/kWh). Porovnání s PND za celý den 5. 10. – 6. 10. (0b/1).
+- **Mrazák:** od 4. 10. 16:00 bez poplachu (automatizace běžela jen při startu HA), chod ~64–68 W, ~21–32 Wh/h →
+  odhad ~0,6 kWh/den. V sankey nad `min_state` (0,47 kWh v 11 h); karta ukazuje kWh (uživatel 5. 10.) → 0b/4 uzavřeno.
+- **Noc 4./5. 10.:** baterie v NT držela 80 % („drží energii na ranní VT“), dům ~2,6 kWh ze sítě v NT; od 6:00 vlastní
+  spotřeba, VT nákup 6–10 h ~0,28 kWh. Plán to volí o ~0,26 Kč levněji (výkup ráno ~2,2–2,7 Kč × ztráta přetoku + opotřebení
+  1 Kč/kWh ≈ úspora NT 3,51) – správně podle modelu, těsné rozhodnutí. Bez EV.
+- **Profil bojleru (C5) – hotovo:** `boiler_kwh_by_hour` 22 h 2,0 / 23 h 0,6 kWh, odpoledne jen ~0,15 kWh/h z přetoku.
+- Log HA bez chyb HAv2 (jen Chromecasty nedostupné, Apple TV reconnect, HACS: `bar-card` vyřazený z HACS – nepoužívaný, odinstalován 5. 10. včetně resource; použitý byl jen ve starém v1 dashboardu v archivu).
 
 ### 0a. Kontrola 4. 10. ráno (výsledky)
 - **PND 3. 10.:** plánovaná synchronizace 6:00 **selhala** (timeout portálu ČEZ, `PndTimeoutError`); integrace po timeoutu
@@ -76,8 +96,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
    (`sensor.mrazak_energy` je v kWh).
 5. **Statistiky sauny a mrazáku** smazány 4. 10. ~16:00 (`recorder/clear_statistics`), plní se od té doby – grafy
    kWh/den 14 dní budou do ~18. 10. neúplné. Profil plánovače (`STAT_SAUNA`, medián 14 dní) to neovlivní.
-6. **Zbývá ručně v UI (uživatel):** přejmenovat `update.shellypro1pm_2cbcbba45344_beta_firmware` →
-   `update.sauna_beta_firmware_update` (klasifikátor přejmenování zamítl), případně oblast Sklep pro mrazák.
+6. ~~Přejmenovat `update.…_beta_firmware` → `update.sauna_beta_firmware_update`~~ – uživatel hotovo 5. 10.
 7. Poučení: 4. 10. jsem spustil `make pull` až po úpravách → přepsal lokální YAML (nový `mrazak.yaml` smazal) – viz
    pracovní postupy výše, před úpravami vždy nejdřív stáhnout.
 
@@ -176,8 +195,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 3. **Filtrace – nesoulad s venkovními vypínači:** první notifikace „vypnuto vypínačem“ / „běží ručně“
    (`switch_mismatch` v `sensor.pool_controller`).
 4. **Večerní prodej z baterie:** start/konec na čtvrthodině, ráno ve VT nechybí baterie (1. 10.: prodej 19:00–20:00 OK).
-5. **Profil bojleru v plánu** se přeučuje z 16–18 h na noc (medián 8 dní, měření Shelly + PND) – do ~5. 10. plán
-   nadhodnocuje večerní nákup; atribut `boiler_source` v `sensor.energy_load_forecast`.
+5. ~~Profil bojleru v plánu se přeučuje na noc~~ – hotovo 5. 10. (0c).
 6. Nenastalo: 3f z plné baterie, NT nabíjení baterie před zataženým dnem. (Watchdog otestován 2. 10., viz A5.)
 7. **EV – kmitání proudu (úprava 2. 10.):** proud se mění až po 2 min trvání (nahoru i dolů); přehrání 26. 9.–1. 10.
    změn 177 → 57. Ověřit při prvním solárním nabíjení s troubou: proud drží, baterie kryje krátké poklesy.
