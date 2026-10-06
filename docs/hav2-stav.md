@@ -42,6 +42,10 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   `pnd_check` správně den přeskočil (bojler/odchylky dál za 4. 10.). Pojistka `hav2_pnd_retry` to nepoznala (kontrolovala
   jen `date` včerejší spotřeby = 5. 10.) → **úprava připravena** (`packages/hav2_pnd.yaml`): opakovat i když
   `energy_boiler_pnd_daily.date` ≠ včerejšek, další pokusy 12:30 / 15:30 / 18:30, notifikace až v 18:30.
+  Portál PND (Přehled statusů, uživatel 6. 10.): −A elektroměru 971244 „naměřená data OK“ 0:00–15:30, „nedefinovaný
+  status“ 15:30–24:00 = data z elektroměru do ČEZ nedorazila (ne výpadek napětí, ne neplatná data; v HA odběr i dodávka
+  celý den normálně). Výpadek ČEZ veřejně nehlásí; PND se aktualizuje 2× denně. Pokud chybí i 7. 10. → nahlásit ČEZ
+  Distribuci (800 850 860) – problém dálkového odečtu.
 - **Energy dashboard (0b/1) – částečně:** za hodiny 0–14 h 5. 10. nákup gross 2,531 / PND 2,583 kWh (stálý offset
   ~5 Wh/h), prodej net 10,884 / PND 10,870 kWh; náklady 5. 10. 20,49 Kč za 5,38 kWh (NT 3,51 / VT 6,10). Celý den
   porovnat po doplnění PND.
