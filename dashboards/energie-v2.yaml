@@ -22,18 +22,25 @@ views:
         entity: sensor.energy_price_buy_now
         name: Nákup
         show_name: true
-      - type: entity
+      # Mushroom template badge: hodnota zaokrouhlená v dashboardu (entity beze změny přesnosti)
+      - type: custom:mushroom-template-badge
         entity: sensor.energy_price_sell_now
-        name: Prodej
-        show_name: true
+        icon: mdi:cash-refund
+        label: Prodej
+        content: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.2f}'.format(v | float | round(2) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+        tap_action:
+          action: more-info
       - type: entity
         entity: binary_sensor.sklep_shellyproem50_ece334fd2370_energy_meter_0_bojler_hreje_prumer
         name: Bojler
         show_name: true
-      - type: entity
+      - type: custom:mushroom-template-badge
         entity: sensor.energy_breaker_headroom_a
-        name: Rezerva jističe
-        show_name: true
+        icon: mdi:electric-switch
+        label: Rezerva jističe
+        content: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+        tap_action:
+          action: more-info
     sections:
       - type: grid
         column_span: 3
@@ -41,40 +48,58 @@ views:
           - type: heading
             heading: Dnes
             icon: mdi:calendar-today
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.today_s_pv_generation
-            name: FVE
+            primary: FVE
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
             icon: mdi:solar-power
+            tap_action:
+              action: more-info
             grid_options:
               columns: 4
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.today_load
-            name: Spotřeba (GoodWe)
+            primary: Spotřeba (GoodWe)
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
             icon: mdi:home-lightning-bolt
+            tap_action:
+              action: more-info
             grid_options:
               columns: 4
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ecovolter_revcr01c00002056_eco_volter_daily_energy
-            name: EV
+            primary: EV
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
             icon: mdi:car-electric
+            tap_action:
+              action: more-info
             grid_options:
               columns: 4
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_buy_daily
-            name: Nákup
+            primary: Nákup
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
             icon: mdi:transmission-tower-import
+            tap_action:
+              action: more-info
             grid_options:
               columns: 4
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_sell_daily
-            name: Prodej
+            primary: Prodej
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
             icon: mdi:transmission-tower-export
+            tap_action:
+              action: more-info
             grid_options:
               columns: 4
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_net_cost_daily
-            name: Náklady netto
+            primary: Náklady netto
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
             icon: mdi:scale-balance
+            tap_action:
+              action: more-info
             grid_options:
               columns: 4
       - type: grid
@@ -194,9 +219,13 @@ views:
               - last_changed
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.sauna_power
-            name: Výkon
+            primary: Výkon
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:flash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -261,9 +290,13 @@ views:
               action: none
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.mrazak_power
-            name: Výkon
+            primary: Výkon
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:flash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: statistic
@@ -348,9 +381,13 @@ views:
             name: Baterie SOC
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_net_cost_daily
-            name: Náklady dnes (netto)
+            primary: Náklady dnes (netto)
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
   # ================================================================== PLÁN
@@ -714,9 +751,13 @@ views:
             name: Nabito
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_session_cost
-            name: Cena
+            primary: Cena
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash-clock
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -724,9 +765,13 @@ views:
             name: Průměr
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_soc_estimate
-            name: SOC
+            primary: SOC
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:car-electric
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: markdown
@@ -859,14 +904,22 @@ views:
             features_position: inline
             features:
               - type: toggle
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_soc_estimate
-            name: SOC (odhad)
+            primary: SOC (odhad)
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:car-electric
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_energy_needed_kwh
-            name: Chybí do cíle
+            primary: Chybí do cíle
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:ev-plug-type2
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -905,9 +958,13 @@ views:
             name: Připojeno
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ecovolter_revcr01c00002056_actual_power
-            name: Výkon
+            primary: Výkon
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:flash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -945,9 +1002,13 @@ views:
               - last_changed
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev6_ev_range
-            name: Dojezd
+            primary: Dojezd
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:road-variant
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -973,9 +1034,13 @@ views:
               action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev6_odometer
-            name: Najeto
+            primary: Najeto
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:speedometer
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -1077,19 +1142,31 @@ views:
           - type: heading
             heading: Souhrn
             icon: mdi:cash
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_charging_cost_monthly
-            name: Tento měsíc
+            primary: Tento měsíc
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_charging_cost_yearly
-            name: Tento rok
+            primary: Tento rok
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_charging_avg_price
-            name: Průměrná cena
+            primary: Průměrná cena
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.2f}'.format(v | float | round(2) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash-check
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -1107,14 +1184,22 @@ views:
             name: Úspora proti VT (měsíc)
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_charging_energy_total
-            name: Nabito od 25. 9.
+            primary: Nabito od 25. 9.
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:ev-plug-type2
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_charging_cost_total
-            name: Náklady od 25. 9.
+            primary: Náklady od 25. 9.
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
       - type: grid
@@ -1175,14 +1260,22 @@ views:
             heading: Historie v1 (ruční NT nabíjení)
             heading_style: subtitle
             icon: mdi:history
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_nt_energie_celkem
-            name: Energie NT celkem
+            primary: Energie NT celkem
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:lightning-bolt
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.ev_nt_naklady_celkem
-            name: Náklady NT celkem
+            primary: Náklady NT celkem
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
 
@@ -1238,14 +1331,22 @@ views:
               **{{ state_attr(p, 'done_h') | float(0) | round(1) }} / {{ state_attr(p, 'target_h') }} h**
               · slunce ~{{ state_attr(p, 'solar_hours_left') | float(0) | round(1) }} h
               · NT ~{{ state_attr(p, 'nt_hours_expected') | float(0) | round(1) }} h
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.pool_hours_done
-            name: Odběhnuto
+            primary: Odběhnuto
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:timer-sand-complete
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.pool_hours_recommended
-            name: Doporučeno
+            primary: Doporučeno
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:pool-thermometer
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -1356,9 +1457,13 @@ views:
             name: SOH
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_battery_stored_cost
-            name: Pořizovací cena
+            primary: Pořizovací cena
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.2f}'.format(v | float | round(2) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:battery-charging-high
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: tile
@@ -1589,43 +1694,71 @@ views:
           - type: heading
             heading: Náklady netto
             icon: mdi:cash
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_net_cost_daily
-            name: Dnes
+            primary: Dnes
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_net_cost_monthly
-            name: Měsíc
+            primary: Měsíc
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_import_cost_total
-            name: Nákup celkem
+            primary: Nákup celkem
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash-minus
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_export_revenue_total
-            name: Prodej celkem
+            primary: Prodej celkem
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:cash-plus
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
           - type: heading
             heading: Kontrola proti PND
             heading_style: subtitle
             icon: mdi:file-compare
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_pnd_deviation_import_kwh
-            name: Odchylka nákupu
+            primary: Odchylka nákupu
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.2f}'.format(v | float | round(2) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:file-compare
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_pnd_deviation_export_kwh
-            name: Odchylka prodeje
+            primary: Odchylka prodeje
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.2f}'.format(v | float | round(2) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:file-compare
+            tap_action:
+              action: more-info
             grid_options:
               columns: 6
-          - type: tile
+          - type: custom:mushroom-template-card
             entity: sensor.energy_grid_cross_energy
-            name: Souběžný nákup+prodej
+            primary: Souběžný nákup+prodej
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            icon: mdi:lightning-bolt
+            tap_action:
+              action: more-info
             grid_options:
               columns: 12
           - type: markdown
