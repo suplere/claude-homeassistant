@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 5. 10. 2026)
+# HAv2 – stav a předávka (k 6. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -35,6 +35,25 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   na auto – předem říct uživateli). Změny `.py`/`hav2.yaml` se načtou samy.
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
+
+### 0d. Kontrola 6. 10. ráno (výsledky)
+- **PND za 5. 10. neúplné:** synchronizace 6:00 i ruční `fetch_data` 8:40 „úspěšné“, ale portál ČEZ měl jen 62/96
+  čtvrthodin (do 15:30; parser: „ČEZ PND pravděpodobně ještě nedopočítal data“) → statistiky `cez_pnd:*` jen 0–14 h,
+  `pnd_check` správně den přeskočil (bojler/odchylky dál za 4. 10.). Pojistka `hav2_pnd_retry` to nepoznala (kontrolovala
+  jen `date` včerejší spotřeby = 5. 10.) → **úprava připravena** (`packages/hav2_pnd.yaml`): opakovat i když
+  `energy_boiler_pnd_daily.date` ≠ včerejšek, další pokusy 12:30 / 15:30 / 18:30, notifikace až v 18:30.
+- **Energy dashboard (0b/1) – částečně:** za hodiny 0–14 h 5. 10. nákup gross 2,531 / PND 2,583 kWh (stálý offset
+  ~5 Wh/h), prodej net 10,884 / PND 10,870 kWh; náklady 5. 10. 20,49 Kč za 5,38 kWh (NT 3,51 / VT 6,10). Celý den
+  porovnat po doplnění PND.
+- **Nasazeno 6. 10. dopoledne:** úprava `hav2_pnd_retry` (nahráno + `automation.reload`, podmínka opakování teď platí → první pokus 12:30); `lovelace-mushroom-better-sliders` odinstalován z HACS včetně resource.
+- **Noc 5./6. 10.:** večer bez prodeje (výkup 0,75 × spot pod prahem), baterie kryla dům celou noc (64 → 34 %), NT bez
+  nabíjení. EV připojené od 18:52 bez termínu → jen přetok (Pozastaveno). Plán 6. 10.: prodej 18–20 h 5 kW (výkup
+  ~4,6–5,2 Kč), pak dům ze sítě (VT 20–22 h ~0,7 kWh, noc NT) – „pozor: ve VT dojde na min. SOC“ je tenhle VT nákup.
+- **Mrazák 5. 10.:** 0,63 kWh, bez poplachu. **Bojler 5. 10.:** z přetoku 0,96 + ze sítě 3,09 kWh. EcoVolter 5. 10.
+  14:15–15:40 nedostupný (auto nepřipojené, bez dopadu).
+- **Frontend:** `lovelace-mushroom-better-sliders` (HACS) se nenačte – stejné názvy prvků jako Mushroom
+  („mushroom-badge-icon has already been used“, od 5. 10. 16:55, před převodem dlaždic); dashboard ho nepoužívá →
+  kandidát na odinstalaci. card-mod hlásí dvojí načtení (stará věc).
 
 ### 0c. Kontrola 5. 10. dopoledne (výsledky)
 - **PND za 4. 10.:** synchronizace v 6:00 OK (skončila 6:00:13, bez zásahu), `pnd_check` v 6:02 po synchronizaci,

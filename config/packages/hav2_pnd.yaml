@@ -1,13 +1,15 @@
 # HAv2 – pojistka stahování PND (4. 10. 2026)
 # Integrace cez_pnd stahuje včerejšek v 6:00; po timeoutu portálu ČEZ sama neopakuje (retry jen
 # po hlášené údržbě) – 4. 10. 6:00 PndTimeoutError, entity unavailable až do ručního fetch_data.
-# Úspěch = atribut `date` včerejší spotřeby je včerejší den. HAv2 pnd_check se spustí sám po konci
-# synchronizace (pnd_sync_entity v hav2.yaml).
+# Úspěch = HAv2 pnd_check zpracoval včerejšek (atribut `date` senzoru energy_boiler_pnd_daily) – ten
+# bere jen úplný den (≥ 23 h v PND). 6. 10.: portál měl za 5. 10. v 6:00 i v 8:40 jen data do 15:30,
+# integrace hlásila úspěch a datum včerejška → stará podmínka opakování nepoznala. pnd_check se spustí
+# sám po konci synchronizace (pnd_sync_entity v hav2.yaml).
 
 automation:
   - id: hav2_pnd_retry
     alias: HAv2 – opakovat stažení PND
-    description: Když ranní synchronizace PND neproběhla, zkusí ji znovu; v 10:00 při neúspěchu upozorní.
+    description: Když ranní synchronizace PND neproběhla nebo je den neúplný, zkusí ji znovu; v 18:30 při neúspěchu upozorní.
     mode: single
     triggers:
       - trigger: time
@@ -18,6 +20,12 @@ automation:
         at: "08:30:00"
       - trigger: time
         at: "10:00:00"
+      - trigger: time
+        at: "12:30:00"
+      - trigger: time
+        at: "15:30:00"
+      - trigger: time
+        at: "18:30:00"
         id: last
     conditions:
       - condition: not
@@ -25,22 +33,25 @@ automation:
           - condition: state
             entity_id: binary_sensor.cez_elektromer_8591_0246_synchronizace_pnd_bezi
             state: "on"
+      # chybí včerejšek, nebo je neúplný (pnd_check ho ještě nezpracoval)
       - condition: template
         value_template: >
-          {{ state_attr('sensor.cez_elektromer_8591_0246_vcerejsi_spotreba', 'date')
-             != (now() - timedelta(days=1)).date() | string }}
+          {% set y = (now() - timedelta(days=1)).date() | string %}
+          {{ state_attr('sensor.cez_elektromer_8591_0246_vcerejsi_spotreba', 'date') != y
+             or state_attr('sensor.energy_boiler_pnd_daily', 'date') != y }}
     actions:
       - action: logbook.log
         data:
           name: HAv2 PND
-          message: "PND za včerejšek chybí – opakuji stažení ({{ now().strftime('%H:%M') }})"
+          message: >
+            PND za včerejšek chybí nebo je neúplné – opakuji stažení ({{ now().strftime('%H:%M') }})
       - action: cez_pnd.fetch_data
       - if:
           - condition: trigger
             id: last
         then:
           - wait_template: >
-              {{ state_attr('sensor.cez_elektromer_8591_0246_vcerejsi_spotreba', 'date')
+              {{ state_attr('sensor.energy_boiler_pnd_daily', 'date')
                  == (now() - timedelta(days=1)).date() | string }}
             timeout: "00:05:00"
           - if:
@@ -51,5 +62,5 @@ automation:
                 data:
                   title: HAv2 – PND
                   message: >
-                    PND za včerejšek se ani na 4. pokus nestáhlo (portál ČEZ?). Bojler podle PND a
+                    PND za včerejšek se ani na 7. pokus nestáhlo celé (portál ČEZ?). Bojler podle PND a
                     kontrola odchylek čekají; zkusit ručně „Stáhnout data z PND“.
