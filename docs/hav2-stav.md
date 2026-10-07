@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 7. 10. 2026)
+# HAv2 – stav a předávka (k 7. 10. 2026, dopoledne)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -22,7 +22,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 **Data:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní, stáhne `make pull`, mimo git)
 + historie HA + PND D+1 (integrace `cez_pnd`, statistiky `cez_pnd:*` od 1. 1. 2026).
 
-## 1b. Pro novou session (stav 4. 10. 2026 odpoledne)
+## 1b. Pro novou session (stav 7. 10. 2026 dopoledne)
 
 **Pracovní postupy:**
 - Kontroly: `config/appdaemon/hav2_data/*.jsonl` (klíče `DATA_STATES`/`DATA_ATTRS` v `hav2_app.py`), PND v
@@ -31,10 +31,31 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   (`rsync --delete`) přepíše na HA i `.ha_mcp/logs` starší lokální kopií. Lokální `.storage` bývá zastaralý → před
   validací stáhnout jen registr (`rsync homeassistant:/config/.storage/core.entity_registry config/.storage/`);
   celý `make pull` by přepsal neuložené YAML.
-- AppDaemon vidí nové entity až po **restartu doplňku** (~4 min, watchdog pošle notifikaci, vypne filtraci, baterii dá
-  na auto – předem říct uživateli). Změny `.py`/`hav2.yaml` se načtou samy.
+- AppDaemon vidí nové entity až po **restartu doplňku** (od 7. 10. bez balíčků ~10 s; předem říct uživateli – při
+  delším výpadku watchdog pošle notifikaci, vypne filtraci, baterii dá na auto). Změny `.py`/`hav2.yaml` se načtou samy.
+- Nasazení na HA (rsync, push dashboardu, zápisy do statistik/registru) až s výslovným souhlasem uživatele.
+- Ranní kontrola: PND za včerejšek úplné (`energy_boiler_pnd_daily.date` = včerejšek), odchylky `meas_*`, noc
+  z jsonl (plán, SOC, EV, filtrace), log HA a AppDaemonu.
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
+
+### Otevřené body (stav 7. 10. 2026)
+**Ověřit, až nastane:**
+- **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %); dnes/brzy první
+  nabíjení z přetoku po opravě (auto 70 %, cíl 80 %). Zároveň C7 – proud drží, žádné kmitání.
+- **Pojistka PND:** neúplný den ověřen (5. 10.); timeout portálu zatím ne (logbook „HAv2 PND“, notifikace v 18:30).
+- **Sauna na Pro 1PM** při prvním použití (0b/2) + test sauny (0/6, termín neurčen).
+- **Mrazák:** od 4. 10. bez poplachu, ~0,6 kWh/den – sledovat dál „6 h bez odběru“ / „nedostupná 30 min“ (0b/3).
+- C1 záporný výkup s plnou baterií, C3 nesoulad filtrace s vypínači, C4 večerní prodej (6. 10. 18–20 h – vyhodnotit
+  VT nákup po prodeji), C6 3f z plné baterie / NT nabíjení před zataženým dnem.
+**Termíny:**
+- **~16. 10.:** C8 – Solcast automatické tlumení vs. pevná korekce `hav2.jinja` (+ 0/7 přesnost předpovědí).
+- **~18. 10.:** grafy kWh/den sauny a mrazáku už úplné (statistiky smazány 4. 10.).
+- **~19. 10.:** uživatel smaže HA zálohu `982d67d5` (před přepočtem historie výkupu); `19a8c8ff` (před smazáním PND app)
+  lze smazat také, až bude jasné, že nic nechybí.
+- **listopad:** C9 ranní stín FVE (přepočet tvaru dne).
+- **~5. 11.:** faktura výkupu Yello za říjen – porovnat s PND a 0,75 × spot (postup 0c); vyúčtování nákupu, až přijde.
+**Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
 
 ### 0e. Kontrola 7. 10. ráno (výsledky)
 - **PND 5. 10. doplněno** – ČEZ data dodal během 6. 10. odpoledne, pojistka `hav2_pnd_retry` je stáhla v 18:30
