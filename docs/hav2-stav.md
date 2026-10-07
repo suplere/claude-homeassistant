@@ -43,6 +43,8 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 **Ověřit, až nastane:**
 - **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %); dnes/brzy první
   nabíjení z přetoku po opravě (auto 70 %, cíl 80 %). Zároveň C7 – proud drží, žádné kmitání.
+- **Chyba šablony nákladů EV (oprava 7. 10. odpoledne):** při příštím nabíjení v logu HA nesmí být
+  „can't multiply sequence by non-int of type 'float'“ a počet změn `ev_energy_solar_total` ≈ změn čítače EcoVolteru.
 - **Pojistka PND:** neúplný den ověřen (5. 10.); timeout portálu zatím ne (logbook „HAv2 PND“, notifikace v 18:30).
 - **Sauna na Pro 1PM** při prvním použití (0b/2) + test sauny (0/6, termín neurčen).
 - **Mrazák:** od 4. 10. bez poplachu, ~0,6 kWh/den – sledovat dál „6 h bez odběru“ / „nedostupná 30 min“ (0b/3).
@@ -89,6 +91,14 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   jen pro starou app (chromium, chromium-driver, fontconfig, fonts-freefont-ttf, dbus; selenium, pandas, bs4, numpy) –
   HAv2 je nepoužívá → **7. 10. 7:46 odebrány (souhlas uživatele) a doplněk restartován:** start AppDaemonu ~10 s
   (dříve ~4 min), chyba `dependency_manager` zmizela, HAv2 hned přepočítal plán, filtraci, EV i export.
+
+- **Chyba šablony nákladů EV opravena (7. 10. odpoledne, nasazeno rsync + `template.reload`):** 6. 10. 11:16–15:03
+  14× `TemplateError: can't multiply sequence by non-int of type 'float'` ve `variables` bloku nákladů EV
+  (`hav2_statistics.yaml`). Když nákup + vybíjení baterie = spotřeba domu, `share_solar` vyšel ~1e-16 → Python ho píše
+  vědecky, HA ho nechá jako text → `d * share_solar` spadne. Čítač EcoVolteru 925 změn, `ev_energy_solar_total` 911 →
+  ~0,14 kWh (< 1 Kč) nezapočteno, řízení neovlivněno. Oprava: mezivýsledky `share_*`, `e_*`, `cost` a u baterie
+  `grid_to_battery_w`/`grid_share` zaokrouhleny (`round(4)`, resp. `round(1)`) → 0 nebo ≥ 0,0001 (bez vědeckého zápisu).
+  **Pozor do budoucna:** ve `variables` trigger šablon se mezivýsledky, které mohou být < 1e-4, vždy zaokrouhlují.
 
 - **EV odhad SOC opraven (7. 10.):** `sensor.ev_soc_estimate` ukazoval od 6. 10. 23:39 100 % (Kia 70 %, nenabíjelo se)
   → regulátor „Nabito – cílový SOC dosažen“. Příčina: výpadek EcoVolteru (unavailable 23:39, 1:51, 7:03) spustil trigger,
@@ -394,6 +404,13 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - **Senzory `energy_pnd_deviation_*` jsou bez bojleru** (zbytek rozdílu HA↔PND, počítá AppDaemon; od 3. 10. s měřeným bojlerem `meas_*`). Na dashboardu v kWh (`_kwh`), % je u malých součtů zavádějící.
 - Validátor referencí zná i entity z AppDaemonu (hledá `set_state("…")` v `config/appdaemon/apps`). Testy validátoru: `PYTHONPATH=. pytest -o addopts="" tests/test_reference_validator.py` (ve venv chybí coverage).
 - **GoodWe EMS:** `conserve` nabíjí i ze sítě – nepoužívat; „drž SOC“ = `battery_standby`.
+- **SOC baterie (`sensor.battery_state_of_charge`) jen v celých % a s korekcemi BMS** (rozbor 7. 10. z jsonl 5.–7. 10.):
+  integrace GoodWe čte každých 5 s (UDP, keep_alive) – nezdržuje. 1 % ≈ 107 Wh → při 1 kW krok ~6 min, při 200–400 W
+  15–20 min („pomalé“ SOC). Mezi ~25–88 % sedí s energií z `batt_w` (~0,11 kWh/%, kapacita ~10,7 kWh). **Nahoře** (~88–100 %)
+  Pylontech BMS při vyrovnávání článků SOC drží a pak skočí na 100 % (6. 10. 15–16 h +11 % za 0,74 kWh; 5. 10. +6 % za
+  0,14 kWh), **dole u 20 %** korekce podle napětí (7. 10. 6–7 h −6 % za 0,22 kWh). Běžné chování Pylontechu, ne chyba
+  integrace. Pro řízení: u plné baterie může SOC chvíli ukazovat méně (rozhodnutí „plná“ o desítky minut později);
+  energii v baterii počítat raději z kapacity × SOC ve středu rozsahu, ne z krátkých změn SOC.
 - **AppDaemon `set_state` zahazuje falsy hodnoty** (0, False, i v seznamech) → čísla a logické hodnoty v atributech jako text, seznamy řádků s textovými hodnotami, nebo JSON řetězec.
 - AppDaemon **nevidí entity vzniklé v HA po svém startu** (1. 10.: `sensor.pool_hours_done` = None i po reloadu app) → restart doplňku. Start doplňku trval ~4 min (chromium pro starou PND app; od 7. 10. bez balíčků ~10 s) → watchdogy HAv2 pošlou notifikaci a filtraci mimo NT vypnou; předem upozornit uživatele.
 - AppDaemon: nová podsložka apps se načte až po restartu doplňku; `log:` jen s definicí v `appdaemon.yaml`; `logbook.log` bez `entity_id`.

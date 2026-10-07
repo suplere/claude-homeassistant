@@ -296,8 +296,9 @@ template:
       grid_to_battery_w: >
         {{ [[states('sensor.energy_buy') | float(0) - states('sensor.base_house_consumption') | float(0)
              - states('sensor.eco_volter_vykon') | float(0) - states('sensor.bazenova_filtrace_vykon') | float(0), 0] | max,
-            charge_w] | min }}
-      grid_share: "{{ (grid_to_battery_w / charge_w) if charge_w > 0 else 0 }}"
+            charge_w] | min | round(1) }}
+      # round: drobné číslo (např. 1e-13) by HA nechal jako text a násobení by selhalo
+      grid_share: "{{ ((grid_to_battery_w / charge_w) if charge_w > 0 else 0) | round(4) }}"
       cost_in: >
         {{ grid_share * states('sensor.energy_price_buy_now') | float(6.1)
            + (1 - grid_share) * [states('sensor.energy_price_sell_now') | float(0), 0] | max }}
@@ -343,17 +344,19 @@ template:
         {% else %}0{% endif %}
       # zdroje podle aktuální bilance domu (poměrově): síť (Σ fázových nákupů), baterie, zbytek FVE
       load_w: "{{ states('sensor.house_consumption') | float(0) }}"
-      share_grid: "{{ [states('sensor.energy_buy') | float(0) / load_w, 1] | min if load_w > 0 else 1 }}"
-      share_battery: "{{ [states('sensor.fve_battery_discharge_w') | float(0) / load_w, 1 - share_grid] | min if load_w > 0 else 0 }}"
-      share_solar: "{{ [1 - share_grid - share_battery, 0] | max }}"
+      # round(4) všude: hodnoty pod 1e-4 (např. 1.1e-16) má Python ve vědeckém zápisu, HA je nechá jako text
+      # a násobení ve variables spadne (6. 10. 2026 14× „can't multiply sequence by non-int of type 'float'“)
+      share_grid: "{{ ([states('sensor.energy_buy') | float(0) / load_w, 1] | min if load_w > 0 else 1) | round(4) }}"
+      share_battery: "{{ ([states('sensor.fve_battery_discharge_w') | float(0) / load_w, 1 - share_grid] | min if load_w > 0 else 0) | round(4) }}"
+      share_solar: "{{ [1 - share_grid - share_battery, 0] | max | round(4) }}"
       is_nt: "{{ is_state_attr('sensor.energy_price_buy_now', 'tariff', 'NT') }}"
       price_grid: "{{ states('sensor.energy_price_buy_now') | float(6.1) }}"
       price_solar: "{{ [states('sensor.energy_price_sell_now') | float(0), 0] | max }}"
       price_battery: "{{ states('sensor.energy_battery_energy_value') | float(states('input_number.energy_price_vt') | float(6.1)) }}"
-      e_solar: "{{ d * share_solar }}"
-      e_battery: "{{ d * share_battery }}"
-      e_grid: "{{ d * share_grid }}"
-      cost: "{{ e_solar * price_solar + e_battery * price_battery + e_grid * price_grid }}"
+      e_solar: "{{ (d * share_solar) | round(4) }}"
+      e_battery: "{{ (d * share_battery) | round(4) }}"
+      e_grid: "{{ (d * share_grid) | round(4) }}"
+      cost: "{{ (e_solar * price_solar + e_battery * price_battery + e_grid * price_grid) | round(4) }}"
     sensor:
       - name: EV energie ze slunce
         unique_id: hav2_ev_energy_solar_total
