@@ -2173,70 +2173,295 @@ views:
         name: Prodej
         grid_options:
           columns: 6
+      # barvy: nákup červená / prodej zelená (jako jinde na dashboardu), NT modrá / VT oranžová.
+      # ApexCharts neumí externí statistiky (cez_pnd:…) jako entitu → data_generator čte recorder přímo,
+      # entita série je jen nosič (existující senzor PND).
       - type: heading
         heading: Po dnech (14 dní)
         icon: mdi:calendar-week
-      - type: statistics-graph
-        title: Nákup a prodej (kWh)
-        chart_type: bar
-        period: day
-        days_to_show: 14
-        stat_types: [change]
-        entities:
-          - entity: cez_pnd:859182400703740246_consumption
+      - type: custom:apexcharts-card
+        grid_options:
+          columns: full
+        graph_span: 14d
+        span:
+          end: day
+        update_interval: 1h
+        header:
+          show: true
+          title: Nákup a prodej kWh za den
+          show_states: false
+        apex_config:
+          chart:
+            height: 280
+          legend:
+            show: true
+          plotOptions:
+            bar:
+              columnWidth: 70%
+          xaxis:
+            labels:
+              format: "d. M."
+          tooltip:
+            x:
+              format: "d. M. yyyy"
+        yaxis:
+          - min: 0
+            decimals: 0
+            apex_config:
+              title:
+                text: kWh
+        all_series_config:
+          type: column
+          float_precision: 1
+        series:
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: Nákup ze sítě
-          - entity: cez_pnd:859182400703740246_production
+            color: "#e53935"
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_consumption';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'day', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: Prodej do sítě
-      - type: statistics-graph
-        title: Nákup podle tarifu (kWh)
-        chart_type: bar
-        period: day
-        days_to_show: 14
-        stat_types: [change]
-        entities:
-          - entity: cez_pnd:859182400703740246_consumption_nt
+            color: "#43a047"
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_production';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'day', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+      - type: custom:apexcharts-card
+        grid_options:
+          columns: full
+        graph_span: 14d
+        span:
+          end: day
+        update_interval: 1h
+        header:
+          show: true
+          title: Nákup podle tarifu kWh za den
+          show_states: false
+        apex_config:
+          chart:
+            height: 280
+          legend:
+            show: true
+          plotOptions:
+            bar:
+              columnWidth: 70%
+          xaxis:
+            labels:
+              format: "d. M."
+          tooltip:
+            x:
+              format: "d. M. yyyy"
+        yaxis:
+          - min: 0
+            decimals: 0
+            apex_config:
+              title:
+                text: kWh
+        all_series_config:
+          type: column
+          float_precision: 1
+        series:
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: NT
-          - entity: cez_pnd:859182400703740246_consumption_vt
+            color: "#3949ab"
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_consumption_nt';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'day', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: VT
+            color: "#fb8c00"
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_consumption_vt';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'day', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
     - type: grid
       column_span: 2
       cards:
       - type: heading
         heading: Po měsících (12 měsíců)
         icon: mdi:calendar-month
-      - type: statistics-graph
-        title: Nákup a prodej (kWh)
-        chart_type: bar
-        period: month
-        days_to_show: 365
-        stat_types: [change]
-        entities:
-          - entity: cez_pnd:859182400703740246_consumption
+      - type: custom:apexcharts-card
+        grid_options:
+          columns: full
+        graph_span: 365d
+        span:
+          end: month
+        update_interval: 1h
+        header:
+          show: true
+          title: Nákup a prodej kWh za měsíc
+          show_states: false
+        apex_config:
+          chart:
+            height: 280
+          legend:
+            show: true
+          plotOptions:
+            bar:
+              columnWidth: 70%
+          xaxis:
+            labels:
+              format: "MMM yy"
+          tooltip:
+            x:
+              format: "MMMM yyyy"
+        yaxis:
+          - min: 0
+            decimals: 0
+            apex_config:
+              title:
+                text: kWh
+        all_series_config:
+          type: column
+          float_precision: 1
+        series:
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: Nákup ze sítě
-          - entity: cez_pnd:859182400703740246_production
+            color: "#e53935"
+            show:
+              datalabels: true
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_consumption';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'month', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: Prodej do sítě
-      - type: statistics-graph
-        title: Nákup podle tarifu (kWh)
-        chart_type: bar
-        period: month
-        days_to_show: 365
-        stat_types: [change]
-        entities:
-          - entity: cez_pnd:859182400703740246_consumption_nt
+            color: "#43a047"
+            show:
+              datalabels: true
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_production';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'month', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+      - type: custom:apexcharts-card
+        grid_options:
+          columns: full
+        graph_span: 365d
+        span:
+          end: month
+        update_interval: 1h
+        header:
+          show: true
+          title: Nákup podle tarifu kWh za měsíc
+          show_states: false
+        apex_config:
+          chart:
+            height: 280
+          legend:
+            show: true
+          plotOptions:
+            bar:
+              columnWidth: 70%
+          xaxis:
+            labels:
+              format: "MMM yy"
+          tooltip:
+            x:
+              format: "MMMM yyyy"
+        yaxis:
+          - min: 0
+            decimals: 0
+            apex_config:
+              title:
+                text: kWh
+        all_series_config:
+          type: column
+          float_precision: 1
+        series:
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: NT
-          - entity: cez_pnd:859182400703740246_consumption_vt
+            color: "#3949ab"
+            show:
+              datalabels: true
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_consumption_nt';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'month', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: VT
-      - type: statistics-graph
-        title: Náklady na nákup podle PND (Kč)
-        chart_type: bar
-        period: month
-        days_to_show: 365
-        stat_types: [change]
-        entities:
-          - entity: cez_pnd:859182400703740246_cost_nt
+            color: "#fb8c00"
+            show:
+              datalabels: true
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_consumption_vt';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'month', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+      - type: custom:apexcharts-card
+        grid_options:
+          columns: full
+        graph_span: 365d
+        span:
+          end: month
+        update_interval: 1h
+        header:
+          show: true
+          title: Náklady na nákup podle PND (Kč za měsíc)
+          show_states: false
+        apex_config:
+          chart:
+            height: 280
+          legend:
+            show: true
+          plotOptions:
+            bar:
+              columnWidth: 70%
+          xaxis:
+            labels:
+              format: "MMM yy"
+          tooltip:
+            x:
+              format: "MMMM yyyy"
+        yaxis:
+          - min: 0
+            decimals: 0
+            apex_config:
+              title:
+                text: Kč
+        all_series_config:
+          type: column
+          float_precision: 1
+        series:
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: NT
-          - entity: cez_pnd:859182400703740246_cost_vt
+            color: "#3949ab"
+            show:
+              datalabels: true
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_cost_nt';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'month', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
+          - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: VT
+            color: "#fb8c00"
+            show:
+              datalabels: true
+            data_generator: |
+              const id = 'cez_pnd:859182400703740246_cost_vt';
+              const r = await hass.callWS({type: 'recorder/statistics_during_period',
+                start_time: start.toISOString(), end_time: end.toISOString(),
+                statistic_ids: [id], period: 'month', types: ['change']});
+              return (r[id] || []).map((s) => [s.start, s.change]);
 
   # ============================================================ NASTAVENÍ
   - title: Nastavení
