@@ -52,7 +52,8 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   + `binary_sensor.pnd_running`. HAv2 běží dál (heartbeat). AppDaemon po smazání .py souborů hlásí každou sekundu
   `TypeError` v `dependency_manager` (nečeká smazaný soubor) – opraví restart doplňku. Doplněk má v options balíčky
   jen pro starou app (chromium, chromium-driver, fontconfig, fonts-freefont-ttf, dbus; selenium, pandas, bs4, numpy) –
-  HAv2 je nepoužívá; bez nich start doplňku místo ~4 min.
+  HAv2 je nepoužívá → **7. 10. 7:46 odebrány (souhlas uživatele) a doplněk restartován:** start AppDaemonu ~10 s
+  (dříve ~4 min), chyba `dependency_manager` zmizela, HAv2 hned přepočítal plán, filtraci, EV i export.
 
 ### 0d. Kontrola 6. 10. ráno (výsledky)
 - **PND za 5. 10. neúplné:** synchronizace 6:00 i ruční `fetch_data` 8:40 „úspěšné“, ale portál ČEZ měl jen 62/96
@@ -353,7 +354,7 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - Validátor referencí zná i entity z AppDaemonu (hledá `set_state("…")` v `config/appdaemon/apps`). Testy validátoru: `PYTHONPATH=. pytest -o addopts="" tests/test_reference_validator.py` (ve venv chybí coverage).
 - **GoodWe EMS:** `conserve` nabíjí i ze sítě – nepoužívat; „drž SOC“ = `battery_standby`.
 - **AppDaemon `set_state` zahazuje falsy hodnoty** (0, False, i v seznamech) → čísla a logické hodnoty v atributech jako text, seznamy řádků s textovými hodnotami, nebo JSON řetězec.
-- AppDaemon **nevidí entity vzniklé v HA po svém startu** (1. 10.: `sensor.pool_hours_done` = None i po reloadu app) → restart doplňku. Start doplňku trvá ~4 min (instaluje chromium) → watchdogy HAv2 pošlou notifikaci a filtraci mimo NT vypnou; předem upozornit uživatele.
+- AppDaemon **nevidí entity vzniklé v HA po svém startu** (1. 10.: `sensor.pool_hours_done` = None i po reloadu app) → restart doplňku. Start doplňku trval ~4 min (chromium pro starou PND app; od 7. 10. bez balíčků ~10 s) → watchdogy HAv2 pošlou notifikaci a filtraci mimo NT vypnou; předem upozornit uživatele.
 - AppDaemon: nová podsložka apps se načte až po restartu doplňku; `log:` jen s definicí v `appdaemon.yaml`; `logbook.log` bez `entity_id`.
 - Trigger šablony: `this` nejde ve `variables`.
 - Nové YAML platformy (statistics, history_stats, integration) potřebují restart HA.
