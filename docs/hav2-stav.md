@@ -41,10 +41,11 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 
 ### Otevřené body (stav 7. 10. 2026)
 **Ověřit, až nastane:**
-- **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %); dnes/brzy první
-  nabíjení z přetoku po opravě (auto 70 %, cíl 80 %). Zároveň C7 – proud drží, žádné kmitání.
-- **Chyba šablony nákladů EV (oprava 7. 10. odpoledne):** při příštím nabíjení v logu HA nesmí být
-  „can't multiply sequence by non-int of type 'float'“ a počet změn `ev_energy_solar_total` ≈ změn čítače EcoVolteru.
+- **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %). První nabíjení
+  z přetoku po opravě 7. 10. od 14:30 v pořádku: odhad 70 → 71,2 % plynule; C7 – proud jen klesal se sluncem
+  9 → 8 → 7 → 6 A (14:30, 14:47, 15:01, 15:09), bez kmitání, síť ~0, baterie (SOC 90 %) dál nabíjí ~0,4 kW.
+- ~~Chyba šablony nákladů EV~~ – **ověřeno 7. 10. 14:30–15:12** při nabíjení z přetoku: čítač EcoVolteru i
+  `ev_energy_solar_total` shodně 102 změn, v system logu dál jen starých 14 výskytů z 6. 10.
 - **Pojistka PND:** neúplný den ověřen (5. 10.); timeout portálu zatím ne (logbook „HAv2 PND“, notifikace v 18:30).
 - **Sauna na Pro 1PM** při prvním použití (0b/2) + test sauny (0/6, termín neurčen).
 - **Mrazák:** od 4. 10. bez poplachu, ~0,6 kWh/den – sledovat dál „6 h bez odběru“ / „nedostupná 30 min“ (0b/3).
