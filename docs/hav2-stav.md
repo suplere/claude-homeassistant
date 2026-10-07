@@ -54,8 +54,20 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **~19. 10.:** uživatel smaže HA zálohu `982d67d5` (před přepočtem historie výkupu); `19a8c8ff` (před smazáním PND app)
   lze smazat také, až bude jasné, že nic nechybí.
 - **listopad:** C9 ranní stín FVE (přepočet tvaru dne).
-- **~5. 11.:** faktura výkupu Yello za říjen – porovnat s PND a 0,75 × spot (postup 0c); vyúčtování nákupu, až přijde.
+- **~5.–7. 11.:** faktury za říjen – výkup Yello (PND × 0,75 × spot, postup 0c) a nákup ARMEX (PND NT/VT × 6,092 / 3,508 + 460,85 Kč, postup 0f).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0f. Faktura nákupu ARMEX ENERGY za 9/2026 (7. 10.) – ověřeno
+- **Množství:** VT 111 / NT 104 kWh (registry 971244: VT 5958→6069, NT 2479→2583) = PND VT 111,54 / NT 104,17 kWh
+  (registry v celých kWh, zbytek přejde do dalšího měsíce); i 7/2026 (78/18 vs 78,08/17,55) a 8/2026 (83/131 vs
+  82,41/131,13) → **NT/VT podle HDO 22–06 v PND odpovídá registrům elektroměru.**
+- **Ceny (produkt E HOME OPTIMAL 419 FIX 24M, výročí 4. 3. 2028):** VT bez DPH 2,59 dodávka + 2,25245 distribuce
+  + 0,0283 daň + 0,16424 systémové služby = 5,035 → **6,092 Kč s DPH** (HA 6,10); NT 2,59 + 0,1165 + 0,0283 + 0,16424 =
+  2,899 → **3,508 Kč** (HA 3,51). Variabilní část: faktura 1 041,06 Kč, PND × ceny HA 1 044,91 Kč (rozdíl = zaokrouhlení
+  registrů a 0,008 Kč/kWh u VT).
+- **Pevné platby (v HA nejsou):** stálý plat 99 + jistič 3×25 A 269 + OTE 12,87 = 380,87 Kč bez DPH = **460,85 Kč/měsíc
+  s DPH**; POZE 0 Kč. Celkem září 1 501,92 Kč, záloha 700 → nedoplatek 802 Kč; nová záloha od 11/2026 1 310 Kč/měsíc (SIPO).
+- GoodWe nákup září 126,95 kWh vs PND 215,7 – rozdíl je bojler mimo měření GoodWe (známé).
 
 ### 0e. Kontrola 7. 10. ráno (výsledky)
 - **PND 5. 10. doplněno** – ČEZ data dodal během 6. 10. odpoledne, pojistka `hav2_pnd_retry` je stáhla v 18:30
