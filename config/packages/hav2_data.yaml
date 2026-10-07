@@ -374,6 +374,11 @@ template:
       - trigger: event
         event_type: event_template_reloaded
         id: reload
+    # Nedostupný čítač EcoVolteru (výpadky Wi-Fi) by se četl jako 0 kWh → 6. 10. 23:39 přebázování
+    # s base_energy 0 a po návratu čítače odhad 100 % (auto mělo 70 %). Bez platného čítače nic nepočítat.
+    conditions:
+      - condition: template
+        value_template: "{{ has_value('sensor.ecovolter_revcr01c00002056_total_charged_energy') }}"
     # `this` není ve `variables` trigger šablony dostupné → logika je přímo v šablonách
     # (všechny vidí stejný předchozí stav entity, takže jsou konzistentní)
     sensor:
@@ -391,7 +396,7 @@ template:
           {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
           {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
           {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-          {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+          {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
           {% set base_soc = kia_soc | float if rebase else this.attributes.get('base_soc', kia_soc) | float(50) %}
           {% set base_energy = total_now if rebase else this.attributes.get('base_energy', total_now) | float %}
           {% set added = (total_now - base_energy) * states('input_number.ev_charge_efficiency') | float(90) / 100 %}
@@ -401,20 +406,20 @@ template:
             {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
             {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-            {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
             {{ kia_soc | float if rebase else this.attributes.get('base_soc', kia_soc) | float(50) }}
           base_energy: >
             {% set total_now = states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) %}
             {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
             {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-            {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
             {{ total_now if rebase else this.attributes.get('base_energy', total_now) | float }}
           base_time: >
             {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
             {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-            {% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time)) %}
+            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
             {{ (kia_time.isoformat() if kia_time is not none else now().isoformat()) if rebase else this.attributes.get('base_time') }}
           source: >
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}

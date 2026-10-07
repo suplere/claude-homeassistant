@@ -55,6 +55,12 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   HAv2 je nepoužívá → **7. 10. 7:46 odebrány (souhlas uživatele) a doplněk restartován:** start AppDaemonu ~10 s
   (dříve ~4 min), chyba `dependency_manager` zmizela, HAv2 hned přepočítal plán, filtraci, EV i export.
 
+- **EV odhad SOC opraven (7. 10.):** `sensor.ev_soc_estimate` ukazoval od 6. 10. 23:39 100 % (Kia 70 %, nenabíjelo se)
+  → regulátor „Nabito – cílový SOC dosažen“. Příčina: výpadek EcoVolteru (unavailable 23:39, 1:51, 7:03) spustil trigger,
+  šablona se zároveň přebázovala na novější čas z Kia (19:55) a nedostupný čítač četla jako 0 → `base_energy` 0, po návratu
+  čítače +1 111 kWh. Oprava `hav2_data.yaml`: trigger šablona má `conditions` (jen s platným čítačem EcoVolteru)
+  a přebázuje i při nesmyslné bázi (`base_energy` ≤ 0 nebo > čítač) → po reloadu 70 %, potřeba 8,6 kWh.
+
 ### 0d. Kontrola 6. 10. ráno (výsledky)
 - **PND za 5. 10. neúplné:** synchronizace 6:00 i ruční `fetch_data` 8:40 „úspěšné“, ale portál ČEZ měl jen 62/96
   čtvrthodin (do 15:30; parser: „ČEZ PND pravděpodobně ještě nedopočítal data“) → statistiky `cez_pnd:*` jen 0–14 h,
