@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 6. 10. 2026)
+# HAv2 – stav a předávka (k 7. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -35,6 +35,15 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   na auto – předem říct uživateli). Změny `.py`/`hav2.yaml` se načtou samy.
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
+
+### 0e. Kontrola 7. 10. ráno (výsledky)
+- **PND 5. 10. doplněno** – ČEZ data dodal během 6. 10. odpoledne, pojistka `hav2_pnd_retry` je stáhla v 18:30
+  (bez notifikace, 24 h, součty navazují). **PND 6. 10.** v 6:00 kompletní na první pokus. Upravená pojistka ověřena.
+- **Energy dashboard proti PND (0b/1) – uzavřeno:** 5. 10. nákup PND 5,471 / HA 5,376 kWh (+0,095), prodej 13,581 /
+  13,639 (−0,058); 6. 10. nákup 7,051 / 7,016 (+0,035), prodej 5,282 / 5,380 (−0,098) → do ~0,1 kWh, náklady i výnos
+  se počítají (5. 10. 20,49 / 19,62 Kč, 6. 10. 28,01 / 32,80 Kč).
+- **Odchylky s měřeným bojlerem:** 6. 10. nákup +0,03 kWh (+0,5 %), prodej −0,10 kWh (−1,8 %). Bojler podle PND
+  5. 10. 3,79 kWh / 10,21 Kč, 6. 10. 4,73 kWh / 16,57 Kč (Shelly 3,97 / 4,96 kWh).
 
 ### 0d. Kontrola 6. 10. ráno (výsledky)
 - **PND za 5. 10. neúplné:** synchronizace 6:00 i ruční `fetch_data` 8:40 „úspěšné“, ale portál ČEZ měl jen 62/96
