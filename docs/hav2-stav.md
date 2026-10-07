@@ -45,6 +45,15 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Odchylky s měřeným bojlerem:** 6. 10. nákup +0,03 kWh (+0,5 %), prodej −0,10 kWh (−1,8 %). Bojler podle PND
   5. 10. 3,79 kWh / 10,21 Kč, 6. 10. 4,73 kWh / 16,57 Kč (Shelly 3,97 / 4,96 kWh).
 
+- **Stará AppDaemon PND app smazána (7. 10., souhlas uživatele, HA záloha `19a8c8ff`):** HACS
+  `ondrejvysek/HomeAssistant-CEZDistribuce-PND` (+ `init_helper`, který jen spouštěl PND po startu AppDaemonu),
+  `apps.yaml` bez `init_helper`/`pnd`, složka `apps/pnd` (CSV, snímky přihlášení), automatizace `run_pnd`
+  a `run_actions_after_appdaemon_starts`, šablona „PND Running“ v `configuration.yaml`, z registru 9× `sensor.pnd_*`
+  + `binary_sensor.pnd_running`. HAv2 běží dál (heartbeat). AppDaemon po smazání .py souborů hlásí každou sekundu
+  `TypeError` v `dependency_manager` (nečeká smazaný soubor) – opraví restart doplňku. Doplněk má v options balíčky
+  jen pro starou app (chromium, chromium-driver, fontconfig, fonts-freefont-ttf, dbus; selenium, pandas, bs4, numpy) –
+  HAv2 je nepoužívá; bez nich start doplňku místo ~4 min.
+
 ### 0d. Kontrola 6. 10. ráno (výsledky)
 - **PND za 5. 10. neúplné:** synchronizace 6:00 i ruční `fetch_data` 8:40 „úspěšné“, ale portál ČEZ měl jen 62/96
   čtvrthodin (do 15:30; parser: „ČEZ PND pravděpodobně ještě nedopočítal data“) → statistiky `cez_pnd:*` jen 0–14 h,
@@ -166,7 +175,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
    GoodWe, s průměrem 30–60 s sedí). Pokud se potvrdí, vyhladit vstupy `sensor.bojler_z_pretoku_w` (~60 s průměr) –
    logika po fázích (L3) zůstává. Postup analýzy: §A „Fakturace po fázích“.
 4. **Rozpad bojleru za celý 3. 10.** (`sensor.bojler_z_pretoku_energie` / `_ze_site_energie`, sankey na Úsporách).
-5. **Smazat AppDaemon PND app** (po 2–3 dnech bezchybného stahování přes integraci, se souhlasem): aplikace z HACS,
+5. ~~**Smazat AppDaemon PND app**~~ – hotovo 7. 10. (0e). Původně: aplikace z HACS,
    `config/appdaemon/apps/HomeAssistant-CEZDistribuce-PND/`, `apps/pnd/`, blok `pnd:` v `apps.yaml`, automatizace
    `automation.run_pnd` a `automation.run_actions_after_appdaemon_starts` (obě vypnuté), entity `sensor.pnd_*`.
    `init_helper` (událost APPDAEMON_READY) nechat, dokud ho něco používá – ověřit.
@@ -235,7 +244,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
    `house_consumption_with_boiler_w`); sankey s bojlerem (od 3. 10. celý den, `energy_sources_total` od 2. 10. 9:29).
 
 ### B. Čeká na uživatele
-1. Souhlas se smazáním AppDaemon PND app (0/5).
+1. ~~Souhlas se smazáním AppDaemon PND app (0/5)~~ – smazáno 7. 10.
 2. Termín testu sauny (0/6).
 3. Volitelně kratší ID nových helperů bojleru (např. `sensor.bojler_vykon_prumer_1min`, `binary_sensor.bojler_hreje`) –
    přejmenování entit jen se souhlasem (CLAUDE.md), pak upravit i dashboard.

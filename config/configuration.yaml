@@ -71,10 +71,6 @@ template:
         state_class: total
         state: >
           {{ states('input_number.ev_nt_naklady_celkem_kc') | float(0) }}
-  - binary_sensor:
-      - name: "PND Running"
-        unique_id: 1f1c154f-c5ea-4eae-94c0-69425334b48b
-        state: "off"
   - trigger:
       - trigger: time
         at: "23:59:55"
