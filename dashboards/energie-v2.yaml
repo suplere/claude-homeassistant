@@ -1225,10 +1225,10 @@ views:
                 color: "#1e88e5"
               - entity: sensor.ev_charging_cost_grid_nt_total
                 name: Síť NT
-                color: "#43a047"
+                color: "#3949ab"
               - entity: sensor.ev_charging_cost_grid_vt_total
                 name: Síť VT
-                color: "#e53935"
+                color: "#fb8c00"
           - type: heading
             heading: Denní energie podle zdroje
             heading_style: subtitle
@@ -1250,10 +1250,10 @@ views:
                 color: "#1e88e5"
               - entity: sensor.ev_energy_grid_nt_total
                 name: Síť NT
-                color: "#43a047"
+                color: "#3949ab"
               - entity: sensor.ev_energy_grid_vt_total
                 name: Síť VT
-                color: "#e53935"
+                color: "#fb8c00"
       - type: grid
         cards:
           - type: heading
@@ -1985,11 +1985,11 @@ views:
               - id: sensor.energy_import_nt_total
                 section: 0
                 name: Síť NT
-                color: "#5c6bc0"
+                color: "#3949ab"
               - id: sensor.energy_import_vt_total
                 section: 0
                 name: Síť VT
-                color: "#e53935"
+                color: "#fb8c00"
               - id: sensor.total_battery_discharge
                 section: 0
                 name: Baterie (vybíjení)
