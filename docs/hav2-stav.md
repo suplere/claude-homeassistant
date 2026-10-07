@@ -54,7 +54,9 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **~19. 10.:** uživatel smaže HA zálohu `982d67d5` (před přepočtem historie výkupu); `19a8c8ff` (před smazáním PND app)
   lze smazat také, až bude jasné, že nic nechybí.
 - **listopad:** C9 ranní stín FVE (přepočet tvaru dne).
-- **~5.–7. 11.:** faktury za říjen – výkup Yello (PND × 0,75 × spot, postup 0c) a nákup ARMEX (PND NT/VT × 6,092 / 3,508 + 460,85 Kč, postup 0f).
+- **~5.–7. 11.:** faktury za říjen – výkup Yello (PND × 0,75 × spot, postup 0c) a nákup ARMEX (PND NT/VT × 6,092 / 3,508 + 460,85 Kč, postup 0f). Pak rozhodnout s uživatelem: doplnit
+  pevné platby (460,85 Kč/měsíc) do nákladů na dashboardu (uživatel souhlasí v principu, počkat na srovnání za říjen);
+  případně VT 6,10 → 6,09.
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
 
 ### 0f. Faktura nákupu ARMEX ENERGY za 9/2026 (7. 10.) – ověřeno
