@@ -8,8 +8,10 @@ homeassistant:
 frontend:
   themes: !include_dir_merge_named themes
   # card-mod jako frontend modul (rychlejší a funguje i mimo dashboardy)
+  # URL musí přesně odpovídat prostředku dashboardu z HACS včetně hacstag –
+  # po aktualizaci card-mod v HACS hacstag přepsat (Nastavení → Dashboardy → Prostředky)
   extra_module_url:
-    - /hacsfiles/lovelace-card-mod/card-mod.js
+    - /hacsfiles/lovelace-card-mod/card-mod.js?hacstag=190927524421
 
 automation: !include automations.yaml
 script: !include scripts.yaml

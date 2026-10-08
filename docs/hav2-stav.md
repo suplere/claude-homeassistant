@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 7. 10. 2026, dopoledne)
+# HAv2 – stav a předávka (k 8. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -46,6 +46,10 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   9 → 8 → 7 → 6 A (14:30, 14:47, 15:01, 15:09), bez kmitání, síť ~0, baterie (SOC 90 %) dál nabíjí ~0,4 kW.
 - ~~Chyba šablony nákladů EV~~ – **ověřeno 7. 10. 14:30–15:12** při nabíjení z přetoku: čítač EcoVolteru i
   `ev_energy_solar_total` shodně 102 změn, v system logu dál jen starých 14 výskytů z 6. 10.
+- **card-mod „hui-card already patched by 4.2.1“ (sledovat):** URL sjednoceny 8. 10. (`hacstag`, §3), přesto Safari
+  na Macu hlásí dál (12:03, 12:05 i po zavření okna). Na HA nic dalšího card-mod nenačítá → nejspíš mezipaměť Safari
+  (vymazat data webu HA v Safari → Nastavení → Soukromí), případně chyba card-mod (issue #582 bez řešení). Funkčně
+  neškodí; sledovat v system logu, zda se objevuje i z jiných zařízení nebo po aktualizaci card-mod.
 - **Pojistka PND:** neúplný den ověřen (5. 10.); timeout portálu zatím ne (logbook „HAv2 PND“, notifikace v 18:30).
 - **Sauna na Pro 1PM** při prvním použití (0b/2) + test sauny (0/6, termín neurčen).
 - **Mrazák:** od 4. 10. bez poplachu, ~0,6 kWh/den – sledovat dál „6 h bez odběru“ / „nedostupná 30 min“ (0b/3).
@@ -61,6 +65,17 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   pevné platby (460,85 Kč/měsíc) do nákladů na dashboardu (uživatel souhlasí v principu, počkat na srovnání za říjen);
   případně VT 6,10 → 6,09.
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0g. Kontrola 8. 10. (výsledky)
+- **PND 7. 10.** v 6:00 kompletní na první pokus; bojler 5,05 kWh / 17,70 Kč. Odchylky s měřeným bojlerem: nákup
+  +0,17 kWh (+1,7 %), prodej −0,20 kWh (−10 %, malý součet) – trochu víc než 5.–6. 10. (−0,06/−0,10), sledovat.
+- **Noc:** 22:00 držení baterie (SOC 69 %) + bojler NT 22:00–00:07, 2:15 vlastní spotřeba z baterie (ráno 54 %),
+  bez nákupu ze sítě a bez prodeje. EV: nabíjení 7. 10. skončilo 15:35 (~72 %), auto odjelo 5:43, Kia 6:23 hlásí 66 %.
+- **Oprava odhadu SOC EV ověřena:** EcoVolter 8. 10. ráno 4× nedostupný (6:01, 6:37, 7:46, 7:53) → odhad zůstal 66 %.
+- **HA 2026.10.0** (aktualizace 9:44, restart) – HAv2 se zotavil do minuty. Od 9:46 iOS appka 2026.9.3 opakovaně
+  „Received frame with non-zero reserved bits“ (websocket) – nejspíš nesoulad appky s novým HA, čekat na update appky.
+- **card-mod dvakrát:** `extra_module_url` sjednoceno s prostředkem HACS (`?hacstag=190927524421`), restart HA 11:55
+  (start ~40 s, bez chyb); varování ze Safari trvá → viz Otevřené body.
 
 ### 0f. Faktura nákupu ARMEX ENERGY za 9/2026 (7. 10.) – ověřeno
 - **Množství:** VT 111 / NT 104 kWh (registry 971244: VT 5958→6069, NT 2479→2583) = PND VT 111,54 / NT 104,17 kWh
@@ -420,6 +435,10 @@ HACS karty: power-flow-card-plus, apexcharts-card, flex-table-card, auto-entitie
 - Utility metery vždy přes GUI (YAML neprojde validátorem).
 - Markdown karty: obsah jako `|` (literal), ne `>` – jinak se rozbijí tabulky.
 - Dashboard dlaždice: vždy explicitní `grid_options`, jinak se v sekcích „rozsypou“.
+- **card-mod se načítá dvakrát** (`extra_module_url` v `configuration.yaml` + prostředek dashboardu z HACS) → URL musí
+  být **přesně stejné včetně `?hacstag=`** (README card-mod; jinak varování „hui-card already patched… loaded twice“).
+  Od 8. 10. sjednoceno (`hacstag=190927524421`). **Po každé aktualizaci card-mod v HACS** přepsat hacstag v
+  `configuration.yaml` podle Nastavení → Dashboardy → Prostředky a restartovat HA; prostředek z HACS nechat.
 - Štítky: nové HAv2 entity vždy `hav2` + oblast (`hav2_system` / `hav2_baterie` / `hav2_ev` / `hav2_bazen`) – výjimka v CLAUDE.md. Senzory z AppDaemonu štítek mít nemůžou.
 - **PND = jen integrace cez_pnd (od 3. 10.):** statistiky `cez_pnd:*_consumption` / `_consumption_nt` / `_consumption_vt` / `_production` / `_cost_*`
   od 1. 1. 2026. NT/VT určuje podle historie `binary_sensor.cez_hdo_hightariffactive_dum` v recorderu (~10 dní) – **při zpětném
