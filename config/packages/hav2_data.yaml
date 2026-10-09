@@ -552,9 +552,9 @@ template:
         unit_of_measurement: Kč/kWh
         state_class: measurement
         icon: mdi:cash-check
-        availability: "{{ states('sensor.ev_charging_energy_total') | float(0) > 0 and has_value('sensor.ev_charging_cost_total') }}"
-        state: >
-          {{ (states('sensor.ev_charging_cost_total') | float / states('sensor.ev_charging_energy_total') | float) | round(2) }}
+        # tento rok (od 1. 1.) z ročního souhrnu AppDaemonu – jen data HAv2 se známými náklady
+        availability: "{{ state_attr('sensor.ev_charging_year', 'hav2_kwh') | float(0) > 0 }}"
+        state: "{{ state_attr('sensor.ev_charging_year', 'avg_price') | float(0) | round(2) }}"
 
       - name: EV vlastní energie
         unique_id: hav2_ev_own_energy_share
@@ -562,11 +562,9 @@ template:
         unit_of_measurement: "%"
         state_class: measurement
         icon: mdi:solar-power
-        # podíl slunce + baterie domu na nabité energii
-        availability: "{{ states('sensor.ev_charging_energy_total') | float(0) > 0 }}"
-        state: >
-          {{ ((states('sensor.ev_energy_solar_total') | float(0) + states('sensor.ev_energy_battery_total') | float(0))
-              / states('sensor.ev_charging_energy_total') | float * 100) | round(0) }}
+        # podíl slunce + baterie domu na nabité energii tento rok (data HAv2)
+        availability: "{{ state_attr('sensor.ev_charging_year', 'hav2_kwh') | float(0) > 0 }}"
+        state: "{{ state_attr('sensor.ev_charging_year', 'own_pct') | float(0) | round(0) }}"
 
       - name: EV úspora proti VT tento měsíc
         unique_id: hav2_ev_saving_vs_vt_monthly

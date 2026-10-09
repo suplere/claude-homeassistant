@@ -102,6 +102,20 @@ views:
               action: more-info
             grid_options:
               columns: 4
+          # kdy by auto bylo nabité jen z přetoku FVE (sensor.ev_plan, předpověď do zítřka 24:00)
+          - type: custom:mushroom-template-card
+            entity: sensor.ev_plan
+            primary: EV ze slunce
+            secondary: >-
+              {% set t = state_attr(entity, 'solar_eta_text') %}{{ t if t else '–' }}
+            icon: mdi:car-electric
+            icon_color: >-
+              {% set t = state_attr(entity, 'solar_eta_text') or '' %}{{ 'green' if t.startswith('nabito') else 'amber' if state_attr(entity, 'solar_eta') else 'grey' }}
+            tap_action:
+              action: navigate
+              navigation_path: /lovelace/ev
+            grid_options:
+              columns: 12
       - type: grid
         column_span: 2
         cards:
@@ -1133,9 +1147,6 @@ views:
           - type: markdown
             content: |
               <small>EV odebrané ze sítě v NT × cena NT ({{ states('input_number.energy_price_nt') }} Kč/kWh).
-              Do 25. 9. 2026 ruční NT nabíjení (v1), potom HAv2. Ze sítě ve VT navíc
-              {{ states('sensor.ev_energy_grid_vt_total') | float(0) | round(1) }} kWh /
-              {{ states('sensor.ev_charging_cost_grid_vt_total') | float(0) | round(0) | int }} Kč (od 25. 9.).
               Aktualizace 1× za hodinu.</small>
       - type: grid
         cards:
@@ -1184,20 +1195,22 @@ views:
             name: Úspora proti VT (měsíc)
             grid_options:
               columns: 6
+          # tento rok od 1. 1. (sensor.ev_charging_year z AppDaemonu: energie z čítače EcoVolteru)
           - type: custom:mushroom-template-card
-            entity: sensor.ev_charging_energy_total
-            primary: Nabito od 25. 9.
-            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.1f}'.format(v | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            entity: sensor.ev_charging_year
+            primary: Nabito tento rok
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
             icon: mdi:ev-plug-type2
             tap_action:
               action: more-info
             grid_options:
               columns: 6
           - type: custom:mushroom-template-card
-            entity: sensor.ev_charging_cost_total
-            primary: Náklady od 25. 9.
-            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
-            icon: mdi:cash
+            entity: sensor.ev_charging_year
+            primary: Ze sítě VT tento rok
+            secondary: >-
+              {% set k = state_attr(entity, 'grid_vt') %}{% set c = state_attr(entity, 'cost_vt') %}{% if is_number(k) %}{{ ('{:,.1f}'.format(k | float | round(1) + 0)).replace(',', ' ').replace('.', ',') }} kWh · {{ ('{:,.0f}'.format(c | float(0) | round(0) + 0)).replace(',', ' ') }} Kč{% else %}–{% endif %}
+            icon: mdi:transmission-tower
             tap_action:
               action: more-info
             grid_options:

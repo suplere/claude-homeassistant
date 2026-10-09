@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 8. 10. 2026)
+# HAv2 – stav a předávka (k 9. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -64,7 +64,44 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **~5.–7. 11.:** faktury za říjen – výkup Yello (PND × 0,75 × spot, postup 0c) a nákup ARMEX (PND NT/VT × 6,092 / 3,508 + 460,85 Kč, postup 0f). Pak rozhodnout s uživatelem: doplnit
   pevné platby (460,85 Kč/měsíc) do nákladů na dashboardu (uživatel souhlasí v principu, počkat na srovnání za říjen);
   případně VT 6,10 → 6,09.
+- **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0h. Kontrola 9. 10. (výsledky) + nabídka dodavatele
+- **PND 8. 10.** kompletní; s měřeným bojlerem nákup +0,09 kWh (+0,7 %), prodej −0,10 kWh → odchylka prodeje
+  z 7. 10. (−0,20) byla výjimka. Bojler 3,90 kWh / 13,64 Kč.
+- **EV v NT na termín:** uživatel 8. 10. 22:51 zadal „nabito do 9. 10. 6:00“ → 22:53 start 3f 8 A, pak 11 A (~5 kW),
+  1:55 „Nabito“ 80 %; baterie celou dobu `battery_standby` (jen 1. minuta 5,2 kW z baterie, než EMS přepnul – odezva
+  5–10 s), vše v NT. Auto odjelo 6:05.
+- **Noc:** od 2:00 vlastní spotřeba z baterie (ráno 56 %), bez nákupu; bojler NT.
+- **ČEZ HDO (`cez_hdo`):** v noci 1:34–3:37 selhávalo OCR CAPTCHA (ERROR v logu), pak úspěch – data platná do 15. 10.
+  Pokud by „Dní do vypršení“ kleslo k 0, řešit ručně (PND NT/VT podle historie `cez_hdo_hightariffactive_dum`).
+- **Skenování z internetu** 9. 10. 5:58 (boti, path traversal na `.env`, `/api/config`) – HA filtroval, auth selhala.
+  `http:` v configuration.yaml chybí → `login_attempts_threshold` vypnutý; volitelně zapnout (uživatel nerozhodl).
+- iOS appka 2026.9.3 dál websocket „non-zero reserved bits“ (837×) – čekat na update appky.
+
+**EV ze slunce + roční souhrn (9. 10. odpoledne, nasazeno 15:26):**
+- `sensor.ev_plan` atributy `solar_eta` / `solar_eta_text` / `solar_eta_kwh` (`E.solar_eta`): kdy by auto mělo cíl
+  jen z přetoku FVE, **přes všechny dny předpovědi** (Solcast 7 dní, verze 16:43). Dnes+zítra = přetok z plánu baterie
+  (`grid_export_kwh − battery_out_kwh`, bez prodeje z baterie); další dny `E.extend_solar_slots` z `week` (opravená
+  předpověď) × průběh dne slunečnějšího z dneška/zítřka (`E.day_shape`), dům = profil spotřeby + bojler, baterie
+  zjednodušeně (den nabíjí, mimo NT kryje dům, v NT drží), start = SOC na konci plánu. Filtrace má přednost: její energie
+  (cíl − odběhnuto, další dny cíl × příkon, den 06–06) ubírá z prvního přetoku (`E.PoolDemand`). Slot jen když unese
+  ≥ 1f 6 A, nejvýš 3f 11 A. **Spolehlivost 1,0** (plán EV dál 0,7): zpětný test 3.–9. 10. se skutečnou FVE sedí
+  (6. 10. model 10,5 kWh pro EV, skutečně 8,9 ze slunce + 5,1 prodej), opravená předpověď je už nízká (9. 10. 16,5 vs
+  skutečnost 19,2 kWh) → po C8 (~16. 10.) případně přehodnotit. Počítá i bez připojeného auta („– po připojení“).
+  Karta „EV ze slunce“ na Přehledu (sekce Dnes, klepnutí → EV). 9. 10. 16:43: „do 15.10. nestihne – slunce ~6,7 z 11,2 kWh“.
+- `sensor.ev_charging_year` (AppDaemon, hodinově s vyúčtováním NT): od 1. 1. z dlouhodobých statistik – energie
+  z čítače EcoVolteru (statistiky od 4/2026 → 2026 i před HAv2, 1 133 kWh), zdroje a náklady z čítačů HAv2
+  (atributy `hav2_kwh`, `solar`, `battery`, `grid_nt`, `grid_vt`, `cost`, `cost_vt`, `avg_price`, `own_pct`).
+  `sensor.ev_charging_avg_price` (2,50 Kč/kWh) a `sensor.ev_own_energy_share_pct` (52 %) i cena na 100 km jsou teď
+  roční (jen data HAv2). Dashboard EV náklady: „Nabito tento rok“, „Ze sítě VT tento rok“, bez zmínek o 25. 9. a v1.
+
+**Nabídka PREMIUM FIX 36M (9. 10., uživatel):** 2,89 Kč/kWh + 129 Kč/měs. bez DPH vs. stávající ARMEX 2,59 Kč/kWh
++ 99 Kč/měs. (fixace do 4. 3. 2028, §0f) → **+0,363 Kč/kWh a +36,30 Kč/měs. s DPH** (VT 6,455 / NT 3,871 Kč).
+Spotřeba ze sítě podle PND I–IX/2026 1 947 kWh (VT 1 463 / NT 484), odhad roku ~3 000 kWh → **dráž o ~1 525 Kč/rok,
+~4 600 Kč za 36 měsíců**; dražší v obou složkách, bez bodu zvratu. Doporučení: nebrat (navíc možná sankce za předčasné
+ukončení ARMEX); nabídky porovnat ~září 2027, půl roku před koncem fixace.
 
 ### 0g. Kontrola 8. 10. (výsledky)
 - **PND 7. 10.** v 6:00 kompletní na první pokus; bojler 5,05 kWh / 17,70 Kč. Odchylky s měřeným bojlerem: nákup

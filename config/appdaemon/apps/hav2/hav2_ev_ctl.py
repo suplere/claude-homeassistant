@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import hav2_ev as E
 
@@ -279,6 +279,20 @@ class EvControl:
             ev_plan.reason = "SOC auta neznámý – jen slunce; " + ev_plan.reason
         self.ev_plan = ev_plan
 
+        # odhad „nabito jen ze slunce“ (i bez připojeného auta – kdyby se připojilo teď);
+        # přetok jen z FVE: bez exportu z baterie (večerní prodej v plánu baterie)
+        sun_slots = [E.EvSlot(s.start, s.is_nt, max(0.0, r.grid_export_kwh - r.battery_out_kwh), s.fraction)
+                     for s, r in zip(slots, plan.results)]
+        try:
+            sun_slots += self._ev_sun_days(slots, plan, is_nt)
+        except Exception as err:  # noqa: BLE001 – další dny jen doplněk, odhad do zítřka platí dál
+            self.log(f"EV ze slunce – další dny: {err}", level="WARNING")
+        eta_target = self.fnum(EV_TARGET, 80) if lp.over else lp.top_now
+        # spolehlivost 1,0: opravená předpověď FVE už je snížená (zpětný test 3.–9. 10. 2026 se
+        # skutečnou výrobou sedí, × 0,7 by odhad dvojnásobně podhodnotil); plán EV dál × 0,7
+        eta = E.solar_eta(sun_slots, needed, now, confidence=1.0, pool=self._ev_pool_demand())
+        eta_text = E.solar_eta_text(eta, now, eta_target, connected) if soc_known else "SOC auta neznámý"
+
         # rezerva pro baterii domu (priorita 3): když ji slunce do večera samo nenabije,
         # dostane EV jen přebytek nad průměrný výkon potřebný k nabití do 17:00
         soc = self.fnum("sensor.battery_state_of_charge", 50)
@@ -306,6 +320,9 @@ class EvControl:
             "shortfall_kwh": f"{ev_plan.shortfall_kwh:.2f}",
             "est_grid_cost": f"{ev_plan.est_cost:.2f}",
             "battery_reserve_w": f"{self.ev_reserve_w:.0f}",
+            "solar_eta": eta.eta.isoformat(timespec="minutes") if eta.eta and soc_known else "",
+            "solar_eta_text": eta_text,
+            "solar_eta_kwh": f"{eta.solar_kwh:.2f}",
             "horizon_end": ev_plan.horizon_end.isoformat() if ev_plan.horizon_end else "",
             "grid_slots_json": json.dumps([[t.isoformat(timespec="minutes"), k] for t, k in ev_plan.grid_slots.items()],
                                           ensure_ascii=False),
@@ -317,6 +334,44 @@ class EvControl:
             self.ev_notified.add(key)
             self.call_service(NOTIFY, title="HAv2 – EV nestihne termín",
                               message=f"{ev_plan.reason}. Zapni „EV nabít za každou cenu“ pro doplnění ve VT.")
+
+    def _ev_sun_days(self, slots, plan, is_nt) -> List[E.EvSlot]:
+        """Přetok pro dny za podrobnou předpovědí (do zítřka 24:00) z denních součtů `week`."""
+        if not slots or not plan.results:
+            return []
+        start = slots[-1].start + timedelta(minutes=15)
+        days = []
+        for item in self.get_state("sensor.energy_pv_forecast_corrected", attribute="week") or []:
+            try:
+                d = datetime.fromisoformat(str(item[0])).replace(tzinfo=self.ev_tz)
+                days.append((d, float(item[2])))  # [datum, Solcast, opravená, konzervativní]
+            except (TypeError, ValueError, IndexError):
+                continue
+        shape = E.day_shape(self._pv_slots())
+        if not shape:
+            return []
+        cap = self.fnum("input_number.battery_capacity", 10)
+        min_soc = self.fnum("input_number.energy_battery_min_soc", 20)
+
+        def load(t: datetime) -> float:
+            return self.base_profile.get((t.weekday() >= 5, t.hour), 0.5) + self.boiler_profile.get(t.hour, 0.0)
+
+        return E.extend_solar_slots(start, days, shape, load, is_nt, plan.results[-1].soc_pct / 100 * cap,
+                                    cap, min_soc / 100 * cap,
+                                    self.fnum("input_number.energy_battery_efficiency", 90) / 100)
+
+    def _ev_pool_demand(self) -> Optional[E.PoolDemand]:
+        """Filtrace bere přetok před EV – zbývající hodiny dnes a cíl na další dny."""
+        if self.get_state("sensor.pool_controller") in (None, "unavailable", "Mimo sezónu"):
+            return None
+        try:
+            target = float(self.get_state("sensor.pool_plan", attribute="target_h") or 0)
+            done = float(self.get_state("sensor.pool_plan", attribute="done_h") or 0)
+        except (TypeError, ValueError):
+            return None
+        kw = self.fnum("sensor.bazen_cerpadlo_vykon", 0) / 1000
+        kw = kw if kw > 0.3 else 0.53  # čerpadlo stojí → typický příkon
+        return E.PoolDemand(left_today_kwh=max(0.0, target - done) * kw, per_day_kwh=target * kw)
 
     # ------------------------------------------------------------ vstupy
     def ev_sun_returns(self, now: datetime, lowest_kw: float) -> bool:

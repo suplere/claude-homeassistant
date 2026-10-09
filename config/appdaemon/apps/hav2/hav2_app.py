@@ -60,6 +60,17 @@ BILLING_STATS = {
     "v1_kwh": "sensor.ev_nt_energie_celkem",
     "v1_kc": "sensor.ev_nt_naklady_celkem",
 }
+# roční souhrn EV od 1. 1. (sensor.ev_charging_year): energie z čítače EcoVolteru (statistiky
+# i před HAv2), zdroje a náklady z čítačů HAv2
+YEAR_STATS = {
+    "energy": "sensor.ecovolter_revcr01c00002056_total_charged_energy",
+    "solar": "sensor.ev_energy_solar_total",
+    "battery": "sensor.ev_energy_battery_total",
+    "grid_nt": "sensor.ev_energy_grid_nt_total",
+    "grid_vt": "sensor.ev_energy_grid_vt_total",
+    "cost": "sensor.ev_charging_cost_total",
+    "cost_vt": "sensor.ev_charging_cost_grid_vt_total",
+}
 DATA_STATES = {
     "pv_w": "sensor.pv_power",
     "house_w": "sensor.house_consumption",
@@ -191,6 +202,26 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             self._ev_billing()
         except Exception as err:  # noqa: BLE001
             self.log(f"vyúčtování EV NT selhalo: {err}", level="WARNING")
+        try:
+            self._ev_year()
+        except Exception as err:  # noqa: BLE001
+            self.log(f"roční souhrn EV selhal: {err}", level="WARNING")
+
+    def _ev_year(self) -> None:
+        now = datetime.now(TZ)
+        stats = self._get_statistics(list(YEAR_STATS.values()), 0, period="month",
+                                     start=datetime(now.year, 1, 1, tzinfo=TZ))
+        changes = {key: sum(float(r.get("change") or 0) for r in stats.get(sid, []) or [])
+                   for key, sid in YEAR_STATS.items()}
+        y = E.year_summary(changes)
+        # atributy jako text: AppDaemon set_state zahazuje falsy hodnoty (0)
+        self.set_state("sensor.ev_charging_year", state=f"{y['energy']:.1f}", replace=True, attributes={
+            "friendly_name": "EV nabito tento rok", "icon": "mdi:ev-plug-type2",
+            "unit_of_measurement": "kWh", "device_class": "energy",
+            "year": str(now.year),
+            **{k: f"{v:.2f}" for k, v in y.items() if k != "energy"},
+            "updated": now.isoformat(),
+        })
 
     def _ev_billing(self) -> None:
         now = datetime.now(TZ)

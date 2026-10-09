@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 # ------------------------------------------------------------ výkon ↔ proud
 # změřeno 2026-09-25 (EcoVolter + Kia EV6); auto bere pod setpointem nelineárně
@@ -199,6 +199,143 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
     cost = (nt_kwh + later_kwh) * p.nt_price + vt_kwh * p.vt_price
     return EvPlan(need, round(solar, 2), round(nt_kwh + later_kwh, 2), round(vt_kwh, 2), round(shortfall, 2),
                   dict(sorted(grid.items())), horizon, ", ".join(parts), round(cost, 2))
+
+
+# ------------------------------------------- odhad „nabito jen ze slunce“ (dashboard)
+WEEKDAYS_CS = ["po", "út", "st", "čt", "pá", "so", "ne"]
+
+
+@dataclass
+class SolarEta:
+    eta: Optional[datetime]  # kdy přetok FVE dobije potřebnou energii; None = v předpovědi nestihne
+    solar_kwh: float  # využitelný přetok v předpovědi (po domě, baterii a filtraci, × spolehlivost)
+    needed_kwh: float
+    horizon_end: Optional[datetime] = None  # konec předpovědi
+
+
+@dataclass
+class PoolDemand:
+    """Filtrace má ze slunce přednost před EV (den 06–06). Běží už dopoledne, kdy se nabíjí
+    baterie – ta se pak naplní později, takže přetok ubude o energii filtrace od svého začátku."""
+    left_today_kwh: float = 0.0  # zbývá odběhnout v aktuálním bazénovém dni
+    per_day_kwh: float = 0.0  # další dny (cíl hodin × příkon)
+
+
+def solar_eta(slots: Sequence[EvSlot], needed_kwh: float, now: datetime, confidence: float = 0.7,
+              amin: int = 6, amax: int = 11, pool: Optional[PoolDemand] = None) -> SolarEta:
+    """Kdy by auto dosáhlo cíle jen z přetoku FVE (bez NT/VT), podle předpovědi po 15 min.
+
+    Slot se počítá, jen když jeho přetok × spolehlivost (po filtraci) unese aspoň 1f amin
+    (pod tím EV z přetoku nenabíjí); výkon nejvýš 3f amax. Uvnitř slotu lineárně.
+    """
+    need = max(0.0, needed_kwh)
+    horizon = slots[-1].start + timedelta(minutes=15) if slots else None
+    if need <= 0.05:
+        return SolarEta(now, 0.0, need, horizon)
+    min_kw, max_kw = ev_power_kw(1, amin), ev_power_kw(3, amax)
+    total, eta = 0.0, None
+    pool_day = (now - timedelta(hours=6)).date()
+    pool_left = pool.left_today_kwh if pool else 0.0
+    for s in slots:
+        dur_h = 0.25 * s.fraction
+        end = s.start + timedelta(minutes=15)
+        if end <= now or dur_h <= 0:
+            continue
+        e_sun = s.solar_kwh * confidence
+        if pool:
+            day = (s.start - timedelta(hours=6)).date()
+            if day != pool_day:
+                pool_day, pool_left = day, pool.per_day_kwh
+            take = min(pool_left, e_sun)
+            e_sun -= take
+            pool_left -= take
+        kw = e_sun / dur_h
+        if kw < min_kw:
+            continue
+        e = min(kw, max_kw) * dur_h
+        if eta is None and total + e >= need:
+            eta = end - timedelta(hours=dur_h * (1 - (need - total) / e))
+        total += e
+    return SolarEta(eta, round(total, 2), round(need, 2), horizon)
+
+
+def day_shape(pv_slots: Sequence[Tuple[datetime, float]]) -> Dict[int, float]:
+    """Průběh dne FVE (index 15min slotu v dni → podíl na denní výrobě) ze slunečnějšího dne
+    v podrobné předpovědi (sloty po 30 min se dělí na 2 × 15 min)."""
+    days: Dict[Any, Dict[int, float]] = {}
+    for t, kwh in pv_slots:
+        idx = (t.hour * 60 + t.minute) // 15
+        d = days.setdefault(t.date(), {})
+        for k in (idx, idx + 1):
+            d[k] = d.get(k, 0.0) + max(0.0, kwh) / 2
+    if not days:
+        return {}
+    best = max(days.values(), key=lambda d: sum(d.values()))
+    tot = sum(best.values())
+    return {k: v / tot for k, v in best.items() if v > 0} if tot > 0 else {}
+
+
+def extend_solar_slots(start: datetime, days: Sequence[Tuple[datetime, float]], shape: Dict[int, float],
+                       load_kwh_h: Callable[[datetime], float], is_nt: Callable[[datetime], bool],
+                       soc_kwh: float, cap_kwh: float, min_kwh: float, eff: float = 0.9) -> List[EvSlot]:
+    """Sloty přetoku pro dny za koncem podrobné předpovědi z denních součtů FVE.
+
+    Zjednodušená simulace „vlastní spotřeby“: FVE → dům → nabití baterie (účinnost) → přetok;
+    mimo NT kryje dům baterie do min. SOC, v NT se drží (jako plán baterie). start = půlnoc
+    prvního dne; days = (půlnoc dne, kWh FVE opravené předpovědi).
+    """
+    out: List[EvSlot] = []
+    soc = soc_kwh
+    for day, pv_kwh in days:
+        if day < start:
+            continue
+        for i in range(96):
+            t = day + timedelta(minutes=15 * i)
+            pv = max(0.0, pv_kwh) * shape.get(i, 0.0)
+            load = load_kwh_h(t) / 4
+            net = pv - load
+            export = 0.0
+            if net > 0:
+                charge = min(net, max(0.0, cap_kwh - soc) / eff)
+                soc += charge * eff
+                export = net - charge
+            elif not is_nt(t):
+                soc -= min(-net, max(0.0, soc - min_kwh))
+            out.append(EvSlot(t, is_nt(t), round(export, 4)))
+    return out
+
+
+def solar_eta_text(r: SolarEta, now: datetime, target_soc: float, connected: bool) -> str:
+    """Krátký text pro hlavní kartu: „zítra ~13:45 (80 %)“ / „do 15.10. nestihne…“."""
+    if r.needed_kwh <= 0.05:
+        return f"nabito ({target_soc:.0f} %)"
+    if r.eta is None:
+        until = f"do {(r.horizon_end - timedelta(minutes=1)):%d.%m.}" if r.horizon_end else "v předpovědi"
+        return (f"{until} nestihne – slunce ~{r.solar_kwh:.1f} z {r.needed_kwh:.1f} kWh"
+                if r.solar_kwh > 0.05 else f"{until} bez přetoku (potřeba {r.needed_kwh:.1f} kWh)")
+    t = r.eta + timedelta(minutes=(15 - r.eta.minute % 15) % 15)  # zaokrouhlit nahoru na 15 min
+    days = (t.date() - now.date()).days
+    day = "dnes" if days == 0 else "zítra" if days == 1 else f"{WEEKDAYS_CS[t.weekday()]} {t.day}. {t.month}."
+    return f"{day} ~{t:%H:%M} ({target_soc:.0f} %)" + ("" if connected else " – po připojení")
+
+
+# ------------------------------------------------------- roční souhrn EV (dashboard)
+
+
+def year_summary(changes: Dict[str, float]) -> Dict[str, float]:
+    """Souhrn EV od 1. 1. ze změn statistik (kWh/Kč). energy = čítač EcoVolteru (i před HAv2),
+    zdroje a náklady = čítače HAv2; průměrná cena a podíl vlastní energie jen z dat HAv2."""
+    g = lambda k: max(0.0, changes.get(k, 0.0))  # noqa: E731
+    hav2 = g("solar") + g("battery") + g("grid_nt") + g("grid_vt")
+    return {
+        "energy": round(max(g("energy"), hav2), 2),
+        "hav2_kwh": round(hav2, 2),
+        "solar": round(g("solar"), 2), "battery": round(g("battery"), 2),
+        "grid_nt": round(g("grid_nt"), 2), "grid_vt": round(g("grid_vt"), 2),
+        "cost": round(g("cost"), 2), "cost_vt": round(g("cost_vt"), 2),
+        "avg_price": round(g("cost") / hav2, 2) if hav2 > 0.05 else 0.0,
+        "own_pct": round((g("solar") + g("battery")) / hav2 * 100, 0) if hav2 > 0.05 else 0.0,
+    }
 
 
 # ------------------------------------------------- limit nabíjení v autě (Kia AC)

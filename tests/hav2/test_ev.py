@@ -566,3 +566,113 @@ def test_limit_car_below_target_warns_only():
 def test_limit_unknown_car_limit_never_writes():
     assert lim(car_limit=None).want_limit is None
     assert lim(target_soc=100, car_limit=None).want_limit is None
+
+
+# ------------------------------------------- odhad „nabito jen ze slunce“
+
+
+def _sun_slots(start, kwh_per_slot):
+    return [EvSlot(start + timedelta(minutes=15 * i), False, k) for i, k in enumerate(kwh_per_slot)]
+
+
+def test_solar_eta_interpolates_inside_slot():
+    from hav2_ev import solar_eta
+    now = datetime(2026, 10, 9, 10, 0, tzinfo=TZ)
+    # 1 kWh/slot × 0,7 = 0,7 kWh (2,8 kW); potřeba 1,05 kWh → v polovině druhého slotu
+    r = solar_eta(_sun_slots(now, [1.0, 1.0, 1.0]), 1.05, now)
+    assert r.eta == now + timedelta(minutes=22, seconds=30)
+    assert r.solar_kwh == pytest.approx(2.1)
+
+
+def test_solar_eta_skips_slots_below_min_power_and_caps_max():
+    from hav2_ev import ev_power_kw, solar_eta
+    now = datetime(2026, 10, 9, 10, 0, tzinfo=TZ)
+    # 0,4 kWh × 0,7 = 1,12 kW < 1f 6 A (1,27 kW) → nepočítá se; 5 kWh/slot → strop 3f 11 A
+    r = solar_eta(_sun_slots(now, [0.4, 5.0]), 10.0, now)
+    assert r.eta is None
+    assert r.solar_kwh == pytest.approx(round(ev_power_kw(3, 11) * 0.25, 2))
+
+
+def test_solar_eta_ignores_past_slots_and_partial_first_slot():
+    from hav2_ev import solar_eta
+    now = datetime(2026, 10, 9, 10, 10, tzinfo=TZ)
+    first = EvSlot(datetime(2026, 10, 9, 10, 0, tzinfo=TZ), False, 0.5, fraction=1 / 3)  # 10:10–10:15
+    past = EvSlot(datetime(2026, 10, 9, 9, 45, tzinfo=TZ), False, 9.0)
+    r = solar_eta([past, first], 0.35, now)
+    assert r.eta == datetime(2026, 10, 9, 10, 15, tzinfo=TZ)
+
+
+def test_solar_eta_text_variants():
+    from hav2_ev import SolarEta, solar_eta_text
+    now = datetime(2026, 10, 9, 20, 0, tzinfo=TZ)
+    assert solar_eta_text(SolarEta(now, 0.0, 0.0), now, 80, True) == "nabito (80 %)"
+    eta = datetime(2026, 10, 10, 13, 41, tzinfo=TZ)
+    assert solar_eta_text(SolarEta(eta, 9.0, 6.0), now, 80, True) == "zítra ~13:45 (80 %)"
+    assert solar_eta_text(SolarEta(eta, 9.0, 6.0), now, 80, False).endswith("– po připojení")
+    horizon = datetime(2026, 10, 16, 0, 0, tzinfo=TZ)
+    assert solar_eta_text(SolarEta(None, 4.2, 9.6, horizon), now, 80, True) == "do 15.10. nestihne – slunce ~4.2 z 9.6 kWh"
+    assert solar_eta_text(SolarEta(None, 0.0, 9.6, horizon), now, 80, True).startswith("do 15.10. bez přetoku")
+    later = datetime(2026, 10, 12, 12, 5, tzinfo=TZ)
+    assert solar_eta_text(SolarEta(later, 9.0, 6.0), now, 80, True) == "po 12. 10. ~12:15 (80 %)"
+
+
+def test_solar_eta_pool_takes_surplus_first_and_resets_at_6():
+    from hav2_ev import PoolDemand, solar_eta
+    now = datetime(2026, 10, 9, 10, 0, tzinfo=TZ)
+    # 1 kWh/slot × 0,7 = 0,7 kWh; filtrace sebere prvních 1,0 kWh (slot 1 celý, slot 2 z 0,3)
+    pool = PoolDemand(left_today_kwh=1.0, per_day_kwh=0.7)
+    r = solar_eta(_sun_slots(now, [1.0] * 4), 99, now, pool=pool)
+    assert r.solar_kwh == pytest.approx(0.4 + 0.7 + 0.7, abs=0.01)  # slot 2 zbude 0,4 kWh (1,6 kW)
+    # další bazénový den (od 06:00) zase celý cíl
+    night = datetime(2026, 10, 10, 5, 45, tzinfo=TZ)
+    r = solar_eta(_sun_slots(night, [1.0] * 2), 99, now, pool=PoolDemand(0.0, 0.7))
+    assert r.solar_kwh == pytest.approx(0.7, abs=0.01)  # 5:45 bez filtrace, 6:00 ji celou sebere
+
+
+def test_day_shape_uses_sunnier_day_and_splits_half_hours():
+    from hav2_ev import day_shape
+    d1, d2 = datetime(2026, 10, 9, tzinfo=TZ), datetime(2026, 10, 10, tzinfo=TZ)
+    pv = [(d1.replace(hour=12), 2.0), (d1.replace(hour=12, minute=30), 2.0),
+          (d2.replace(hour=11), 1.0)]
+    shape = day_shape(pv)
+    assert shape == {48: 0.25, 49: 0.25, 50: 0.25, 51: 0.25}  # 12:00–13:00 po 15 min
+
+
+def test_extend_solar_slots_battery_first_then_export():
+    from hav2_ev import extend_solar_slots
+    start = datetime(2026, 10, 11, 0, 0, tzinfo=TZ)
+    shape = {48: 0.5, 49: 0.5}  # celý den v 12:00–12:30
+    nt = lambda t: t.hour >= 22 or t.hour < 6  # noqa: E731
+    out = extend_solar_slots(start, [(start - timedelta(days=1), 50.0), (start, 10.0)], shape,
+                             lambda t: 0.4, nt, soc_kwh=5.0, cap_kwh=10.0, min_kwh=2.0, eff=1.0)
+    assert len(out) == 96 and out[0].start == start  # den před startem se přeskočí
+    # 06:00–12:00 kryje dům baterie: 24 slotů × 0,1 kWh → 2,6 kWh; 12:00 nabije +4,9 (7,5),
+    # 12:15 dobije zbylých 2,5 a přetok je 2,4 kWh
+    assert out[48].solar_kwh == 0.0
+    assert out[49].solar_kwh == pytest.approx(2.4)
+    assert all(s.solar_kwh == 0.0 for s in out if s.start.hour != 12)
+
+
+def test_solar_eta_reaches_target_on_later_day():
+    from hav2_ev import solar_eta
+    now = datetime(2026, 10, 9, 20, 0, tzinfo=TZ)
+    day3 = datetime(2026, 10, 11, 12, 0, tzinfo=TZ)
+    slots = _sun_slots(datetime(2026, 10, 10, 12, 0, tzinfo=TZ), [0.2] * 4) + _sun_slots(day3, [1.0] * 8)
+    r = solar_eta(slots, 1.4, now)
+    assert r.eta == day3 + timedelta(minutes=30)
+
+
+# ------------------------------------------------------- roční souhrn EV
+
+
+def test_year_summary_energy_from_ecovolter_prices_from_hav2():
+    from hav2_ev import year_summary
+    y = year_summary({"energy": 1130.0, "solar": 40.0, "battery": 5.0, "grid_nt": 40.0, "grid_vt": 5.0,
+                      "cost": 225.0, "cost_vt": 30.0})
+    assert y["energy"] == 1130.0  # vč. dubna–září z EcoVolteru
+    assert y["hav2_kwh"] == 90.0
+    assert y["avg_price"] == 2.5
+    assert y["own_pct"] == 50.0
+    # bez statistik EcoVolteru (nový rok, výpadek) aspoň součet HAv2; prázdný rok bez dělení nulou
+    assert year_summary({"solar": 3.0})["energy"] == 3.0
+    assert year_summary({})["avg_price"] == 0.0
