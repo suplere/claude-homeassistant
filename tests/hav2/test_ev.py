@@ -238,6 +238,29 @@ def test_plan_without_deadline_no_grid():
     assert past.grid_slots == {}
 
 
+def test_plan_auto_nt_when_sun_in_4_days_not_enough():
+    """Bez termínu: co slunce do 4 dnů nepokryje (auto_nt_kwh) → nejbližší NT blok od začátku
+    (uživatel 10. 10. 2026); jen v režimu Solár+NT, s termínem se neuplatní."""
+    now = datetime(2026, 9, 25, 20, 0, tzinfo=TZ)
+    slots = ev_slots(now, 28, 1.0)
+    plan = plan_ev(slots, EvPlanParams(needed_kwh=20, mode="Solár+NT", auto_nt_kwh=6.0), now)
+    assert abs(plan.nt_kwh - 6.0) < 0.01 and plan.vt_kwh == 0
+    grid = sorted(plan.grid_slots)
+    assert grid[0] == datetime(2026, 9, 25, 22, 0, tzinfo=TZ) and set(plan.grid_slots.values()) == {"NT"}
+    assert all(t < datetime(2026, 9, 26, 6, 0, tzinfo=TZ) for t in grid)  # jen nejbližší noc
+    assert "slunce do 4 dnů nestačí" in plan.reason and "jen slunce" not in plan.reason
+    # nejvýš do cíle (víc, než chybí po slunci v horizontu, se v NT nenabíjí)
+    small = plan_ev(slots, EvPlanParams(needed_kwh=5, mode="Solár+NT", auto_nt_kwh=6.0), now)
+    assert small.nt_kwh <= 5 - small.solar_kwh + 0.01
+    assert plan_ev(slots, EvPlanParams(needed_kwh=20, mode="Solár", auto_nt_kwh=6.0), now).nt_kwh == 0
+
+
+def test_plan_auto_nt_inside_running_nt_block():
+    now = datetime(2026, 9, 26, 2, 0, tzinfo=TZ)  # uprostřed NT
+    plan = plan_ev(ev_slots(now, 24, 1.0), EvPlanParams(needed_kwh=10, mode="Solár+NT", auto_nt_kwh=3.5), now)
+    assert min(plan.grid_slots) == now and abs(plan.nt_kwh - 3.5) < 0.01
+
+
 def test_plan_nt_fills_rest_from_start_of_block():
     now = datetime(2026, 9, 25, 20, 0, tzinfo=TZ)
     deadline = datetime(2026, 9, 27, 0, 0, tzinfo=TZ)
@@ -676,3 +699,54 @@ def test_year_summary_energy_from_ecovolter_prices_from_hav2():
     # bez statistik EcoVolteru (nový rok, výpadek) aspoň součet HAv2; prázdný rok bez dělení nulou
     assert year_summary({"solar": 3.0})["energy"] == 3.0
     assert year_summary({})["avg_price"] == 0.0
+
+
+
+# ------------------------------------------------------------ cizí auto
+
+
+def test_foreign_car_charges_only_in_nt_under_breaker():
+    from hav2_ev import STATE_FOREIGN
+    reg = Regulator()
+    # mimo NT stojí (i s přebytkem), cíl SOC Kie se neuplatní
+    cmd = reg.step(inputs(foreign=True, is_nt=False, target_reached=True, surplus_w=8000))
+    assert not cmd.enable and cmd.state == STATE_FOREIGN
+    # v NT 3f a proud podle rezervy jističe (limit 23 A − 1 A − nejvíc zatížená fáze)
+    reg = Regulator()
+    cmd = reg.step(inputs(foreign=True, is_nt=True, cur_enabled=False, worst_phase_a=12.5))
+    assert cmd.enable and cmd.phases == 3 and cmd.amps == 9
+    reg = Regulator()
+    cmd = reg.step(inputs(foreign=True, is_nt=True, cur_enabled=False, worst_phase_a=4))
+    assert cmd.amps == 11
+    # bojler + nabíjení baterie zaberou jistič → EV ustoupí až na stop
+    reg = Regulator()
+    cmd = reg.step(inputs(foreign=True, is_nt=True, cur_enabled=True, cur_amps=6, worst_phase_a=22.5))
+    assert not cmd.enable
+
+
+def test_foreign_car_manual_stop_and_mode_off():
+    reg = Regulator()
+    assert not reg.step(inputs(foreign=True, is_nt=True, manual="Zastavit")).enable
+    assert not reg.step(inputs(foreign=True, is_nt=True, mode="Vypnuto")).enable
+
+
+def test_year_summary_excludes_foreign_car():
+    from hav2_ev import year_summary
+    y = year_summary({"energy": 120.0, "foreign": 20.0, "solar": 50.0, "grid_nt": 30.0, "cost": 100.0})
+    assert y["energy"] == 100.0 and y["hav2_kwh"] == 80.0
+
+
+def test_foreign_rows_by_month():
+    from hav2_ev import foreign_rows
+    now = datetime(2026, 11, 3, tzinfo=TZ)
+    rows = foreign_rows({"kwh": {(2026, 10): 25.0}, "cost": {(2026, 10): 88.0}, "billed": {(2026, 10): 152.5}},
+                        now, 3)
+    assert rows[0] == ("listopad 2026", 0.0, 0.0, 0.0)
+    assert rows[1] == ("říjen 2026", 25.0, 88.0, 152.5)
+
+
+def test_pending_detection_holds_charging_but_manual_wins():
+    reg = Regulator()
+    cmd = reg.step(inputs(pending=True, plan_slot="NT"))
+    assert not cmd.enable and "rozpoznání" in cmd.reason
+    assert reg.step(inputs(pending=True, manual="Nabíjet teď")).enable

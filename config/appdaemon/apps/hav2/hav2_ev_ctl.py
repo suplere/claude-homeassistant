@@ -38,6 +38,10 @@ OVERRIDE_FOR = timedelta(hours=2)
 LIMIT_RETRY = timedelta(minutes=10)  # zápis limitu do auta (Kia cloud) – další pokus nejdřív za
 LIMIT_TRIES = 3
 FORCE_UPDATE_PER_DAY = 2
+EV_FOREIGN = "input_boolean.ev_foreign_car"
+KIA_LOCATION = "device_tracker.ev6_location"
+KIA_UPDATED = "sensor.ev6_last_updated_at"
+FOREIGN_CHECK_S = 240
 # „bojler dnes nahřátý“ – pomocník v HA: přežije restart, je vidět v UI a jde ručně změnit
 BOILER_LAST_FULL = "input_datetime.energy_boiler_last_full"
 
@@ -62,6 +66,7 @@ class EvControl:
         self.ev_logged: Optional[tuple] = None
         self.ev_manual_since: Optional[datetime] = None
         self.ev_force_updates: Dict[str, int] = {}
+        self.ev_connected_at: Optional[datetime] = None  # kvůli rozpoznání cizího auta
         self.ev_unavailable_since: Optional[datetime] = None
         self.ev_notified: set = set()
         self.ev_limit_tries: Dict[int, Tuple[datetime, int]] = {}
@@ -239,7 +244,9 @@ class EvControl:
         lp = self.ev_limit_plan(now)
         if lp.over and self.ev_reached(lp, self.fnum(EV_TARGET, 80)) and not lp.capped:
             self._ev_oneoff_done(now, "nabito")
-        self._ev_limit_act(now, lp)
+        foreign = self.ev_is_foreign()
+        if not foreign:  # limit v Kii nastavovat jen pro Kiu
+            self._ev_limit_act(now, lp)
         # potřeba do cíle; nad standardním limitem auta jen v okně před termínem
         high_kwh = 0.0
         e_top = self.ev_energy_to(lp.top_now if not lp.over else self.fnum(EV_TARGET, 80))
@@ -249,7 +256,22 @@ class EvControl:
                 high_kwh = max(0.0, e_top - (self.ev_energy_to(lp.normal_top) or 0.0))
         else:
             needed, soc_known = 0.0, False
-        connected = self.get_state(EV_CONNECTED) == "on"
+        connected = self.get_state(EV_CONNECTED) == "on" and not foreign
+
+        # přetok jen z FVE: bez exportu z baterie (večerní prodej v plánu baterie); dnes+zítra
+        # z plánu baterie, další dny z denních součtů předpovědi
+        sun_slots = [E.EvSlot(s.start, s.is_nt, max(0.0, r.grid_export_kwh - r.battery_out_kwh), s.fraction)
+                     for s, r in zip(slots, plan.results)]
+        try:
+            sun_slots += self._ev_sun_days(slots, plan, is_nt)
+        except Exception as err:  # noqa: BLE001 – další dny jen doplněk, odhad do zítřka platí dál
+            self.log(f"EV ze slunce – další dny: {err}", level="WARNING")
+        pool = self._ev_pool_demand()
+        # bez termínu: co slunce do 4 dnů nepokryje → nejbližší NT (uživatel 10. 10. 2026)
+        sun_4d = E.solar_eta([x for x in sun_slots if x.start < now + timedelta(days=4)], 1e9, now,
+                             confidence=1.0, pool=pool).solar_kwh
+        auto_nt = max(0.0, needed - sun_4d) if (connected and soc_known) else 0.0
+
         params = E.EvPlanParams(
             needed_kwh=needed if connected else 0.0,
             mode=self.get_state("input_select.ev_mode") or "Solár+NT",
@@ -259,6 +281,7 @@ class EvControl:
             vt_price=self.fnum("input_number.energy_price_vt", 6.1),
             high_kwh=high_kwh if connected else 0.0,
             high_from=lp.high_from,
+            auto_nt_kwh=auto_nt,
         )
         # NT za koncem slotů (a před termínem) – naplánuje se, až bude v horizontu
         if params.deadline and slots:
@@ -273,25 +296,21 @@ class EvControl:
             params.later_nt_kwh = later
             params.later_nt_high_kwh = later_high
         ev_plan = E.plan_ev(ev_slots, params, now)
-        if not connected:
+        if foreign:
+            ev_plan.reason = "cizí auto – nabíjí jen v NT (výkon pod jistič), bez plánu Kie"
+        elif not connected:
             ev_plan.reason = "auto nepřipojeno"
         elif not soc_known:
             ev_plan.reason = "SOC auta neznámý – jen slunce; " + ev_plan.reason
         self.ev_plan = ev_plan
 
-        # odhad „nabito jen ze slunce“ (i bez připojeného auta – kdyby se připojilo teď);
-        # přetok jen z FVE: bez exportu z baterie (večerní prodej v plánu baterie)
-        sun_slots = [E.EvSlot(s.start, s.is_nt, max(0.0, r.grid_export_kwh - r.battery_out_kwh), s.fraction)
-                     for s, r in zip(slots, plan.results)]
-        try:
-            sun_slots += self._ev_sun_days(slots, plan, is_nt)
-        except Exception as err:  # noqa: BLE001 – další dny jen doplněk, odhad do zítřka platí dál
-            self.log(f"EV ze slunce – další dny: {err}", level="WARNING")
+        # odhad „nabito jen ze slunce“ (i bez připojeného auta – kdyby se připojilo teď)
         eta_target = self.fnum(EV_TARGET, 80) if lp.over else lp.top_now
         # spolehlivost 1,0: opravená předpověď FVE už je snížená (zpětný test 3.–9. 10. 2026 se
         # skutečnou výrobou sedí, × 0,7 by odhad dvojnásobně podhodnotil); plán EV dál × 0,7
-        eta = E.solar_eta(sun_slots, needed, now, confidence=1.0, pool=self._ev_pool_demand())
-        eta_text = E.solar_eta_text(eta, now, eta_target, connected) if soc_known else "SOC auta neznámý"
+        eta = E.solar_eta(sun_slots, needed, now, confidence=1.0, pool=pool)
+        eta_text = ("připojené cizí auto" if foreign else
+                    E.solar_eta_text(eta, now, eta_target, connected) if soc_known else "SOC auta neznámý")
 
         # rezerva pro baterii domu (priorita 3): když ji slunce do večera samo nenabije,
         # dostane EV jen přebytek nad průměrný výkon potřebný k nabití do 17:00
@@ -323,6 +342,8 @@ class EvControl:
             "solar_eta": eta.eta.isoformat(timespec="minutes") if eta.eta and soc_known else "",
             "solar_eta_text": eta_text,
             "solar_eta_kwh": f"{eta.solar_kwh:.2f}",
+            "solar_4d_kwh": f"{sun_4d:.2f}",
+            "auto_nt_kwh": f"{auto_nt:.2f}",
             "horizon_end": ev_plan.horizon_end.isoformat() if ev_plan.horizon_end else "",
             "grid_slots_json": json.dumps([[t.isoformat(timespec="minutes"), k] for t, k in ev_plan.grid_slots.items()],
                                           ensure_ascii=False),
@@ -388,7 +409,8 @@ class EvControl:
         pool_w = (self.fnum("input_number.filtrace_vykon_w", 500) if virtual_pool else 0.0) \
             if virtual_pool is not None else self.fnum("sensor.bazenova_filtrace_vykon", 0)
         # cíl omezený limitem v autě (nad limit auto nenabije, i kdyby wallbox pouštěl)
-        target_reached = self.ev_reached(self.ev_limit_plan(now))
+        foreign = self.ev_is_foreign()
+        target_reached = False if foreign else self.ev_reached(self.ev_limit_plan(now))
         connected = self.get_state(EV_CONNECTED) == "on"
         mode = self.get_state("input_select.ev_mode") or "Solár+NT"
         manual = self.get_state("input_select.ev_manual") or "Auto"
@@ -396,7 +418,8 @@ class EvControl:
         surplus_pool = self.fnum("sensor.energy_surplus_smoothed_w", 0) - pool_w
         # prostor pro bojler (WATrouter): jen když EV nabíjí ze slunce a termín nehrozí
         self.ev_boiler.p.enabled = self.get_state("input_boolean.ev_boiler_priority") == "on"
-        eligible = (connected and not target_reached and mode in ("Solár", "Solár+NT") and manual == "Auto"
+        eligible = (connected and not foreign and not target_reached and mode in ("Solár", "Solár+NT")
+                    and manual == "Auto"
                     and not plan_slot and not (self.ev_plan and self.ev_plan.shortfall_kwh > 0.05))
         self.ev_boiler_reserve_w = self.ev_boiler.step(E.BoilerInputs(
             now=now, eligible=eligible, surplus_w=surplus_pool,
@@ -427,6 +450,10 @@ class EvControl:
             sell_price=self.fnum("sensor.energy_price_sell_now", 99.0),
             battery_refill=getattr(self, "ev_battery_refill", False),
             boiler_reserve_w=self.ev_boiler_reserve_w,
+            foreign=foreign,
+            is_nt=self._nt_fn()[0](now) if foreign else False,
+            pending=bool(connected and not foreign and self.ev_connected_at
+                         and (now - self.ev_connected_at).total_seconds() < FOREIGN_CHECK_S + 15),
         )
 
     # ------------------------------------------------------------ smyčka
@@ -579,9 +606,50 @@ class EvControl:
                 self.ev_force_updates = {day: self.ev_force_updates.get(day, 0) + 1}
                 self.call_service("kia_uvo/force_update")
             self.run_in(self.tick, 60, reason="připojeno EV")
+            # po vynucené aktualizaci Kia (poloha se přepne na „doma“ do ~10 s od připojení)
+            self.ev_connected_at = datetime.now(self.ev_tz)
+            self.run_in(self._ev_foreign_check, FOREIGN_CHECK_S, connected_at=self.ev_connected_at.isoformat())
         elif new == "off" and old == "on":
+            if self.ev_is_foreign():
+                self.call_service("input_boolean/turn_off", entity_id=EV_FOREIGN)
+                self.call_service("logbook/log", name="HAv2 EV", message="Cizí auto odpojeno – přepínač vypnut")
             # jednorázový cíl odpojení neruší (krátká jízda před cestou) – končí nabitím nebo termínem
             self.run_in(self.tick, 5, reason="odpojeno EV")
+
+    def ev_is_foreign(self) -> bool:
+        return self.get_state(EV_FOREIGN) == "on"
+
+    def _ev_foreign_check(self, kwargs: Dict[str, Any]) -> None:
+        """Pár minut po připojení: Kia podle polohy není doma → připojené je cizí auto.
+        Ruční volbu po připojení nepřepisuje. Kia doma, ale nepřipojená → jen ručně
+        (kabel `ev6_ev_battery_plug` Kia cloud hlásí nespolehlivě)."""
+        try:
+            if self.get_state(EV_CONNECTED) != "on" or self.ev_is_foreign():
+                return
+            connected_at = datetime.fromisoformat(kwargs["connected_at"])
+            changed = self.get_state(EV_FOREIGN, attribute="last_changed")
+            if changed and datetime.fromisoformat(str(changed)) > connected_at:
+                return  # uživatel přepínač po připojení změnil
+            # jen čerstvá data z Kia (po připojení); vynucená aktualizace je max. 2× denně –
+            # se starou polohou by se Kia, která právě přijela, označila za cizí auto
+            try:
+                kia_time = datetime.fromisoformat(str(self.get_state(KIA_UPDATED)))
+            except (TypeError, ValueError):
+                return
+            if kia_time < connected_at - timedelta(minutes=1):
+                self.log("cizí auto: data z Kia nejsou čerstvá – nerozhoduji (přepínač ručně)")
+                return
+            where = self.get_state(KIA_LOCATION)
+            if where in (None, "unknown", "unavailable", "home"):
+                return
+            self.call_service("input_boolean/turn_on", entity_id=EV_FOREIGN)
+            text = f"Připojeno auto, ale Kia podle polohy není doma ({where}) → cizí auto (nabíjí jen v NT)"
+            self.call_service("logbook/log", name="HAv2 EV", message=text)
+            self.log(text)
+            self.call_service(NOTIFY, title="HAv2 – cizí auto",
+                              message=text + ". Pokud je to Kia, vypni „Nabíjí se cizí auto“ na záložce EV.")
+        except Exception as err:  # noqa: BLE001
+            self.log(f"rozpoznání cizího auta selhalo: {err}", level="WARNING")
 
     def _ev_availability(self, now: datetime, available: bool, execute: bool) -> None:
         if available:

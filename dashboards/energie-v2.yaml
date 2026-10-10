@@ -857,6 +857,24 @@ views:
             content: |
               <small>Řízení EV v HAv2 je vypnuté – ruční volba se zatím jen zaznamená
               do doporučení, wallbox neovládá.</small>
+          # cizí auto: zapne HAv2 sám (Kia podle polohy není doma), jinak ručně; vypne se po odpojení
+          - type: tile
+            entity: input_boolean.ev_foreign_car
+            name: Cizí auto
+            icon: mdi:car-arrow-left
+            tap_action:
+              action: toggle
+            grid_options:
+              columns: 6
+          - type: markdown
+            visibility:
+              - condition: state
+                entity: input_boolean.ev_foreign_car
+                state: "on"
+            content: |
+              <small>Cizí auto nabíjí jen v NT, 3f a proudem pod jistič (bojler a nabíjení baterie
+              mají přednost), bez cílového SOC. Zastavit: Nabíjení → Zastavit. Evidence zvlášť za cenu
+              NT (EV náklady → Cizí auto), Kia ani její SOC se nemění.</small>
       - type: grid
         cards:
           - type: heading
@@ -1267,6 +1285,47 @@ views:
               - entity: sensor.ev_energy_grid_vt_total
                 name: Síť VT
                 color: "#fb8c00"
+      - type: grid
+        cards:
+          - type: heading
+            heading: Cizí auto
+            icon: mdi:car-arrow-left
+          - type: custom:mushroom-template-card
+            entity: sensor.ev_foreign_last_session
+            primary: Poslední session
+            secondary: >-
+              {% set a = states[entity].attributes if states[entity] is defined else {} %}{% set st = a.get('started', '') | as_datetime(none) %}{% set lc = a.get('last_charge', '') | as_datetime(none) %}{% if st %}{{ as_local(st).strftime('%-d. %-m. %H:%M') }}{% if lc %} – {{ as_local(lc).strftime('%-d. %-m. %H:%M') }}{% endif %} · {{ (states(entity) | float(0)) | round(1) | string | replace('.', ',') }} kWh · {{ (a.get('billed', 0) | float(0)) | round(0) | int }} Kč{% else %}zatím žádná{% endif %}
+            icon: mdi:car-arrow-left
+            tap_action:
+              action: more-info
+            grid_options:
+              columns: full
+          - type: custom:flex-table-card
+            grid_options:
+              columns: full
+            entities:
+              include: sensor.ev_foreign_billing
+            columns:
+              - name: Měsíc
+                data: table.mesic
+              - name: kWh
+                data: table.kwh
+                align: right
+              - name: Náklady Kč
+                data: table.naklady
+                align: right
+              - name: K vyúčtování Kč
+                data: table.vyuctovat
+                align: right
+            css:
+              table+: "width: 100%; border-collapse: collapse;"
+              tbody tr:nth-child(odd): "background-color: rgba(127, 127, 127, 0.07);"
+              tbody tr:first-child: "font-weight: 500;"
+              tbody tr:last-child: "font-weight: 700; border-top: 2px solid var(--divider-color);"
+          - type: markdown
+            content: |
+              <small>K vyúčtování = kWh × cena NT ({{ states('input_number.energy_price_nt') }} Kč/kWh, bez zisku).
+              Náklady = skutečná cena podle zdroje (pro kontrolu). Tabulka se aktualizuje 1× za hodinu.</small>
       - type: grid
         cards:
           - type: heading

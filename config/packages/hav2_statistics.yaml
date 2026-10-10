@@ -222,7 +222,7 @@ template:
         unit_of_measurement: Kč/kWh
         device_class: monetary
         icon: mdi:ev-station
-        availability: "{{ states('sensor.ev_session_energy') | float(0) > 0 }}"
+        availability: "{{ states('sensor.ev_session_energy') | float(0) > 0 and has_value('sensor.ev_session_cost') }}"
         state: >
           {{ (states('sensor.ev_session_cost') | float / states('sensor.ev_session_energy') | float) | round(2) }}
 
@@ -332,6 +332,11 @@ template:
         from: "off"
         to: "on"
         id: connect
+      - trigger: state
+        entity_id: input_boolean.ev_foreign_car
+        from: "off"
+        to: "on"
+        id: foreign_start
     variables:
       d: >
         {% if trigger.id == 'energy' %}
@@ -353,10 +358,19 @@ template:
       price_grid: "{{ states('sensor.energy_price_buy_now') | float(6.1) }}"
       price_solar: "{{ [states('sensor.energy_price_sell_now') | float(0), 0] | max }}"
       price_battery: "{{ states('sensor.energy_battery_energy_value') | float(states('input_number.energy_price_vt') | float(6.1)) }}"
-      e_solar: "{{ (d * share_solar) | round(4) }}"
-      e_battery: "{{ (d * share_battery) | round(4) }}"
-      e_grid: "{{ (d * share_grid) | round(4) }}"
-      cost: "{{ (e_solar * price_solar + e_battery * price_battery + e_grid * price_grid) | round(4) }}"
+      # cizí auto (input_boolean.ev_foreign_car): energie a náklady jdou jen do ev_foreign_*,
+      # čítače Kie (ev_energy_*, ev_charging_cost_*) a odhad jejího SOC se nemění; session = obě auta
+      foreign: "{{ is_state('input_boolean.ev_foreign_car', 'on') }}"
+      own: "{{ 0 if foreign else 1 }}"
+      price_nt: "{{ states('input_number.energy_price_nt') | float(3.51) }}"
+      r_solar: "{{ (d * share_solar) | round(4) }}"
+      r_battery: "{{ (d * share_battery) | round(4) }}"
+      r_grid: "{{ (d * share_grid) | round(4) }}"
+      r_cost: "{{ (r_solar * price_solar + r_battery * price_battery + r_grid * price_grid) | round(4) }}"
+      e_solar: "{{ r_solar * own }}"
+      e_battery: "{{ r_battery * own }}"
+      e_grid: "{{ r_grid * own }}"
+      cost: "{{ r_cost * own }}"
     sensor:
       - name: EV energie ze slunce
         unique_id: hav2_ev_energy_solar_total
@@ -434,7 +448,52 @@ template:
         state_class: total
         icon: mdi:cash-remove
         # srovnávací metrika: úspora = tato hodnota − EV náklady celkem
-        state: "{{ (this.state | float(0) + d * states('input_number.energy_price_vt') | float(6.1)) | round(3) }}"
+        state: "{{ (this.state | float(0) + d * own * states('input_number.energy_price_vt') | float(6.1)) | round(3) }}"
+      - name: EV cizí auto energie
+        unique_id: hav2_ev_foreign_energy_total
+        default_entity_id: sensor.ev_foreign_energy_total
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        icon: mdi:car-arrow-left
+        state: "{{ (this.state | float(0) + (d if foreign else 0)) | round(4) }}"
+      - name: EV cizí auto náklady
+        unique_id: hav2_ev_foreign_cost_total
+        default_entity_id: sensor.ev_foreign_cost_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        icon: mdi:cash
+        # skutečné náklady podle zdroje (jako u Kie)
+        state: "{{ (this.state | float(0) + (r_cost if foreign else 0)) | round(3) }}"
+      - name: EV cizí auto k vyúčtování
+        unique_id: hav2_ev_foreign_billed_total
+        default_entity_id: sensor.ev_foreign_billed_total
+        unit_of_measurement: Kč
+        device_class: monetary
+        state_class: total
+        icon: mdi:receipt-text-outline
+        # bez zisku: kWh × cena NT (cizí auto nabíjí jen v NT)
+        state: "{{ (this.state | float(0) + (d * price_nt if foreign else 0)) | round(3) }}"
+      - name: EV cizí auto poslední session
+        unique_id: hav2_ev_foreign_last_session
+        default_entity_id: sensor.ev_foreign_last_session
+        unit_of_measurement: kWh
+        device_class: energy
+        icon: mdi:car-arrow-left
+        # nová session = zapnutí přepínače cizího auta; zůstává do další
+        state: "{{ 0 if trigger.id == 'foreign_start' else (this.state | float(0) + (d if foreign else 0)) | round(3) }}"
+        attributes:
+          started: "{{ now().isoformat() if trigger.id == 'foreign_start' else this.attributes.get('started', '') }}"
+          last_charge: >
+            {{ '' if trigger.id == 'foreign_start' else (now().isoformat() if foreign and d > 0
+               else this.attributes.get('last_charge', '')) }}
+          cost: >
+            {{ 0 if trigger.id == 'foreign_start' else (this.attributes.get('cost', 0) | float(0)
+               + (r_cost if foreign else 0)) | round(2) }}
+          billed: >
+            {{ 0 if trigger.id == 'foreign_start' else (this.attributes.get('billed', 0) | float(0)
+               + (d * price_nt if foreign else 0)) | round(2) }}
       - name: EV energie session
         unique_id: hav2_ev_session_energy
         default_entity_id: sensor.ev_session_energy
@@ -444,19 +503,19 @@ template:
         state: "{{ 0 if trigger.id == 'connect' else (this.state | float(0) + d) | round(3) }}"
         # rozpad session podle zdroje (kWh), stejný poměrový výpočet jako *_total výše
         attributes:
-          solar: "{{ 0 if trigger.id == 'connect' else (this.attributes.get('solar', 0) | float(0) + e_solar) | round(3) }}"
-          battery: "{{ 0 if trigger.id == 'connect' else (this.attributes.get('battery', 0) | float(0) + e_battery) | round(3) }}"
+          solar: "{{ 0 if trigger.id == 'connect' else (this.attributes.get('solar', 0) | float(0) + r_solar) | round(3) }}"
+          battery: "{{ 0 if trigger.id == 'connect' else (this.attributes.get('battery', 0) | float(0) + r_battery) | round(3) }}"
           grid_nt: >
-            {{ 0 if trigger.id == 'connect' else (this.attributes.get('grid_nt', 0) | float(0) + (e_grid if is_nt else 0)) | round(3) }}
+            {{ 0 if trigger.id == 'connect' else (this.attributes.get('grid_nt', 0) | float(0) + (r_grid if is_nt else 0)) | round(3) }}
           grid_vt: >
-            {{ 0 if trigger.id == 'connect' else (this.attributes.get('grid_vt', 0) | float(0) + (0 if is_nt else e_grid)) | round(3) }}
+            {{ 0 if trigger.id == 'connect' else (this.attributes.get('grid_vt', 0) | float(0) + (0 if is_nt else r_grid)) | round(3) }}
       - name: EV náklady session
         unique_id: hav2_ev_session_cost
         default_entity_id: sensor.ev_session_cost
         unit_of_measurement: Kč
         device_class: monetary
         icon: mdi:cash-clock
-        state: "{{ 0 if trigger.id == 'connect' else (this.state | float(0) + cost) | round(2) }}"
+        state: "{{ 0 if trigger.id == 'connect' else (this.state | float(0) + r_cost) | round(2) }}"
         attributes:
           started: >
             {{ now().isoformat() if trigger.id == 'connect' else this.attributes.get('started') }}

@@ -368,6 +368,9 @@ template:
       - trigger: state
         entity_id: sensor.ecovolter_revcr01c00002056_total_charged_energy
         id: energy
+      - trigger: state
+        entity_id: sensor.ev_foreign_energy_total
+        id: foreign
       - trigger: homeassistant
         event: start
         id: start
@@ -390,13 +393,14 @@ template:
         state_class: measurement
         icon: mdi:car-electric
         # Kia SOC (staré i hodiny) + energie nabitá od té doby × účinnost / kapacita.
+        # Energie = čítač EcoVolteru − energie cizího auta (sensor.ev_foreign_energy_total).
         # Na Kia SOC se přebázuje jen tehdy, když jsou data z auta novější než báze.
         state: >
-          {% set total_now = states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) %}
+          {% set total_now = (states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) - states('sensor.ev_foreign_energy_total') | float(0)) %}
           {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
           {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
           {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-          {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
+          {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > (states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) - states('sensor.ev_foreign_energy_total') | float(0))) %}
           {% set base_soc = kia_soc | float if rebase else this.attributes.get('base_soc', kia_soc) | float(50) %}
           {% set base_energy = total_now if rebase else this.attributes.get('base_energy', total_now) | float %}
           {% set added = (total_now - base_energy) * states('input_number.ev_charge_efficiency') | float(90) / 100 %}
@@ -406,20 +410,20 @@ template:
             {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
             {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
+            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > (states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) - states('sensor.ev_foreign_energy_total') | float(0))) %}
             {{ kia_soc | float if rebase else this.attributes.get('base_soc', kia_soc) | float(50) }}
           base_energy: >
-            {% set total_now = states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) %}
+            {% set total_now = (states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) - states('sensor.ev_foreign_energy_total') | float(0)) %}
             {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
             {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
+            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > (states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) - states('sensor.ev_foreign_energy_total') | float(0))) %}
             {{ total_now if rebase else this.attributes.get('base_energy', total_now) | float }}
           base_time: >
             {% set kia_soc = states('sensor.ev6_ev_battery_level') %}
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}
             {% set base_time = this.attributes.get('base_time') | as_datetime(none) if this.attributes.get('base_time') else none %}
-            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0)) %}
+            {% set be = this.attributes.get('base_energy', 0) | float(0) %}{% set rebase = kia_soc | is_number and (base_time is none or (kia_time is not none and kia_time > base_time) or be <= 0 or be > (states('sensor.ecovolter_revcr01c00002056_total_charged_energy') | float(0) - states('sensor.ev_foreign_energy_total') | float(0))) %}
             {{ (kia_time.isoformat() if kia_time is not none else now().isoformat()) if rebase else this.attributes.get('base_time') }}
           source: >
             {% set kia_time = states('sensor.ev6_last_updated_at') | as_datetime(none) %}

@@ -70,6 +70,13 @@ YEAR_STATS = {
     "grid_vt": "sensor.ev_energy_grid_vt_total",
     "cost": "sensor.ev_charging_cost_total",
     "cost_vt": "sensor.ev_charging_cost_grid_vt_total",
+    "foreign": "sensor.ev_foreign_energy_total",
+}
+# cizí auto po měsících (sensor.ev_foreign_billing)
+FOREIGN_STATS = {
+    "kwh": "sensor.ev_foreign_energy_total",
+    "cost": "sensor.ev_foreign_cost_total",
+    "billed": "sensor.ev_foreign_billed_total",
 }
 DATA_STATES = {
     "pv_w": "sensor.pv_power",
@@ -81,6 +88,7 @@ DATA_STATES = {
     "grid_l3_w": "sensor.meter_active_power_l3",
     "batt_w": "sensor.battery_power",  # + vybíjení
     "soc": "sensor.battery_state_of_charge",
+    "ev_foreign": "input_boolean.ev_foreign_car",
     "ems": "select.goodwe_ems_mode",
     "ems_w": "number.goodwe_ems_power_limit",
     "export_limit_w": "number.goodwe_limit_dodavky_do_site",
@@ -206,6 +214,36 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             self._ev_year()
         except Exception as err:  # noqa: BLE001
             self.log(f"roční souhrn EV selhal: {err}", level="WARNING")
+        try:
+            self._ev_foreign_billing()
+        except Exception as err:  # noqa: BLE001
+            self.log(f"přehled cizího auta selhal: {err}", level="WARNING")
+
+    def _ev_foreign_billing(self) -> None:
+        now = datetime.now(TZ)
+        oldest = E.month_starts(now, BILLING_MONTHS)[-1]
+        stats = self._get_statistics(list(FOREIGN_STATS.values()), 0, period="month",
+                                     start=datetime(oldest[0], oldest[1], 1, tzinfo=TZ))
+        changes: Dict[str, Dict[Tuple[int, int], float]] = {}
+        for key, sid in FOREIGN_STATS.items():
+            for row in stats.get(sid, []) or []:
+                t = self._ts(row.get("start"))
+                changes.setdefault(key, {})[(t.year, t.month)] = float(row.get("change") or 0)
+        rows = E.foreign_rows(changes, now, BILLING_MONTHS)
+
+        def fmt(x: float, d: int) -> str:
+            return f"{x:,.{d}f}".replace(",", " ").replace(".", ",") if x > 0.005 else "–"
+
+        tot = [sum(r[i] for r in rows) for i in (1, 2, 3)]
+        table = [{"mesic": m, "kwh": fmt(k, 1), "naklady": fmt(c, 0), "vyuctovat": fmt(b, 0)}
+                 for m, k, c, b in rows + [(f"Celkem {BILLING_MONTHS} měsíců", *tot)]]
+        self.set_state("sensor.ev_foreign_billing", state=f"{rows[0][3]:.2f}", replace=True, attributes={
+            "friendly_name": "Cizí auto – k vyúčtování tento měsíc", "icon": "mdi:car-arrow-left",
+            "unit_of_measurement": "Kč", "device_class": "monetary",
+            "table": table,
+            "total_kwh": fmt(tot[0], 1), "total_cost": fmt(tot[1], 0), "total_billed": fmt(tot[2], 0),
+            "updated": now.isoformat(),
+        })
 
     def _ev_year(self) -> None:
         now = datetime.now(TZ)
@@ -632,7 +670,8 @@ class Hav2(EvControl, PoolControl, hass.Hass):
                 and self.get_state("input_boolean.energy_battery_control") == "on")
 
     def ev_wants_energy(self) -> bool:
-        if self.get_state(EV_CONNECTED) != "on" or self.get_state("input_select.ev_mode") == "Vypnuto":
+        if (self.get_state(EV_CONNECTED) != "on" or self.get_state("input_select.ev_mode") == "Vypnuto"
+                or self.get_state("input_boolean.ev_foreign_car") == "on"):  # cizí auto: jen NT ze sítě
             return False
         need = self.ev_needed_now()  # omezeno limitem nabíjení v autě
         return True if need is None else need > 0.05  # SOC auta neznámý → počítat s tím, že nabíjí
@@ -641,7 +680,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         """EV nabíjí ze sítě (plánovaný slot, Rychle, ručně „Nabíjet teď“) → baterie domu drží,
         do EV se nevybíjí (uživatel 3. 10. 2026). Nabíjení ze slunce s dotováním beze změny."""
         cmd = getattr(self, "ev_virtual", None)
-        grid_states = (E.STATE_PLAN, E.STATE_FAST, E.STATE_MANUAL)
+        grid_states = (E.STATE_PLAN, E.STATE_FAST, E.STATE_MANUAL, E.STATE_FOREIGN)
         hold = bool(cmd and cmd.enable and cmd.state in grid_states and self.get_state(EV_CONNECTED) == "on")
         if hold != self.ev_grid_hold:
             self.ev_grid_hold = hold

@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 9. 10. 2026)
+# HAv2 – stav a předávka (k 10. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -41,6 +41,10 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 
 ### Otevřené body (stav 7. 10. 2026)
 **Ověřit, až nastane:**
+- **NT dobití Kie (auto_nt, 10. 10.):** ráno 11. 10. – nabito ~3,4 kWh 22:00–22:30 v NT, baterie držela, plán pak
+  „bez termínu“ (zbytek ze slunce). Sledovat, že se během dne/noci nepřepíná.
+- **Cizí auto:** při prvním použití – rozpoznání (notifikace), jen NT, proud pod jistič, evidence session/měsíce,
+  Kia SOC beze změny. Při příjezdu Kie ověřit, že se za cizí auto neoznačí.
 - **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %). První nabíjení
   z přetoku po opravě 7. 10. od 14:30 v pořádku: odhad 70 → 71,2 % plynule; C7 – proud jen klesal se sluncem
   9 → 8 → 7 → 6 A (14:30, 14:47, 15:01, 15:09), bez kmitání, síť ~0, baterie (SOC 90 %) dál nabíjí ~0,4 kW.
@@ -66,6 +70,29 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   případně VT 6,10 → 6,09.
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0i. Kontrola 10. 10. + NT dobití EV + cizí auto (nasazeno 14:59–15:01)
+- **Kontrola:** PND 9. 10. kompletní (s bojlerem nákup −0,03, prodej −0,07 kWh; bojler 5,16 kWh / 11,99 Kč).
+  Noc: držení 71 %, **5:30–6:00 NT dobití baterie 3 kW na 83 %** (zatažený den, jinak min. SOC ve VT) – plán, OK.
+  HDO obnoveno 1:21 (do 16. 10.), Solcast 3× HTTP 429, pak OK. iOS appka dál „non-zero reserved bits“ (2 101×).
+- **`sensor.ev_session_avg_price`:** availability i na `ev_session_cost` (chyba při template.reload 9. 10. 15:26).
+- **NT dobití, když slunce do 4 dnů nestačí (uživatel 10. 10.):** `ev_replan` spočítá `sun_4d` = přetok pro EV do
+  now + 96 h (stejný výpočet jako „EV ze slunce“, spolehlivost 1,0, filtrace první); `auto_nt = potřeba − sun_4d`
+  → `plan_ev` (jen Solár+NT, bez termínu) ho dá do nejbližšího NT bloku od začátku (3f 11 A); jen chybějící část.
+  Atributy `solar_4d_kwh`, `auto_nt_kwh` v `sensor.ev_plan`. První běh: potřeba 12,0, slunce do 4 dnů 8,6 →
+  **NT 3,4 kWh 10. 10. 22:00–22:30**. Ověřit ráno 11. 10.
+- **Cizí auto:** `input_boolean.ev_foreign_car` (záložka EV). Zapne AppDaemon 4 min po připojení, když Kia podle
+  **čerstvé** polohy (`sensor.ev6_last_updated_at` po připojení, vynucená aktualizace max 2×/den) není doma
+  (`device_tracker.ev6_location`) + notifikace; po odpojení se vypne; ručně kdykoli. `binary_sensor.ev6_ev_battery_plug`
+  je nepoužitelný (za týden 1× on). Kia doma nepřipojená + cizí auto → jen ručně. Prvních 4 min 15 s po připojení
+  se nenabíjí (stav „čeká na rozpoznání auta“, ruční „Nabíjet teď“ má přednost) kvůli čisté evidenci.
+  Regulátor `STATE_FOREIGN` „Cizí auto“: jen NT, 3f, proud = jistič 23 A − 1 A − nejvíc zatížená fáze (bojler
+  a nabíjení baterie mají přednost), bez cíle SOC, stop = Nabíjení → Zastavit; baterie drží (grid hold).
+  Evidence: `sensor.ev_foreign_energy_total`, `_cost_total` (skutečná podle zdroje), `_billed_total` (kWh × cena NT,
+  bez zisku), `sensor.ev_foreign_last_session` (od zapnutí přepínače; atributy started, last_charge, cost, billed),
+  `sensor.ev_foreign_billing` (AppDaemon, 6 měsíců). Čítače Kie, `ev_soc_estimate` (čítač EcoVolteru − cizí auto)
+  a `sensor.ev_charging_year` cizí auto nezapočítávají; session `ev_session_*` = obě auta. Dashboard: EV → tile
+  „Cizí auto“, EV náklady → sekce „Cizí auto“ (poslední session + tabulka). Štítky hav2 + hav2_ev přidány.
 
 ### 0h. Kontrola 9. 10. (výsledky) + nabídka dodavatele
 - **PND 8. 10.** kompletní; s měřeným bojlerem nákup +0,09 kWh (+0,7 %), prodej −0,10 kWh → odchylka prodeje

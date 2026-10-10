@@ -28,6 +28,7 @@ STATE_FAST = "Rychle"
 STATE_MANUAL = "Ručně"
 STATE_OFF = "Vypnuto"
 STATE_DONE = "Nabito"
+STATE_FOREIGN = "Cizí auto"
 
 
 def ev_power_kw(phases: int, amps: int) -> float:
@@ -77,6 +78,9 @@ class EvPlanParams:
     high_kwh: float = 0.0
     high_from: Optional[datetime] = None
     later_nt_high_kwh: float = 0.0
+    # bez termínu: co přetok FVE podle předpovědi do 4 dnů nepokryje, se nabije v nejbližší
+    # NT (uživatel 10. 10. 2026 – jen chybějící část, ne celý zbytek do cíle)
+    auto_nt_kwh: float = 0.0
 
 
 @dataclass
@@ -167,6 +171,24 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
                 if e > 0:
                     grid[s.start] = "NT"
                     nt_kwh += e
+    auto_nt = 0.0
+    if p.mode == "Solár+NT" and not has_deadline and p.auto_nt_kwh > 0.05 and rest_normal > 0.05:
+        want = min(p.auto_nt_kwh, rest_normal)
+        block: List[EvSlot] = []  # nejbližší souvislý NT blok (dnes v noci / právě probíhající)
+        for s in window:
+            if s.is_nt and (not block or block[-1].start + timedelta(minutes=15) == s.start):
+                block.append(s)
+            elif block:
+                break
+        for s in block:  # od začátku bloku (baterie domu se dobíjí na jeho konci)
+            if want <= 0.05:
+                break
+            e = min(want, p.grid_kw * 0.25 * s.fraction)
+            grid[s.start] = "NT"
+            want -= e
+            rest_normal -= e
+            auto_nt += e
+        nt_kwh += auto_nt
     if rest_high + rest_normal > 0.05 and p.deadline_hard and p.deadline and p.deadline > now:
         for s in reversed(window):
             if rest_high + rest_normal <= 0.05:
@@ -182,7 +204,9 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
     parts = [f"potřeba {need:.1f} kWh", f"slunce ~{solar:.1f}"]
     if high > 0.05 and p.high_from:
         parts.append(f"z toho nad limit auta {high:.1f} až od {p.high_from:%d.%m. %H:%M}")
-    if nt_kwh:
+    if auto_nt:
+        parts.append(f"NT {auto_nt:.1f} (slunce do 4 dnů nestačí)")
+    elif nt_kwh:
         parts.append(f"NT {nt_kwh:.1f}")
     if later_kwh:
         parts.append(f"NT později {later_kwh:.1f} (poslední noc před termínem)")
@@ -193,7 +217,8 @@ def plan_ev(slots: Sequence[EvSlot], p: EvPlanParams, now: datetime) -> EvPlan:
         if shortfall > 0.05:
             parts.append(f"CHYBÍ {shortfall:.1f} kWh")
     elif p.mode == "Solár+NT":
-        parts.append("bez termínu – jen přetok FVE (NT až se zadaným termínem)")
+        if not auto_nt:
+            parts.append("bez termínu – přetok FVE (NT, když slunce do 4 dnů nestačí)")
     else:
         parts.append("jen slunce")
     cost = (nt_kwh + later_kwh) * p.nt_price + vt_kwh * p.vt_price
@@ -323,12 +348,12 @@ def solar_eta_text(r: SolarEta, now: datetime, target_soc: float, connected: boo
 
 
 def year_summary(changes: Dict[str, float]) -> Dict[str, float]:
-    """Souhrn EV od 1. 1. ze změn statistik (kWh/Kč). energy = čítač EcoVolteru (i před HAv2),
+    """Souhrn Kie od 1. 1. ze změn statistik (kWh/Kč). energy = čítač EcoVolteru (i před HAv2) bez cizího auta,
     zdroje a náklady = čítače HAv2; průměrná cena a podíl vlastní energie jen z dat HAv2."""
     g = lambda k: max(0.0, changes.get(k, 0.0))  # noqa: E731
     hav2 = g("solar") + g("battery") + g("grid_nt") + g("grid_vt")
     return {
-        "energy": round(max(g("energy"), hav2), 2),
+        "energy": round(max(g("energy") - g("foreign"), hav2), 2),  # čítač EcoVolteru bez cizího auta
         "hav2_kwh": round(hav2, 2),
         "solar": round(g("solar"), 2), "battery": round(g("battery"), 2),
         "grid_nt": round(g("grid_nt"), 2), "grid_vt": round(g("grid_vt"), 2),
@@ -471,6 +496,9 @@ class RegInputs:
     sell_price: float = 99.0  # výkupní cena teď (Kč/kWh); výchozí = „drahý“ → bez 3f z baterie
     battery_refill: bool = False  # předpověď FVE do večera baterii dobije
     boiler_reserve_w: float = 0.0  # přebytek nechaný bojleru (už odečtený ze surplus_w)
+    foreign: bool = False  # nabíjí se cizí auto: jen v NT, výkon pod jistič, bez cíle SOC
+    is_nt: bool = False
+    pending: bool = False  # po připojení se teprve rozpoznává Kia / cizí auto → nenabíjet
 
 
 @dataclass
@@ -559,6 +587,10 @@ class Regulator:
 
         if i.mode == "Vypnuto":
             return self._cmd(False, i.cur_amps, i.cur_phases, STATE_OFF, "režim Vypnuto")
+        if i.foreign:
+            return self._foreign(i)
+        if i.pending:  # jinak by začátek nabíjení cizího auta šel do evidence Kie
+            return self._cmd(False, p.amin, i.cur_phases, STATE_PAUSED, "čeká na rozpoznání auta (Kia / cizí)")
         if i.target_reached:
             return self._cmd(False, i.cur_amps, i.cur_phases, STATE_DONE, "cílový SOC dosažen")
         if i.mode == "Rychle":
@@ -575,6 +607,25 @@ class Regulator:
         dt_s = (i.now - self.last_step).total_seconds() if self.last_step else 0.0
         self.last_step = i.now
         return self._solar(i, dt_s)
+
+    def _foreign(self, i: RegInputs) -> Command:
+        """Cizí auto: jen v NT, 3f a nejvyšší proud, který se vejde pod jistič vedle bojleru
+        a nabíjení baterie (ty mají přednost – EV ustoupí); mimo NT stojí."""
+        p = self.p
+        self._reset_episode()
+        if not i.is_nt:
+            return self._cmd(False, p.amin, 3, STATE_FOREIGN, "cizí auto – nabíjí jen v NT")
+        if self.state == STATE_FOREIGN and self.last_step and \
+                (i.now - self.last_step).total_seconds() < p.interval_s - 1:
+            return self.last_cmd or self._hold(i, self.state, "čeká na další krok")
+        self.last_step = i.now
+        own = i.cur_amps if (i.cur_enabled and i.cur_phases == 3) else 0
+        free = p.breaker_limit_a - 1.0 - i.worst_phase_a  # 1 A rezerva
+        amps = min(p.amax, int(own + free))
+        if amps < p.amin:
+            return self._cmd(False, p.amin, 3, STATE_FOREIGN,
+                             f"cizí auto – jistič bez rezervy (fáze {i.worst_phase_a:.1f} A)")
+        return self._cmd(True, amps, 3, STATE_FOREIGN, f"cizí auto – NT {amps} A 3f (rezerva jističe)")
 
     def _solar(self, i: RegInputs, dt_s: float) -> Command:
         if dt_s > 2 * self.p.interval_s:
@@ -843,6 +894,14 @@ def month_starts(now: datetime, months: int) -> List[Tuple[int, int]]:
         out.append((y, m))
         y, m = (y - 1, 12) if m == 1 else (y, m - 1)
     return out
+
+
+def foreign_rows(changes: Dict[str, Dict[Tuple[int, int], float]], now: datetime,
+                 months: int = 6) -> List[Tuple[str, float, float, float]]:
+    """Cizí auto po měsících: (měsíc, kWh, skutečné náklady Kč, k vyúčtování Kč)."""
+    return [(f"{MONTHS_CS[ym[1] - 1]} {ym[0]}", round(changes.get("kwh", {}).get(ym, 0.0), 2),
+             round(changes.get("cost", {}).get(ym, 0.0), 2), round(changes.get("billed", {}).get(ym, 0.0), 2))
+            for ym in month_starts(now, months)]
 
 
 def billing_rows(changes: Dict[str, Dict[Tuple[int, int], float]], now: datetime,

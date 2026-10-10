@@ -7,6 +7,12 @@ input_boolean:
   ev_control:
     name: HAv2 řídí nabíjení EV
     icon: mdi:ev-station
+  # cizí auto: nabíjí jen v NT výkonem pod jistič, oddělená evidence za cenu NT (sensor.ev_foreign_*);
+  # zapne HAv2 sám (Kia podle polohy není doma) nebo ručně, vypne se po odpojení
+  ev_foreign_car:
+    name: Nabíjí se cizí auto
+    icon: mdi:car-arrow-left
+
 
 script:
   hav2_ev_set:
