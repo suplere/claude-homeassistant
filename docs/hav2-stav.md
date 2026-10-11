@@ -42,6 +42,9 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 ### Otevřené body (stav 11. 10. 2026)
 **Ověřit, až nastane:**
 - ~~NT dobití Kie (auto_nt)~~ – **ověřeno 10./11. 10.** (§0j). Dál sledovat konec NT slotu po opravě (zastavit hned).
+- **Watchdogy po restartu HA (oprava 11. 10. 22:21):** při příštím restartu (aktualizace kia_uvo v3.17.1, přes den)
+  nesmí baterii přepnout na auto (logbook „watchdog“, `input_text.energy_last_decision`). 11. 10. 22:15 konec NT
+  slotu Kie po opravě regulátoru: EV zastavilo hned (22:11 po restartu, bez 1f).
 - **Cizí auto:** při prvním použití – rozpoznání (notifikace), jen NT, proud pod jistič, evidence session/měsíce,
   Kia SOC beze změny. (Příjezd Kie 10. 10. 21:19 správně nerozpoznán jako cizí.)
 - **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %). První nabíjení
@@ -83,6 +86,14 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   přechod zastavil jen díky „max. 1 přepnutí fází / 10 min“. **Oprava `_solar_step`:** návrat z `STATE_PLAN` /
   `FAST` / `MANUAL` / `FOREIGN` bez přebytku na minimum → hned pauza + vynulovat časovače fází (test
   `test_back_from_plan_without_surplus_pauses_not_1f`). Ostatní stavy (např. po restartu AppDaemonu) beze změny.
+- **HA 2026.10.1** (11. 10. ~22:10, záloha před aktualizací; stahování ~7 min → restart už v NT). Pro naše integrace
+  nic podstatného; iOS „non-zero reserved bits“ neřeší.
+- **Planý poplach watchdogu po restartu HA (22:12):** AppDaemon po znovupřipojení plánoval už 22:11:42, ale heartbeat
+  zapsal až 22:13 → watchdog baterie viděl heartbeat z 22:08 (3,6 min) a přepnul EMS na auto → 3 min baterie
+  kryla dům (~1 kW, ~0,05 kWh) při nákupu pro filtraci/bojler; 22:15 plán vrátil standby (spustil i watchdog
+  filtrace – v NT ji nechal). **Oprava (nasazeno 22:21):** heartbeat i hned po každém úspěšném plánu (`tick`)
+  + všechny tři watchdogy (baterie, filtrace, EV) `for: 2 min` (výpadek se pozná do 5 min). Ověřeno: heartbeat
+  22:21:38 = čas plánu. **Ověřit při příštím restartu HA** (aktualizace kia_uvo v3.17.1 vyžaduje restart – přes den).
 - PND 10. 10. kompletní (s bojlerem nákup +0,15, prodej −0,07 kWh; bojler 2,82 kWh / 9,88 Kč). Filtrace NT
   doplnění 22:00–1:03, bojler NT. EcoVolter Wi-Fi výpadky 24× / 3 dny (odhad SOC už neovlivní).
 

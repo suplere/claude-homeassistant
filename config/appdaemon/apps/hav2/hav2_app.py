@@ -510,6 +510,9 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         try:
             self._plan(kwargs.get("reason", "pravidelně"))
             self.last_success = datetime.now(TZ)
+            # hned i po plánu: po restartu HA by jinak watchdog viděl starý heartbeat z doby před
+            # restartem a přepnul baterii na auto, i když plánovač už zase běží (11. 10. 22:12)
+            self.heartbeat({})
         except Exception as err:  # noqa: BLE001
             self.log(f"plánování selhalo: {err}", level="ERROR")
             self.set_state("sensor.energy_plan", state="error",

@@ -83,6 +83,9 @@ automation:
       - trigger: template
         value_template: >
           {{ (now() - (states('input_datetime.hav2_heartbeat') | as_datetime(now()) | as_local)).total_seconds() > 180 }}
+        # po restartu HA dát AppDaemonu čas se ozvat (viz watchdog baterie, 11. 10. 2026)
+        for:
+          minutes: 2
     conditions:
       - condition: state
         entity_id: input_select.energy_system_mode
