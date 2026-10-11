@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 10. 10. 2026)
+# HAv2 – stav a předávka (k 11. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -22,7 +22,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 **Data:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní, stáhne `make pull`, mimo git)
 + historie HA + PND D+1 (integrace `cez_pnd`, statistiky `cez_pnd:*` od 1. 1. 2026).
 
-## 1b. Pro novou session (stav 7. 10. 2026 dopoledne)
+## 1b. Pro novou session (stav 11. 10. 2026)
 
 **Pracovní postupy:**
 - Kontroly: `config/appdaemon/hav2_data/*.jsonl` (klíče `DATA_STATES`/`DATA_ATTRS` v `hav2_app.py`), PND v
@@ -39,12 +39,11 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
 
-### Otevřené body (stav 7. 10. 2026)
+### Otevřené body (stav 11. 10. 2026)
 **Ověřit, až nastane:**
-- **NT dobití Kie (auto_nt, 10. 10.):** ráno 11. 10. – nabito ~3,4 kWh 22:00–22:30 v NT, baterie držela, plán pak
-  „bez termínu“ (zbytek ze slunce). Sledovat, že se během dne/noci nepřepíná.
+- ~~NT dobití Kie (auto_nt)~~ – **ověřeno 10./11. 10.** (§0j). Dál sledovat konec NT slotu po opravě (zastavit hned).
 - **Cizí auto:** při prvním použití – rozpoznání (notifikace), jen NT, proud pod jistič, evidence session/měsíce,
-  Kia SOC beze změny. Při příjezdu Kie ověřit, že se za cizí auto neoznačí.
+  Kia SOC beze změny. (Příjezd Kie 10. 10. 21:19 správně nerozpoznán jako cizí.)
 - **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %). První nabíjení
   z přetoku po opravě 7. 10. od 14:30 v pořádku: odhad 70 → 71,2 % plynule; C7 – proud jen klesal se sluncem
   9 → 8 → 7 → 6 A (14:30, 14:47, 15:01, 15:09), bez kmitání, síť ~0, baterie (SOC 90 %) dál nabíjí ~0,4 kW.
@@ -70,6 +69,22 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   případně VT 6,10 → 6,09.
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0j. Kontrola 11. 10. – NT dobití Kie ověřeno, oprava konce NT slotu (nasazeno 11:44)
+- **NT dobití (auto_nt) funguje:** Kia odjela 18:34, zpět 21:19 (SOC 64 %, potřeba vzrostla). Po připojení
+  „čeká na rozpoznání auta“, správně Kia (přepínač cizího auta zůstal vypnutý – rozpoznání ověřeno na Kii).
+  22:00–23:00 NT 3f 8 A (strop kvůli bojleru, souběžně filtrace NT doplnění) ~5 kWh; po půlnoci se horizont
+  předpovědi posunul (detail do zítřka × denní součty) → 0:00–0:15 ještě ~1,7 kWh. Celkem ~6,6 kWh, Kia
+  64 → 71,7 %; zbytek 7,1 kWh slunce do 4 dnů (~9 kWh), „EV ze slunce“ út 13. 10. ~15:15. Baterie držela 46 %.
+  Přepočet o půlnoci (přechod detail → denní součty) mění `sun_4d` o ~1–2 kWh – sledovat, nevadí.
+- **Chyba: konec NT slotu v noci → minuta 1f bez držení baterie (0:15).** Regulátor po `STATE_PLAN` při přebytku
+  pod minimem nezastavil, pokračoval solární regulací se starým časovačem fází („75 min → přepnout na 1f“) →
+  1 min 6 A 1f ve stavu Solár (držení baterie skončilo; data: baterie −45 W, nic neodteklo). V 23:00 stejný
+  přechod zastavil jen díky „max. 1 přepnutí fází / 10 min“. **Oprava `_solar_step`:** návrat z `STATE_PLAN` /
+  `FAST` / `MANUAL` / `FOREIGN` bez přebytku na minimum → hned pauza + vynulovat časovače fází (test
+  `test_back_from_plan_without_surplus_pauses_not_1f`). Ostatní stavy (např. po restartu AppDaemonu) beze změny.
+- PND 10. 10. kompletní (s bojlerem nákup +0,15, prodej −0,07 kWh; bojler 2,82 kWh / 9,88 Kč). Filtrace NT
+  doplnění 22:00–1:03, bojler NT. EcoVolter Wi-Fi výpadky 24× / 3 dny (odhad SOC už neovlivní).
 
 ### 0i. Kontrola 10. 10. + NT dobití EV + cizí auto (nasazeno 14:59–15:01)
 - **Kontrola:** PND 9. 10. kompletní (s bojlerem nákup −0,03, prodej −0,07 kWh; bojler 5,16 kWh / 11,99 Kč).

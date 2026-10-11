@@ -750,3 +750,17 @@ def test_pending_detection_holds_charging_but_manual_wins():
     cmd = reg.step(inputs(pending=True, plan_slot="NT"))
     assert not cmd.enable and "rozpoznání" in cmd.reason
     assert reg.step(inputs(pending=True, manual="Nabíjet teď")).enable
+
+
+def test_back_from_plan_without_surplus_pauses_not_1f():
+    """11. 10. 0:15: konec NT slotu v noci, starý časovač fází → minuta 1f bez držení baterie."""
+    reg = Regulator()
+    night = datetime(2026, 10, 11, 0, 0, tzinfo=TZ)
+    # dřívější nízký přebytek nastartoval časovač přepnutí na 1f
+    reg.phase_cond_dir, reg.phase_cond_since = 1, night - timedelta(minutes=75)
+    cmd = reg.step(inputs(now=night, plan_slot="NT", cur_amps=11, cur_phases=3))
+    assert cmd.state == STATE_PLAN
+    cmd = reg.step(inputs(now=night + timedelta(minutes=15), plan_slot=None, surplus_w=-1255,
+                          cur_enabled=True, cur_amps=11, cur_phases=3, battery_soc=46))
+    assert not cmd.enable and cmd.state == STATE_PAUSED and cmd.phases == 3
+    assert reg.phase_cond_since is None

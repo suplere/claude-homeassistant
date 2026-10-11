@@ -676,6 +676,15 @@ class Regulator:
                 self._reset_episode()
                 return self._cmd(True, self._cap(i, ph, fit), ph, STATE_SOLAR,
                                  f"přechod na solární regulaci: {fit} A {ph}f")
+            if self.state in (STATE_PLAN, STATE_FAST, STATE_MANUAL, STATE_FOREIGN):
+                # konec nabíjení ze sítě a přebytek neunese ani minimum (typicky konec NT slotu
+                # v noci) → hned pauza; jinak starý časovač fází přepnul na 1f a minutu nabíjel
+                # bez držení baterie (11. 10. 2026 0:15)
+                self._reset_episode()
+                self.resume_since = None
+                self.phase_cond_dir, self.phase_cond_since = 0, None
+                return self._cmd(False, p.amin, ph, STATE_PAUSED,
+                                 f"konec režimu {self.state}: přebytek {i.surplus_w:.0f} W < minimum → pauza")
             amps = p.amin
 
         # --- volba fází s hysterezí (max. 1× za 10 min)
