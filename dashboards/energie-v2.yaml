@@ -550,6 +550,7 @@ views:
                     .map(([t, v]) => [new Date(t).getTime(), v * k]);
               - entity: sensor.cez_hdo_schedule_dum
                 name: Nákup (NT/VT)
+                unit: Kč/kWh  # entita HDO jednotku nemá
                 type: line
                 curve: stepline
                 color: "#e53935"
@@ -1684,6 +1685,8 @@ views:
                 apex_config:
                   title:
                     text: kWh
+            all_series_config:
+              unit: kWh  # entita má jednotku %
             series:
               - entity: sensor.energy_forecast_accuracy
                 name: FVE skutečnost
@@ -1980,6 +1983,7 @@ views:
                   return JSON.parse(entity.attributes.days_json || '[]').map(d => [new Date(d[0] + 'T12:00:00').getTime(), d[1]]);
               - entity: sensor.energy_boiler_pnd_daily
                 name: Kč
+                unit: Kč
                 type: line
                 color: "#e53935"
                 yaxis_id: kc
@@ -2511,6 +2515,7 @@ views:
         all_series_config:
           type: column
           float_precision: 1
+          unit: Kč  # entita je jen nosič (kWh); data jsou náklady
         series:
           - entity: sensor.cez_elektromer_8591_0246_vcerejsi_spotreba
             name: NT
