@@ -72,6 +72,7 @@ class EvControl:
         self.ev_limit_tries: Dict[int, Tuple[datetime, int]] = {}
         self.ev_limit_error = ""
         self.ev_deadline_watch: Optional[datetime] = None
+        self.ev_sun_4d_held: Optional[float] = None  # přetok do 4 dnů držený v NT bloku
 
         self.run_every(self.ev_loop, "now+40", 5)
         self.listen_state(self.ev_on_connect, EV_CONNECTED)
@@ -270,6 +271,8 @@ class EvControl:
         # bez termínu: co slunce do 4 dnů nepokryje → nejbližší NT (uživatel 10. 10. 2026)
         sun_4d = E.solar_eta([x for x in sun_slots if x.start < now + timedelta(days=4)], 1e9, now,
                              confidence=1.0, pool=pool).solar_kwh
+        # v NT bloku nepřidávat NT kvůli půlnočnímu přepočtu (uživatel 12. 10. 2026)
+        sun_4d, self.ev_sun_4d_held = E.nt_block_sun(sun_4d, is_nt(now), self.ev_sun_4d_held)
         auto_nt = max(0.0, needed - sun_4d) if (connected and soc_known) else 0.0
 
         params = E.EvPlanParams(

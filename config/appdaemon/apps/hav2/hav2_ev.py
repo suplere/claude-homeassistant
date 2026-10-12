@@ -330,6 +330,19 @@ def extend_solar_slots(start: datetime, days: Sequence[Tuple[datetime, float]], 
     return out
 
 
+def nt_block_sun(sun_kwh: float, in_nt: bool, held: Optional[float]) -> Tuple[float, Optional[float]]:
+    """Přetok do 4 dnů pro auto_nt v probíhajícím NT bloku: (použitá hodnota, nová paměť).
+
+    Během NT bloku odhad neklesne pod nejvyšší hodnotu od začátku bloku – přepočet o půlnoci
+    (zítřek přejde z denních součtů do podrobného plánu baterie) ubírá ~2 kWh a přidával
+    NT nabíjení, které večer nebylo potřeba (11. a 12. 10. 2026). Mimo NT bez paměti.
+    """
+    if not in_nt:
+        return sun_kwh, None
+    used = sun_kwh if held is None else max(sun_kwh, held)
+    return used, used
+
+
 def solar_eta_text(r: SolarEta, now: datetime, target_soc: float, connected: bool) -> str:
     """Krátký text pro hlavní kartu: „zítra ~13:45 (80 %)“ / „do 15.10. nestihne…“."""
     if r.needed_kwh <= 0.05:

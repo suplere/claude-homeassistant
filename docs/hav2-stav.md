@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 11. 10. 2026)
+# HAv2 – stav a předávka (k 12. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -22,7 +22,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 **Data:** minutový záznam `config/appdaemon/hav2_data/RRRR-MM-DD.jsonl` (AppDaemon, 60 dní, stáhne `make pull`, mimo git)
 + historie HA + PND D+1 (integrace `cez_pnd`, statistiky `cez_pnd:*` od 1. 1. 2026).
 
-## 1b. Pro novou session (stav 11. 10. 2026)
+## 1b. Pro novou session (stav 12. 10. 2026)
 
 **Pracovní postupy:**
 - Kontroly: `config/appdaemon/hav2_data/*.jsonl` (klíče `DATA_STATES`/`DATA_ATTRS` v `hav2_app.py`), PND v
@@ -39,12 +39,15 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
 
-### Otevřené body (stav 11. 10. 2026)
+### Otevřené body (stav 12. 10. 2026)
 **Ověřit, až nastane:**
-- ~~NT dobití Kie (auto_nt)~~ – **ověřeno 10./11. 10.** (§0j). Dál sledovat konec NT slotu po opravě (zastavit hned).
-- **Watchdogy po restartu HA (oprava 11. 10. 22:21):** při příštím restartu (aktualizace kia_uvo v3.17.1, přes den)
-  nesmí baterii přepnout na auto (logbook „watchdog“, `input_text.energy_last_decision`). 11. 10. 22:15 konec NT
-  slotu Kie po opravě regulátoru: EV zastavilo hned (22:11 po restartu, bez 1f).
+- ~~NT dobití Kie (auto_nt)~~ – **ověřeno 10./11. 10.** (§0j); ~~konec NT slotu po opravě~~ – **ověřeno 12. 10. 0:15** (§0k).
+- **Půlnoční NT dobití EV (§0k):** 2 noci po sobě o půlnoci `sun_4d` spadne o ~2 kWh (přechod 13. 10. z denních součtů
+  do podrobného plánu) → zbytečných 1,3–1,7 kWh v NT 0:00–0:15. **Oprava nasazena 12. 10. 10:22:** v NT bloku
+  `sun_4d` neklesne pod maximum od začátku bloku (`nt_block_sun`, test `test_nt_block_sun_does_not_drop_at_midnight`).
+  **Ověřit ráno 13. 10.:** o půlnoci žádné NT dobití, pokud ve 22:00 nebylo potřeba.
+- ~~Watchdogy po restartu HA (oprava 11. 10. 22:21)~~ – **ověřeno 12. 10. 9:14** (restart po aktualizaci kia_uvo
+  v3.17.1): žádný ze tří watchdogů se nespustil, AppDaemon 9:12:53 → 9:16:09, plán 9:15 „auto: vlastní spotřeba“.
 - **Cizí auto:** při prvním použití – rozpoznání (notifikace), jen NT, proud pod jistič, evidence session/měsíce,
   Kia SOC beze změny. (Příjezd Kie 10. 10. 21:19 správně nerozpoznán jako cizí.)
 - **EV odhad SOC (oprava 7. 10.):** při dalším výpadku EcoVolteru zůstane odhad beze změny (ne 100 %). První nabíjení
@@ -72,6 +75,27 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   případně VT 6,10 → 6,09.
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0k. Kontrola 12. 10. ráno
+- **Konec NT slotu po opravě – ověřeno:** 0:00–0:15 NT 3f 11 A (Kia 67,1 → 69,0 %), 0:15 „konec režimu Plán:
+  přebytek pod minimem → pauza“, bez 1f, držení baterie skončilo hned. Noc jinak podle plánu: standby (baterie
+  drží 37 → 36 %), filtrace NT doplnění do 22:38 (6,0/6,0 h), bojler NT 22–23 a 3:11–3:31, 6:00 auto. Restart HA od
+  22:21 nebyl (watchdogy po restartu dál neověřené).
+- **Zbytečné NT dobití o půlnoci (2. noc po sobě):** 23:45 `solar_4d_kwh` 11,73 (potřeba 11,09 → NT 0), 0:00
+  9,79 → auto_nt 1,3 kWh (est. 4,6 Kč); ráno 8:45 zase 11,58. Okno 4 dnů obsahuje před i po půlnoci stejné dny
+  12.–15. 10.; mění se jen to, že 13. 10. přejde z `_ev_sun_days` (zjednodušená simulace z denního součtu 22,1 kWh)
+  do podrobného plánu baterie (stejná FVE 22,1 kWh, ale přetok pro EV o ~2 kWh nižší – plán baterie jinak nabíjí/
+  vybíjí baterii). 10./11. 10. totéž (0:00–0:15 ~1,7 kWh). Malá částka, ale proti pravidlu „NT jen co slunce
+  nepokryje“. Návrh opravy: auto_nt rozhodnout jednou na začátku NT bloku (22:00) a během bloku nové NT
+  nepřidávat (jen ubírat); případně sjednotit simulaci dalších dnů s plánem baterie.
+  **Nasazeno 10:22** (`hav2_ev.nt_block_sun`, paměť `ev_sun_4d_held` v `ev_replan`): v NT bloku se použije
+  maximum `sun_4d` od začátku bloku, mimo NT bez paměti; vyšší odhad platí hned. Restart HA 9:14 (kia_uvo v3.17.1)
+  ověřil watchdogy – žádný se nespustil.
+- **PND 11. 10.** kompletní: nákup PND 12,60 / HA 8,72 kWh, s bojlerem odchylka nákupu +0,12 kWh (1,0 %), prodeje
+  −0,11 kWh (−7,4 %); `meas_import` +0,38 kWh (3 %, obvykle ~+0,1) – nejspíš výpadek měření při restartu HA
+  22:10–22:12 (EV + bojler ~6 kW ≈ 0,2 kWh). Bojler 3,76 kWh / 13,19 Kč (NT 22–23 h + 2 h).
+- **Logy:** AppDaemon bez chyb. HA: Solcast 429 (10 pokusů, další 9:38), iOS „non-zero reserved bits“ (690×),
+  chromecasty nedostupné, 2× timeout Supervisoru – nic HAv2.
 
 ### 0j. Kontrola 11. 10. – NT dobití Kie ověřeno, oprava konce NT slotu (nasazeno 11:44)
 - **NT dobití (auto_nt) funguje:** Kia odjela 18:34, zpět 21:19 (SOC 64 %, potřeba vzrostla). Po připojení

@@ -27,6 +27,7 @@ from hav2_ev import (  # noqa: E402
     Regulator,
     ev_power_kw,
     max_amps_for,
+    nt_block_sun,
     plan_ev,
 )
 
@@ -259,6 +260,18 @@ def test_plan_auto_nt_inside_running_nt_block():
     now = datetime(2026, 9, 26, 2, 0, tzinfo=TZ)  # uprostřed NT
     plan = plan_ev(ev_slots(now, 24, 1.0), EvPlanParams(needed_kwh=10, mode="Solár+NT", auto_nt_kwh=3.5), now)
     assert min(plan.grid_slots) == now and abs(plan.nt_kwh - 3.5) < 0.01
+
+
+def test_nt_block_sun_does_not_drop_at_midnight():
+    """12. 10. 2026: 23:45 slunce do 4 dnů 11,73 kWh (potřeba 11,09 → bez NT), o půlnoci přepočet
+    9,79 → NT 1,3 kWh navíc. V NT bloku se odhad drží na maximu od začátku bloku."""
+    used, held = nt_block_sun(11.73, True, None)  # 22:00 – začátek bloku
+    assert used == 11.73 and held == 11.73
+    used, held = nt_block_sun(9.79, True, held)  # 0:00 – přepočet nesmí přidat NT
+    assert used == 11.73 and max(0.0, 11.09 - used) == 0.0
+    used, held = nt_block_sun(12.5, True, held)  # lepší předpověď platí hned
+    assert used == 12.5 and held == 12.5
+    assert nt_block_sun(9.0, False, held) == (9.0, None)  # mimo NT bez paměti
 
 
 def test_plan_nt_fills_rest_from_start_of_block():
