@@ -1788,18 +1788,18 @@ views:
             grid_options:
               columns: 6
           - type: custom:mushroom-template-card
-            entity: sensor.energy_import_cost_total
-            primary: Nákup celkem
-            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            entity: sensor.energy_import_cost_monthly
+            primary: Nákup měsíc
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') or 'Kč' }}{% else %}–{% endif %}"
             icon: mdi:cash-minus
             tap_action:
               action: more-info
             grid_options:
               columns: 6
           - type: custom:mushroom-template-card
-            entity: sensor.energy_export_revenue_total
-            primary: Prodej celkem
-            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') }}{% else %}–{% endif %}"
+            entity: sensor.energy_export_revenue_monthly
+            primary: Prodej měsíc
+            secondary: "{% set v = states(entity) %}{% if is_number(v) %}{{ ('{:,.0f}'.format(v | float | round(0) + 0)).replace(',', ' ').replace('.', ',') }} {{ state_attr(entity, 'unit_of_measurement') or 'Kč' }}{% else %}–{% endif %}"
             icon: mdi:cash-plus
             tap_action:
               action: more-info

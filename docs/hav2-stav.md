@@ -97,6 +97,12 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Logy:** AppDaemon bez chyb. HA: Solcast 429 (10 pokusů, další 9:38), iOS „non-zero reserved bits“ (690×),
   chromecasty nedostupné, 2× timeout Supervisoru – nic HAv2.
 
+- **Dashboard (12. 10.):** jednotky grafů s `data_generator` (náklady PND Kč, přesnost předpovědí kWh, bojler PND Kč,
+  cena NT/VT Kč/kWh). Dlaždice „Nákup/Prodej celkem“ (součty od 25. 9.) nahrazeny **„Nákup/Prodej měsíc“** – nové
+  GUI utility metery `sensor.energy_import_cost_monthly` / `sensor.energy_export_revenue_monthly` (měsíční, štítky
+  hav2 + hav2_system), říjen doplněn `utility_meter.calibrate` (stav čítače − stav 30. 9.: 324,860 / 177,033 Kč;
+  nákup − prodej = `energy_net_cost_monthly` ±0,03 Kč). Statistiky nových měřičů začínají 12. 10.
+
 ### 0j. Kontrola 11. 10. – NT dobití Kie ověřeno, oprava konce NT slotu (nasazeno 11:44)
 - **NT dobití (auto_nt) funguje:** Kia odjela 18:34, zpět 21:19 (SOC 64 %, potřeba vzrostla). Po připojení
   „čeká na rozpoznání auta“, správně Kia (přepínač cizího auta zůstal vypnutý – rozpoznání ověřeno na Kii).
