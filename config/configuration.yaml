@@ -97,4 +97,6 @@ input_number:
     max: 2000
     unit_of_measurement: W
     step: 10
+    # jen záloha (výpadek měření Pro EM-50, virtuální čerpadlo v „Jen doporučení“, denní base spotřeba);
+    # initial = po každém restartu 530 W, na dashboardu se nenastavuje (od 12. 10. 2026)
     initial: 530  # změřeno Pro EM-50 1. 10. 2026 (dříve 500 z fázové bilance)

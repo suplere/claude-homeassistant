@@ -1510,7 +1510,6 @@ views:
               - entity: input_number.pool_hours_min
               - entity: input_number.pool_hours_max
               - entity: input_number.pool_min_run_min
-              - entity: input_number.filtrace_vykon_w
 
   # ======================================================= BATERIE A FVE
   - title: Baterie & FVE
