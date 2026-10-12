@@ -1058,12 +1058,16 @@ views:
             name: Nabíjecí port
             grid_options:
               columns: 6
-          - type: tile
+          # integrace dává climate atribut unit_of_measurement → tile ukazoval „off °C“
+          - type: custom:mushroom-template-card
             entity: climate.ev6_climate_control
-            name: Předtopení
+            primary: Předtopení
+            secondary: >-
+              {% set s = states(entity) %}{% set t = state_attr(entity, 'temperature') %}
+              {% if s in ['unavailable', 'unknown'] %}–{% elif s == 'off' %}Vypnuto{% else %}Zapnuto{% if t is not none %} · {{ (t | string).replace('.', ',') }} °C{% endif %}{% endif %}
+            icon: mdi:air-conditioner
+            icon_color: "{{ 'orange' if states(entity) not in ['off', 'unavailable', 'unknown'] else 'grey' }}"
             tap_action:
-              action: more-info
-            icon_tap_action:
               action: more-info
             grid_options:
               columns: 6
