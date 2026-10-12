@@ -1077,6 +1077,11 @@ views:
             grid_options:
               columns: 6
           - type: tile
+            entity: sensor.ev6_car_battery_level
+            name: Baterie 12 V
+            grid_options:
+              columns: 6
+          - type: tile
             entity: button.ev6_force_refresh
             name: Aktualizovat z auta
             icon: mdi:car-connected
@@ -1091,7 +1096,7 @@ views:
             icon_tap_action:
               action: none
             grid_options:
-              columns: 12
+              columns: 6
           - type: markdown
             content: >
               {% set t = states('sensor.ev6_last_updated_at') | as_datetime %}
