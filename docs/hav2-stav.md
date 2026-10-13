@@ -82,6 +82,19 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
 
+### 0m. Večerní kontrola 13. 10.
+- **Den:** FVE 15,9 kWh (HAv2 předpověď ze 7:14 21,6 = +36 %, Forecast.Solar 17,5 = +10 %, Solcast surově 27,7).
+  Filtrace 3,5/3,5 h ze slunce, baterie 37 → 100 % (16:06), večer 68 % v 19:40 (krátce 4,3 kW domácí zátěž 19:06–19:18).
+- **EV:** 13:15–14:55 ze slunce 1f 11 → 10 → 6 A (Kia 71,6 → 75,7 %), 14:55 pauza „Solcast nevidí návrat přebytku“;
+  15:13–15:48 přebytek kolísal kolem minima 1270 W (6 A 1f) → odpočet 28 min se pořád nuloval, nenabíjelo (baterie
+  ještě nabíjela ~2 kW, pak plná 16:06 a přebytek už < 1 kW) → odteklo do sítě ~1 kWh. Návrh (nízká priorita):
+  hystereze odpočtu (nenulovat při krátkém poklesu). Kia odjela 16:40, zpět 18:55 (74 %, rozpoznána jako Kia),
+  potřeba 5,2 kWh, slunce do 4 dnů 14,6 → bez NT.
+- **Solcast:** všech 10 náhodných běhů (8:34–17:5x) × 10 pokusů = 429, úspěch jen 6:46 a 7:14. Předpověď platí do
+  1:14 → **v noci poprvé záloha Forecast.Solar** (zítra 8,9 vs. Solcast opravená 11,8 → ×0,75). Ověřit ráno
+  `pv_source` a rozhodnutí 5:30.
+- **Logy:** HA chyby jen Solcast 429; AppDaemon bez varování od nasazení 13:18.
+
 ### 0l. Kontrola 13. 10. ráno
 - **NT dobití Kie – velké, podle pravidla:** Kia přijela s 50 % (12. 10. jízda, 66 → 50 %), potřeba 25,8 kWh, slunce
   do 4 dnů jen 9,8 kWh (zataženo) → auto_nt 16,0 kWh. 22:00–0:34 3f 8 A (strop kvůli bojleru), pak 11 A, 1:30 konec
