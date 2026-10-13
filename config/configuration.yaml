@@ -13,6 +13,9 @@ frontend:
   extra_module_url:
     - /hacsfiles/lovelace-card-mod/card-mod.js?hacstag=190927524421
 
+# HTTP (blokování IP, práh přihlášení) se od HA 2026.10 nastavuje jen v UI: Nastavení → Systém → Síť;
+# blok http: tady HA ignoruje (oprava „Nastavení HTTP YAML je po migraci ignorováno“, 13. 10. 2026)
+
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
