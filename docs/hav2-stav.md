@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 12. 10. 2026)
+# HAv2 – stav a předávka (k 13. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -45,7 +45,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Půlnoční NT dobití EV (§0k):** 2 noci po sobě o půlnoci `sun_4d` spadne o ~2 kWh (přechod 13. 10. z denních součtů
   do podrobného plánu) → zbytečných 1,3–1,7 kWh v NT 0:00–0:15. **Oprava nasazena 12. 10. 10:22:** v NT bloku
   `sun_4d` neklesne pod maximum od začátku bloku (`nt_block_sun`, test `test_nt_block_sun_does_not_drop_at_midnight`).
-  **Ověřit ráno 13. 10.:** o půlnoci žádné NT dobití, pokud ve 22:00 nebylo potřeba.
+  **13. 10. ověřeno:** `sun_4d` přes půlnoc drženo 9,78 kWh (§0l); NT dobití jen podle skutečné potřeby.
 - ~~Watchdogy po restartu HA (oprava 11. 10. 22:21)~~ – **ověřeno 12. 10. 9:14** (restart po aktualizaci kia_uvo
   v3.17.1): žádný ze tří watchdogů se nespustil, AppDaemon 9:12:53 → 9:16:09, plán 9:15 „auto: vlastní spotřeba“.
 - **Cizí auto:** při prvním použití – rozpoznání (notifikace), jen NT, proud pod jistič, evidence session/měsíce,
@@ -75,6 +75,22 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   případně VT 6,10 → 6,09.
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0l. Kontrola 13. 10. ráno
+- **NT dobití Kie – velké, podle pravidla:** Kia přijela s 50 % (12. 10. jízda, 66 → 50 %), potřeba 25,8 kWh, slunce
+  do 4 dnů jen 9,8 kWh (zataženo) → auto_nt 16,0 kWh. 22:00–0:34 3f 8 A (strop kvůli bojleru), pak 11 A, 1:30 konec
+  slotu → hned pauza (bez 1f). Kia 50 → 71,6 %, zbytek 7,2 kWh slunce do pá 16. 10. **Oprava z 12. 10. funguje:**
+  `solar_4d_kwh` přes půlnoc drženo 9,78. Jediný nárůst auto_nt v bloku (0:30, +1,1 kWh) = přepočet odhadu SOC
+  0:17 (62,6 → 60,1 %, data z auta), ne předpověď.
+- **Baterie:** standby 26 → 25 %, 5:30–6:00 NT nabíjení 1,5 kWh na 38 % (FVE dnes jen 5,4 kWh), 6:00 auto.
+- **PND 12. 10.** kompletní: nákup PND 22,77 / HA 17,58 kWh, s bojlerem odchylka +0,13 kWh (0,6 %), prodej −0,11 kWh
+  (−5,0 %), `meas_*` +0,09 / −0,08. Bojler 5,06 kWh / 17,76 Kč.
+- **Měsíční měřiče Kč** běží: nákup 415,12 − prodej 180,22 = 234,90 ≈ netto 234,87.
+- **Solcast od 12. 10. 7:12 bez aktualizace** – všech 8 pokusů 12. 10. skončilo 429 (hobby účet), další 13. 10. 7:14.
+  Předpověď 7 dní z 12. 10. ráno platí dál. Ověřit, že se 13. 10. obnoví.
+- **Logy:** AppDaemon bez chyb. HA: bezpečnostní filtr zablokoval ~210 skenovacích dotazů z internetu (`/@fs/../.env`,
+  `cgi-bin`, `proc/self/environ`) – HA je zvenku dostupný; `ip_ban_enabled` není nastaveno (návrh pro uživatele).
+  Dál známé: iOS „non-zero reserved bits“ (997×), EcoVolter timeouty (29×), chromecasty, CEZ HDO captcha 1× opakována.
 
 ### 0k. Kontrola 12. 10. ráno
 - **Konec NT slotu po opravě – ověřeno:** 0:00–0:15 NT 3f 11 A (Kia 67,1 → 69,0 %), 0:15 „konec režimu Plán:
