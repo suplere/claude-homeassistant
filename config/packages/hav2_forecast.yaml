@@ -1,0 +1,33 @@
+# HAv2 – stahování předpovědi FVE
+#
+# Solcast (hobby účet) odmítá dotazy 429, když se tisíce instalací trefí do stejných
+# oken: automatická aktualizace integrace počítá časy jen z východu/západu slunce,
+# bez náhody. Proto je v integraci vypnutá (auto_update 0) a stahuje se tady:
+# každou hodinu v :23 + náhodné zpoždění 0–20 min, jen přes den, do denního limitu.
+# Zavedeno 13. 10. 2026; vrátit = smazat automatizaci a v integraci zapnout auto_update.
+# V létě (dlouhý den) limit dojde kolem 13–14 h – případně pak řídit rozestupem.
+
+automation:
+  - id: hav2_solcast_update
+    alias: HAv2 – Solcast aktualizace v náhodný čas
+    description: >-
+      Stáhne předpověď Solcastu každou hodinu v :23 s náhodným zpožděním 0–20 min,
+      od 30 min po východu do 30 min před západem slunce, dokud nedojde denní limit API.
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: time_pattern
+        minutes: 23
+    conditions:
+      - condition: sun
+        after: sunrise
+        after_offset: "00:30:00"
+        before: sunset
+        before_offset: "-00:30:00"
+      - condition: numeric_state
+        entity_id: sensor.solcast_pv_forecast_api_used
+        below: sensor.solcast_pv_forecast_api_limit
+    actions:
+      - delay:
+          seconds: "{{ range(0, 1200) | random }}"
+      - action: solcast_solar.update_forecasts

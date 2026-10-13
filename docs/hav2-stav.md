@@ -36,6 +36,10 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - Nasazení na HA (rsync, push dashboardu, zápisy do statistik/registru) až s výslovným souhlasem uživatele.
 - Ranní kontrola: PND za včerejšek úplné (`energy_boiler_pnd_daily.date` = včerejšek), odchylky `meas_*`, noc
   z jsonl (plán, SOC, EV, filtrace), log HA a AppDaemonu.
+  + **Solcast** (od 13. 10.): běhy `automation.hav2_solcast_aktualizace_v_nahodny_cas` (časy :23 + 0–20 min, různé
+  každý den), `sensor.solcast_pv_forecast_api_used` večer ≈ limit 9, atributy `failure_count_today/_7_day`
+  senzoru `…_api_last_polled` (429 by měly ubývat), `binary_sensor.energy_forecast_valid` ráno `on`.
+  + **Forecast.Solar**: dnes/zítra vs. Solcast a skutečnost (podklad pro C8 a zálohu předpovědi).
 - **Statistiky přes WS/službu:** recorder zapisuje se zpožděním (desítky s až minuty) – kontrolovat až po ustálení
   a další import navazující na součty spouštět až po zápisu předchozího.
 
@@ -65,7 +69,9 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - C1 záporný výkup s plnou baterií, C3 nesoulad filtrace s vypínači, C4 večerní prodej (6. 10. 18–20 h – vyhodnotit
   VT nákup po prodeji), C6 3f z plné baterie / NT nabíjení před zataženým dnem.
 **Termíny:**
-- **~16. 10.:** C8 – Solcast automatické tlumení vs. pevná korekce `hav2.jinja` (+ 0/7 přesnost předpovědí).
+- **~16. 10.:** C8 – Solcast automatické tlumení vs. pevná korekce `hav2.jinja` (+ 0/7 přesnost předpovědí);
+  nově i **Forecast.Solar** (od 13. 10.) – přesnost proti skutečnosti a návrh zálohy: když Solcast neplatí
+  (`energy_forecast_valid` off), použít Forecast.Solar místo FVE × 0,5.
 - **~18. 10.:** grafy kWh/den sauny a mrazáku už úplné (statistiky smazány 4. 10.).
 - **~19. 10.:** uživatel smaže HA zálohu `982d67d5` (před přepočtem historie výkupu); `19a8c8ff` (před smazáním PND app)
   lze smazat také, až bude jasné, že nic nechybí.
@@ -88,6 +94,19 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Měsíční měřiče Kč** běží: nákup 415,12 − prodej 180,22 = 234,90 ≈ netto 234,87.
 - **Solcast od 12. 10. 7:12 bez aktualizace** – všech 8 pokusů 12. 10. skončilo 429 (hobby účet), další 13. 10. 7:14.
   Předpověď 7 dní z 12. 10. ráno platí dál. **Obnoveno 13. 10. 6:46** (po restartu HA).
+- **Solcast v náhodný čas (uživatel 13. 10.):** automatická aktualizace integrace nemá náhodu (časy jen z východu/
+  západu slunce) → všichni uživatelé v regionu ve stejných oknech → 429. V integraci `auto_update` = 0 (none),
+  nově `packages/hav2_forecast.yaml`: `automation.hav2_solcast_aktualizace_v_nahodny_cas` – každou hodinu v :23
+  + `delay` 0–20 min, slunce +30 min / −30 min, `api_used < api_limit` (9/den), `mode: single`. Říjen ~8:23–16:43,
+  v létě dojde limit kolem 13–14 h (pak řešit rozestupem). Vrátit: smazat balíček a `auto_update` = 1.
+  `binary_sensor.energy_forecast_valid` 14 → **18 h** (bez toho by v zimě ráno platilo FVE × 0,5 → zbytečné NT
+  nabíjení baterie; dnes 5:30 1,5 kWh kvůli neplatné předpovědi z 12. 10.).
+- **Forecast.Solar (zdarma, 1 rovina, aktualizace 1×/h):** 7,5 kWp, sklon 13°, azimut 172° (Solcast −172° = 8° od
+  jihu k východu), entry `01M4SV5DNH5F54WQ5TGWX4GYJB`. Entity bez prefixu (`sensor.energy_production_today`,
+  `_tomorrow`, `_today_remaining`, `energy_current_hour`, `energy_next_hour`, `power_production_now`,
+  `power_highest_peak_time_*`), štítky hav2 + hav2_system. Přejmenování na `forecast_solar_*` jen ručně v UI
+  (doporučeno před prvním použitím). První hodnoty: dnes 18,9 / zítra 9,1 kWh (Solcast surově 27,7 / 16,2,
+  opravená 20,8 / 12,1). Zatím jen sběr, HAv2 ho nepoužívá.
 - **Logy:** AppDaemon bez chyb. HA: bezpečnostní filtr zablokoval ~210 skenovacích dotazů z internetu (`/@fs/../.env`,
   `cgi-bin`, `proc/self/environ`) – HA je zvenku dostupný přes Nabu Casa (`home.supler.eu`). **Blokování IP:** od HA
   2026.10 jen v UI (Nastavení → Systém → Síť; blok `http:` v YAML se ignoruje → oprava). Uživatel 13. 10. nastavil

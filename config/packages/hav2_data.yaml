@@ -526,10 +526,11 @@ template:
         default_entity_id: binary_sensor.energy_forecast_valid
         device_class: connectivity
         icon: mdi:weather-sunny-alert
-        # Solcast aktualizoval do 14 h (přes noc neaktualizuje) a má zítřek
+        # Solcast aktualizoval do 18 h (přes noc neaktualizuje; v zimě poslední dotaz ~15:30 → ráno 6:00
+        # musí platit, jinak plán bere FVE × 0,5 a zbytečně nabíjí v NT – 13. 10. 2026) a má zítřek
         state: >
           {% set polled = states('sensor.solcast_pv_forecast_api_last_polled') | as_datetime(none) %}
-          {{ polled is not none and (now() - polled).total_seconds() < 14 * 3600
+          {{ polled is not none and (now() - polled).total_seconds() < 18 * 3600
              and states('sensor.solcast_pv_forecast_forecast_tomorrow') | is_number }}
 
   # ------------------------------------------------ EV náklady – souhrny pro dashboard
