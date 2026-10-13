@@ -106,7 +106,14 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   `sensor.forecast_solar_energy_production_today`, `…_today_remaining`, `…_tomorrow`, `…_energy_current_hour`,
   `…_energy_next_hour`, `…_power_production_now`, `…_power_highest_peak_time_today` / `_tomorrow` (všech 8,
   ověřeno). Štítky hav2 + hav2_system. První hodnoty: dnes 18,9 / zítra 9,1 kWh (Solcast surově 27,7 / 16,2,
-  opravená 20,8 / 12,1). Zatím jen sběr, HAv2 ho nepoužívá.
+  opravená 20,8 / 12,1).
+- **Solcast 13. 10. celý den 429:** 5 náhodných běhů (8:34–12:34) × 10 pokusů = vše 429, použito jen 2/9. Náhodné
+  časy nechat (neškodí), ale nespasí to → **záloha přes Forecast.Solar (nasazeno 13:18)**: když
+  `energy_forecast_valid` = off, plánovač (`P.stale_pv_fallback`) bere tvar dne z poslední opravené předpovědi
+  a denní součet podle `sensor.forecast_solar_energy_production_today` / `_tomorrow`, jen dolů (faktor 0,3–1,0);
+  den bez zálohy × 0,5 jako dřív. Atribut `pv_source` v `sensor.energy_plan` ("Solcast (opravená)" nebo
+  "Forecast.Solar: 13.10. ×0.91, 14.10. ×0.75"). Test `test_stale_pv_fallback_scales_days_to_backup_only_down`.
+  **Ověřit při prvním neplatném Solcastu** (ranní kontrola: `pv_source`, NT nabíjení v 5:30 dává smysl).
 - **Logy:** AppDaemon bez chyb. HA: bezpečnostní filtr zablokoval ~210 skenovacích dotazů z internetu (`/@fs/../.env`,
   `cgi-bin`, `proc/self/environ`) – HA je zvenku dostupný přes Nabu Casa (`home.supler.eu`). **Blokování IP:** od HA
   2026.10 jen v UI (Nastavení → Systém → Síť; blok `http:` v YAML se ignoruje → oprava). Uživatel 13. 10. nastavil

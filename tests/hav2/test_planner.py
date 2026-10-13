@@ -362,3 +362,22 @@ def test_low_soc_tops_up_at_end_of_nt_instead_of_vt_purchase():
     # buď noc auto + dobití na konci NT, nebo držet (dům v NT ze sítě) – hlavně ne nákup ve VT
     assert plan.candidates["auto+0.5"] < plan.candidates["auto"]
     assert vt_import(plan.results) < 0.05 < vt_import(auto)
+
+
+def test_stale_pv_fallback_scales_days_to_backup_only_down():
+    """Neplatný Solcast (13. 10. 2026): denní součet podle Forecast.Solar, tvar z poslední předpovědi,
+    jen dolů (0,3–1,0); den bez zálohy × 0,5."""
+    from hav2_planner import stale_pv_fallback
+    d0 = datetime(2026, 10, 13, 0, 0, tzinfo=TZ)
+    pv = [(d0 + timedelta(minutes=30 * i), 2.0 if 18 <= i % 48 < 34 else 0.0) for i in range(96)]  # 16 kWh/den
+    out, src = stale_pv_fallback(pv, {d0.date(): 8.0, (d0 + timedelta(days=1)).date(): 40.0})
+    day = lambda d: sum(kw * 0.5 for t, kw in out if t.date() == d)  # noqa: E731
+    assert abs(day(d0.date()) - 8.0) < 1e-6                                 # dolů na zálohu
+    assert abs(day((d0 + timedelta(days=1)).date()) - 16.0) < 1e-6          # nahoru ne
+    assert [kw > 0 for _, kw in out] == [kw > 0 for _, kw in pv]           # tvar dne zachován
+    assert "13.10. ×0.50" in src and "14.10. ×1.00" in src
+    low, _ = stale_pv_fallback(pv[:48], {d0.date(): 1.0})
+    assert abs(sum(kw * 0.5 for _, kw in low) - 16.0 * 0.3) < 1e-6          # min. 0,3
+    half, src2 = stale_pv_fallback(pv[:48], {})
+    assert abs(sum(kw * 0.5 for _, kw in half) - 8.0) < 1e-6 and "bez zálohy" in src2
+    assert stale_pv_fallback([], {}) == ([], "—")

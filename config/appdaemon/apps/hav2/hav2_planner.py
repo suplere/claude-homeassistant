@@ -105,6 +105,28 @@ class Plan:
 # ----------------------------------------------------------------- sloty
 
 
+def stale_pv_fallback(pv: Sequence[Tuple[datetime, float]], backup_kwh: Dict[object, float],
+                      default: float = 0.5, lo: float = 0.3) -> Tuple[List[Tuple[datetime, float]], str]:
+    """Neplatná předpověď Solcastu: tvar dne z poslední opravené předpovědi, denní součet podle
+    zálohy (Forecast.Solar, kWh po dnech). Jen dolů (faktor lo–1,0); den bez zálohy × default.
+
+    pv = [(začátek slotu, kW)] se stejným krokem; vrací (sloty, popis zdroje). Uživatel 13. 10. 2026.
+    """
+    if not pv:
+        return [], "—"
+    step_h = ((pv[1][0] - pv[0][0]).total_seconds() / 3600) if len(pv) > 1 else 0.5
+    day_kwh: Dict[object, float] = {}
+    for t, kw in pv:
+        day_kwh[t.date()] = day_kwh.get(t.date(), 0.0) + kw * step_h
+    factors = {}
+    for day, kwh in day_kwh.items():
+        b = backup_kwh.get(day)
+        factors[day] = default if b is None or kwh <= 0 else min(1.0, max(lo, b / kwh))
+    parts = [f"{d:%d.%m.} ×{f:.2f}" + ("" if backup_kwh.get(d) is not None else " (bez zálohy)")
+             for d, f in sorted(factors.items())]
+    return [(t, kw * factors[t.date()]) for t, kw in pv], "Forecast.Solar: " + ", ".join(parts)
+
+
 def floor_slot(ts: datetime) -> datetime:
     return ts.replace(minute=ts.minute - ts.minute % 15, second=0, microsecond=0)
 

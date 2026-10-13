@@ -523,8 +523,18 @@ class Hav2(EvControl, PoolControl, hass.Hass):
         now = datetime.now(TZ)
         pv = self._pv_slots()
         forecast_ok = self.get_state("binary_sensor.energy_forecast_valid") == "on" and bool(pv)
-        if not forecast_ok:
-            pv = [(t, kw * 0.5) for t, kw in pv]  # konzervativně
+        pv_source = "Solcast (opravená)"
+        if not forecast_ok:  # neplatný Solcast → denní součty z Forecast.Solar, bez nich × 0,5
+            today = now.date()
+            backup = {}
+            for day, ent in ((today, "sensor.forecast_solar_energy_production_today"),
+                             (today + timedelta(days=1), "sensor.forecast_solar_energy_production_tomorrow")):
+                v = self.get_state(ent)
+                try:
+                    backup[day] = float(v)
+                except (TypeError, ValueError):
+                    pass
+            pv, pv_source = P.stale_pv_fallback(pv, backup)
         is_nt, nt_source = self._nt_fn()
 
         def load(h: datetime) -> float:
@@ -600,6 +610,7 @@ class Hav2(EvControl, PoolControl, hass.Hass):
             "pv_tomorrow_kwh": f"{sum(s.pv_kwh for s in slots if s.start.date() > today):.2f}",
             "load_tomorrow_kwh": f"{sum(s.load_kwh for s in slots if s.start.date() > today):.2f}",
             "forecast_ok": "ano" if forecast_ok else "ne",
+            "pv_source": pv_source,
             "nt_source": nt_source,
             "profile_source": self.profile_source,
             "sauna": (f"{sauna[0]:%H:%M}–{sauna[1]:%H:%M}, {sauna[2]:.1f} kW" if sauna else "ne"),
