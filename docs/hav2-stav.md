@@ -87,9 +87,12 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   (−5,0 %), `meas_*` +0,09 / −0,08. Bojler 5,06 kWh / 17,76 Kč.
 - **Měsíční měřiče Kč** běží: nákup 415,12 − prodej 180,22 = 234,90 ≈ netto 234,87.
 - **Solcast od 12. 10. 7:12 bez aktualizace** – všech 8 pokusů 12. 10. skončilo 429 (hobby účet), další 13. 10. 7:14.
-  Předpověď 7 dní z 12. 10. ráno platí dál. Ověřit, že se 13. 10. obnoví.
+  Předpověď 7 dní z 12. 10. ráno platí dál. **Obnoveno 13. 10. 6:46** (po restartu HA).
 - **Logy:** AppDaemon bez chyb. HA: bezpečnostní filtr zablokoval ~210 skenovacích dotazů z internetu (`/@fs/../.env`,
-  `cgi-bin`, `proc/self/environ`) – HA je zvenku dostupný; `ip_ban_enabled` není nastaveno (návrh pro uživatele).
+  `cgi-bin`, `proc/self/environ`) – HA je zvenku dostupný přes Nabu Casa (`home.supler.eu`). **Blokování IP:** od HA
+  2026.10 jen v UI (Nastavení → Systém → Síť; blok `http:` v YAML se ignoruje → oprava). Uživatel 13. 10. nastavil
+  práh 5 neúspěšných přihlášení (dříve −1 = nikdy), ověřeno `http/config`; odblokovat = smazat `/config/ip_bans.yaml`
+  záznam + restart. Restarty HA 6:46 a 7:00 bez zásahu watchdogů.
   Dál známé: iOS „non-zero reserved bits“ (997×), EcoVolter timeouty (29×), chromecasty, CEZ HDO captcha 1× opakována.
 
 ### 0k. Kontrola 12. 10. ráno
