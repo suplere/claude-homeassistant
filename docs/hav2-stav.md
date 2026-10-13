@@ -102,10 +102,11 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   `binary_sensor.energy_forecast_valid` 14 → **18 h** (bez toho by v zimě ráno platilo FVE × 0,5 → zbytečné NT
   nabíjení baterie; dnes 5:30 1,5 kWh kvůli neplatné předpovědi z 12. 10.).
 - **Forecast.Solar (zdarma, 1 rovina, aktualizace 1×/h):** 7,5 kWp, sklon 13°, azimut 172° (Solcast −172° = 8° od
-  jihu k východu), entry `01M4SV5DNH5F54WQ5TGWX4GYJB`. Entity bez prefixu (`sensor.energy_production_today`,
-  `_tomorrow`, `_today_remaining`, `energy_current_hour`, `energy_next_hour`, `power_production_now`,
-  `power_highest_peak_time_*`), štítky hav2 + hav2_system. Přejmenování na `forecast_solar_*` jen ručně v UI
-  (doporučeno před prvním použitím). První hodnoty: dnes 18,9 / zítra 9,1 kWh (Solcast surově 27,7 / 16,2,
+  jihu k východu), entry `01M4SV5DNH5F54WQ5TGWX4GYJB`. Entity přejmenovány (uživatel 13. 10.) na
+  `sensor.forecast_solar_energy_production_today`, `…_today_remaining`, `…_energy_current_hour`,
+  `…_energy_next_hour`, `…_power_production_now`, `…_power_highest_peak_time_today`; **zbývá ručně v UI**
+  `sensor.energy_production_tomorrow` a `sensor.power_highest_peak_time_tomorrow` → `forecast_solar_*`
+  (přejmenování zablokovalo oprávnění Claude Code). Štítky hav2 + hav2_system. První hodnoty: dnes 18,9 / zítra 9,1 kWh (Solcast surově 27,7 / 16,2,
   opravená 20,8 / 12,1). Zatím jen sběr, HAv2 ho nepoužívá.
 - **Logy:** AppDaemon bez chyb. HA: bezpečnostní filtr zablokoval ~210 skenovacích dotazů z internetu (`/@fs/../.env`,
   `cgi-bin`, `proc/self/environ`) – HA je zvenku dostupný přes Nabu Casa (`home.supler.eu`). **Blokování IP:** od HA
