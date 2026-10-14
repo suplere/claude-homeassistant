@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 13. 10. 2026)
+# HAv2 – stav a předávka (k 14. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -82,6 +82,19 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
 
+### 0n. Kontrola 14. 10. ráno – záloha Forecast.Solar poprvé naostro
+- **Záloha funguje:** Solcast od 13. 10. 7:14 bez úspěchu → `energy_forecast_valid` off v 1:15 → plán hned přepočten
+  s `pv_source` „Forecast.Solar: 14.10. ×0.75, 15.10. ×0.68“ (místo ×0,5) → standby (baterie drží 47 % na ráno).
+  Forecast.Solar se přes noc aktualizuje (1×/h) → 2:30 zítřek ×0,62, **4:30 ×0,78 / ×0,86** → plán „auto“ + večerní
+  prodej z baterie (19:00 5 kW, spot 5,40 → výkup 4,05 > NT 3,51), baterie od 4:30 kryje dům v NT (47 → 41 % v 6:00),
+  NT nabíjení 0. Cena zbytku dne v plánu 20,5 → 6,4 Kč. Rozumné; sledovat, zda večerní prodej + nákup v NT vyjde (C4).
+- **22:00–1:15 (ještě platný Solcast):** „auto, NT bez nabíjení, FVE zítra 16,3 kWh baterii dobije“ – baterie kryla dům
+  i v NT (57 → 47 %), protože stará předpověď slibovala 16 kWh. Po zálohové předpovědi (~9,4 kWh dnes) standby.
+- **PND 13. 10.** kompletní: nákup +0,12 kWh (0,6 %), **prodej −0,28 kWh (−21,9 %)** (malý prodej, obvykle −0,1) –
+  sledovat; `meas_*` +0,02 / −0,12. Bojler 6,14 kWh / 21,43 Kč.
+- **Měsíc:** nákup 429,37 − prodej 184,47 = 244,90 ≈ netto 244,87 Kč.
+- **Solcast:** 7denní chyby 184, dnes zatím 0 (první běh 8:23). Kia 74 %, potřeba 5,2, slunce do 4 dnů 6,9 → bez NT.
+
 ### 0m. Večerní kontrola 13. 10.
 - **Den:** FVE 15,9 kWh (HAv2 předpověď ze 7:14 21,6 = +36 %, Forecast.Solar 17,5 = +10 %, Solcast surově 27,7).
   Filtrace 3,5/3,5 h ze slunce, baterie 37 → 100 % (16:06), večer 68 % v 19:40 (krátce 4,3 kW domácí zátěž 19:06–19:18).
@@ -92,7 +105,7 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   potřeba 5,2 kWh, slunce do 4 dnů 14,6 → bez NT.
 - **Solcast:** všech 10 náhodných běhů (8:34–17:5x) × 10 pokusů = 429, úspěch jen 6:46 a 7:14. Předpověď platí do
   1:14 → **v noci poprvé záloha Forecast.Solar** (zítra 8,9 vs. Solcast opravená 11,8 → ×0,75). Ověřit ráno
-  `pv_source` a rozhodnutí 5:30.
+  `pv_source` a rozhodnutí 5:30. → **ověřeno 14. 10.** (§0n).
 - **Logy:** HA chyby jen Solcast 429; AppDaemon bez varování od nasazení 13:18.
 
 ### 0l. Kontrola 13. 10. ráno
