@@ -82,6 +82,19 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
 
+### 0o. Večerní kontrola 14. 10.
+- **Solcast:** všech 9 náhodných běhů prošlo (první 8:26, poslední 16:39, limit 9/9), 0 chyb. Platí od 8:26.
+- **FVE 9,9 kWh:** Solcast opravená (poslední) 10,9, záloha z rána (FS × 0,78) 9,4 – sedí; Forecast.Solar sám 15,1
+  (+53 %; včera +10 %) → jako jediný zdroj nespolehlivý, jako strop pro neplatný Solcast OK.
+- **Baterie:** 35 → 86 % (16:30); **večerní prodej 19:00–19:45 5 kW** (spot 7,20 ≥ práh 7,20) 78 → 44 % (~3,4 kWh,
+  výkup ~5,4 Kč/kWh); pak dům 44 → 30 %, od 22:00 standby (drží 30 % na ráno, min. plánu 23 %). Netto dne −3,09 Kč.
+- **EV:** Kia 74 % připojená, nenabíjela – přebytek pro EV (přebytek − rezerva baterie ~1,1–1,3 kW na večerní
+  prodej) jen krátce nad 1270 W (13–14 h), baterie měla přednost. Správně. Slunce do 4 dnů 14,2 → bez NT.
+- **Filtrace** 3,5/3,5 h ze slunce.
+- **Aktualizace čekají:** Shelly firmware 2.1.0 (sauna Pro 1PM, bazén Pro EM-50), ha-mcp server 8.7.0 + komponenta
+  2.2.2 (oprava „server_update_held“ – server čeká na komponentu z HACS, ta vyžaduje restart HA).
+- **Logy:** skenování z internetu dál (~420×, filtrováno), EcoVolter timeouty, iOS – nic HAv2.
+
 ### 0n. Kontrola 14. 10. ráno – záloha Forecast.Solar poprvé naostro
 - **Záloha funguje:** Solcast od 13. 10. 7:14 bez úspěchu → `energy_forecast_valid` off v 1:15 → plán hned přepočten
   s `pv_source` „Forecast.Solar: 14.10. ×0.75, 15.10. ×0.68“ (místo ×0,5) → standby (baterie drží 47 % na ráno).
