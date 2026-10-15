@@ -91,8 +91,9 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **EV:** Kia 74 % připojená, nenabíjela – přebytek pro EV (přebytek − rezerva baterie ~1,1–1,3 kW na večerní
   prodej) jen krátce nad 1270 W (13–14 h), baterie měla přednost. Správně. Slunce do 4 dnů 14,2 → bez NT.
 - **Filtrace** 3,5/3,5 h ze slunce.
-- **Aktualizace čekají:** Shelly firmware 2.1.0 (sauna Pro 1PM, bazén Pro EM-50), ha-mcp server 8.7.0 + komponenta
-  2.2.2 (oprava „server_update_held“ – server čeká na komponentu z HACS, ta vyžaduje restart HA).
+- **Aktualizace (uživatel 15. 10. ~2:00):** Shelly firmware 2.1.0 (sauna Pro 1PM, bazén Pro EM-50) – měření hlásí;
+  ha-mcp komponenta 2.2.2 + restart HA → server 8.7.0 sám, oprava „server_update_held“ zmizela. Po restartu
+  (2:00) plán 2:01 standby, žádný watchdog, Solcast platný.
 - **Logy:** skenování z internetu dál (~420×, filtrováno), EcoVolter timeouty, iOS – nic HAv2.
 
 ### 0n. Kontrola 14. 10. ráno – záloha Forecast.Solar poprvé naostro
