@@ -1,4 +1,4 @@
-# HAv2 – stav a předávka (k 14. 10. 2026)
+# HAv2 – stav a předávka (k 15. 10. 2026)
 
 Zadání: `docs/HAv2_prompt.md` · Návrh (schválený): `docs/hav2-architektura.md` · Záloha v1 a plán mazání: `archive/v1-2026-09-25/README.md`
 
@@ -81,6 +81,18 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   případně VT 6,10 → 6,09.
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
+
+### 0p. Kontrola 15. 10. dopoledne
+- **Noc:** standby, baterie drží 29 % (prodej 14. 10. večer), 5:46 „auto“ (Solcast zítra 21,7 → baterie kryje dům
+  15 min NT), 6:00 27 %, 9:41 24 % (ve VT na min. SOC – plán to hlásil, cena za prodej + NT nákup). NT nabíjení 0.
+  Plán zbytku dne −12,8 Kč (4× 15 min prodej večer).
+- **PND 14. 10.** kompletní: nákup +0,11 kWh (1,4 %), prodej −0,05 (−1,5 %) – včerejší −22 % se neopakuje.
+  `cez_pnd` při restartu 2:01 stáhl neúplný den (61/96 intervalů, hodina 15:00 vynechána) → ranní synchronizace
+  doplnila (hodinové statistiky 13–16 h UTC 14. 10. úplné). Bojler 4,36 kWh / 15,28 Kč.
+- **Přesnost předpovědi HAv2 (6:00) poslední 2 dny nadhodnocená:** 13. 10. 22,1 vs 15,9 (+39 %), 14. 10. 11,8 vs 9,9
+  (+19 %) – proti zjištění z 13. 10. (říjnový faktor na jasných dnech podhodnocuje). Do C8 (16. 10.) brát obojí.
+- **Solcast:** dnes 2/9 úspěšně (poslední 9:37), 0 chyb. Kia 74 %, potřeba 5,2, slunce zítra ~14:00 → bez NT.
+- **Měsíc:** nákup 453,56 − prodej 202,97 = 250,59 ≈ netto 250,55 Kč. Opravy v HA: 0. Logy: jen známé.
 
 ### 0o. Večerní kontrola 14. 10.
 - **Solcast:** všech 9 náhodných běhů prošlo (první 8:26, poslední 16:39, limit 9/9), 0 chyb. Platí od 8:26.
