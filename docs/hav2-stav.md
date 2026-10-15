@@ -93,6 +93,9 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
   (+19 %) – proti zjištění z 13. 10. (říjnový faktor na jasných dnech podhodnocuje). Do C8 (16. 10.) brát obojí.
 - **Solcast:** dnes 2/9 úspěšně (poslední 9:37), 0 chyb. Kia 74 %, potřeba 5,2, slunce zítra ~14:00 → bez NT.
 - **Měsíc:** nákup 453,56 − prodej 202,97 = 250,59 ≈ netto 250,55 Kč. Opravy v HA: 0. Logy: jen známé.
+- **Restart HA 10:27 (uživatel, aktualizace):** žádné další aktualizace nečekají, opravy 0; plán 10:28 „auto“,
+  žádný watchdog, filtrace jede ze slunce (Pro EM-50 521 W), EcoVolter/sauna hlásí. Nová trvalá notifikace ha-mcp
+  („HA-MCP Server běží uvnitř HA“) – jen informace, lze zavřít / vypnout v konfiguraci komponenty.
 
 ### 0o. Večerní kontrola 14. 10.
 - **Solcast:** všech 9 náhodných běhů prošlo (první 8:26, poslední 16:39, limit 9/9), 0 chyb. Platí od 8:26.
