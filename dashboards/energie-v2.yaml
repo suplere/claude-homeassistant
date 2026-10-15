@@ -897,7 +897,7 @@ views:
             features_position: inline
             features:
               - type: numeric-input
-                style: slider
+                style: buttons  # − / + po 5 %, posuvník šel omylem posunout při scrollování
           - type: markdown
             visibility:
               - condition: state

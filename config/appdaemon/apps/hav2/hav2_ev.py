@@ -464,6 +464,9 @@ class RegParams:
     support_max_min: float = 10.0
     support_max_kwh: float = 1.0
     resume_after_min: float = 5.0
+    # krátký pokles pod minimum odpočet startu jen pozastaví, delší ho vynuluje – za polojasna
+    # se jinak auto nerozjelo vůbec (15. 10. 2026: 33 min nad minimem v kouscích, start 0×)
+    resume_gap_s: float = 120.0
     up_margin_w: float = 150.0
     down_margin_w: float = 100.0
     # trouba/varná deska spínají ~2,5 kW na ~1 min každé 3–4 min → bez čekání ±1 A každou minutu.
@@ -532,6 +535,7 @@ class Regulator:
     phase_cond_since: Optional[datetime] = None
     phase_cond_dir: int = 0
     resume_since: Optional[datetime] = None
+    resume_dip_since: Optional[datetime] = None
     support_since: Optional[datetime] = None
     support_kwh: float = 0.0
     breaker_since: Optional[datetime] = None
@@ -587,7 +591,7 @@ class Regulator:
             return self._hold(i, self.state, "EcoVolter nedostupný – beze změny")
         if not i.connected:
             self._reset_episode()
-            self.resume_since = None
+            self.resume_since = self.resume_dip_since = None
             return self._cmd(False, p.amin, i.cur_phases, STATE_IDLE, "auto nepřipojeno")
 
         # ruční ovládání má přednost
@@ -665,18 +669,28 @@ class Regulator:
         # --- nabíjení neběží: čekáme na stabilní přebytek
         if not i.cur_enabled:
             if avail_kw >= lowest:
+                if self.resume_since and self.resume_dip_since:
+                    self.resume_since += i.now - self.resume_dip_since  # pokles se nepočítá
+                self.resume_dip_since = None
                 self.resume_since = self.resume_since or i.now
                 waited = (i.now - self.resume_since).total_seconds() / 60
                 if waited >= p.resume_after_min:
                     ph = 3 if (avail_kw >= min_3f_eff or not p.allow_1f) else 1
                     amps = max_amps_for(ph, avail_kw, p.amin, p.amax) or p.amin
-                    self.resume_since = None
+                    self.resume_since = self.resume_dip_since = None
                     self._reset_episode()
                     return self._cmd(True, self._cap(i, ph, amps), ph, STATE_SOLAR,
                                      f"přebytek {i.surplus_w:.0f} W stabilní {waited:.0f} min → start {amps} A {ph}f")
                 return self._cmd(False, i.cur_amps, i.cur_phases, STATE_PAUSED,
                                  f"přebytek {i.surplus_w:.0f} W, čekám {p.resume_after_min - waited:.0f} min")
-            self.resume_since = None
+            if self.resume_since:
+                self.resume_dip_since = self.resume_dip_since or i.now
+                if (i.now - self.resume_dip_since).total_seconds() <= p.resume_gap_s:
+                    waited = (self.resume_dip_since - self.resume_since).total_seconds() / 60
+                    return self._cmd(False, i.cur_amps, i.cur_phases, STATE_PAUSED,
+                                     f"přebytek {i.surplus_w:.0f} W – krátký pokles, odpočet stojí "
+                                     f"(zbývá {p.resume_after_min - waited:.0f} min)")
+            self.resume_since = self.resume_dip_since = None
             return self._cmd(False, i.cur_amps, i.cur_phases, STATE_PAUSED,
                              f"přebytek {i.surplus_w:.0f} W < {lowest * 1000:.0f} W")
 
@@ -694,7 +708,7 @@ class Regulator:
                 # v noci) → hned pauza; jinak starý časovač fází přepnul na 1f a minutu nabíjel
                 # bez držení baterie (11. 10. 2026 0:15)
                 self._reset_episode()
-                self.resume_since = None
+                self.resume_since = self.resume_dip_since = None
                 self.phase_cond_dir, self.phase_cond_since = 0, None
                 return self._cmd(False, p.amin, ph, STATE_PAUSED,
                                  f"konec režimu {self.state}: přebytek {i.surplus_w:.0f} W < minimum → pauza")
@@ -762,7 +776,7 @@ class Regulator:
         if i.boiler_reserve_w > 0 and deficit_kw * 1000 <= i.boiler_reserve_w:
             # chybí jen kvůli rezervě pro bojler → nedotovat z baterie, přetok nechat bojleru
             self._reset_episode()
-            self.resume_since = None
+            self.resume_since = self.resume_dip_since = None
             return self._cmd(False, amps, ph, STATE_PAUSED,
                              f"pozastaveno: přebytek nechán bojleru ({i.boiler_reserve_w:.0f} W)")
         if boost and ph == 3 and deficit_kw * 1000 <= p.boost_max_deficit_w:
@@ -785,7 +799,7 @@ class Regulator:
                else "Solcast nevidí návrat přebytku" if not i.sun_returns
                else f"limit dotování ({mins:.0f} min / {self.support_kwh:.2f} kWh)")
         self._reset_episode()
-        self.resume_since = None
+        self.resume_since = self.resume_dip_since = None
         return self._cmd(False, amps, ph, STATE_PAUSED, f"pozastaveno: {why}")
 
 

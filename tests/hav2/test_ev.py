@@ -165,13 +165,27 @@ def test_resume_after_stable_surplus():
     assert cmd.enable and cmd.phases == 3 and cmd.amps == 8
 
 
-def test_resume_resets_when_surplus_drops():
+def test_resume_resets_when_surplus_drops_longer():
     reg = Regulator(state=STATE_PAUSED)
     inp = inputs(surplus_w=5300, cur_enabled=False)
     _, inp = run(reg, inp, 4)
-    _, inp = run(reg, inp, 1, surplus_w=500)
+    _, inp = run(reg, inp, 4, surplus_w=500)  # pokles > 2 min → znovu od nuly
     cmd, _ = run(reg, inp, 3, surplus_w=5300)
     assert not cmd.enable
+
+
+def test_resume_short_dip_only_pauses_countdown():
+    """15. 10. 2026: přebytek nad minimem v kouscích, každý krátký pokles nuloval odpočet → auto stálo.
+    Pokles do 2 min odpočet jen pozastaví (doba poklesu se nepočítá)."""
+    reg = Regulator(state=STATE_PAUSED)
+    inp = inputs(surplus_w=5300, cur_enabled=False)
+    _, inp = run(reg, inp, 3)
+    cmd, inp = run(reg, inp, 2, surplus_w=500)
+    assert not cmd.enable and "odpočet stojí" in cmd.reason
+    cmd, inp = run(reg, inp, 2, surplus_w=5300)
+    assert not cmd.enable                        # 2 + 2 min < 5 min (pokles se nepočítá)
+    cmd, _ = run(reg, inp, 1, surplus_w=5300)
+    assert cmd.enable and cmd.state == STATE_SOLAR
 
 
 def test_boiler_caps_3f_current():

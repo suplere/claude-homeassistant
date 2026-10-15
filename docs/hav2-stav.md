@@ -91,8 +91,14 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **Cíl 80 → 90 → 100 → 90 %** (15:17–15:25, účet uživatele) – jednorázový cíl nad standardem se po nabití/odjezdu
   vrátí na 80 %. Kia mezitím jela (13:15–15:04, 74 → 71 %) → potřeba 16,3 kWh, slunce do 4 dnů 13,7 → NT 2,6 kWh
   ve 22:00 (zmenší se o dnešní nabíjení ze slunce).
-- **Návrhy:** (1) parametry regulace na dashboardu chránit před posunutím při scrollování (helpery `mode: box`
-  nebo karta jen pro čtení); (2) odpočet startu nenulovat při krátkém poklesu (jako `down_hold` u snižování proudu).
+- **Nasazeno 15:48 (uživatel):** (1) 25 parametrů (EV regulace, bazén, baterie, ceny, sauna) `mode: box` – na
+  dashboardu pole místo posuvníku; „Cílový SOC“ na záložce EV tlačítka −/+ (`numeric-input style: buttons`).
+  (2) `Regulator`: pokles pod minimum do `resume_gap_s` = 120 s odpočet startu jen pozastaví (doba poklesu se
+  nepočítá), delší ho vynuluje; text „krátký pokles, odpočet stojí“. Testy `test_resume_short_dip_only_pauses_countdown`,
+  `…_resets_when_surplus_drops_longer`. Přehráno: 13. 10. odpoledne start 15:23 (dřív žádný), 14. a 15. 10. beze změny
+  (krátké výpadky tam nebyly hlavní problém, ale 28 min). Ověřit při příštím polojasnu.
+- **Termín 90 %:** uživatel opravil `input_datetime.ev_deadline` na 16. 10. 5:00 → plán NT 13,2 kWh od 22:00.
+  **Ověřit ráno 16. 10.: Kia 90 % v 5:00.**
 - SSH: `homeassistant.local` (mDNS) z Macu dočasně nešlo přeložit → přes IP s `HostKeyAlias=homeassistant.local`
   (klíč ED25519 přidán do known_hosts pod jménem; starý záznam pro IP 192.168.68.115 v known_hosts:37 je zastaralý).
 
