@@ -82,6 +82,20 @@ Návrat k v1 jen obnovou HA zálohy `465189a7` (před úklidem v1) nebo `81c05fc
 - **~září 2027:** porovnat nabídky dodavatelů před koncem fixace ARMEX 4. 3. 2028 (nabídka z 9. 10. 2026 dražší – doporučeno nebrat, §0h).
 **Volitelně (uživatel):** B3 kratší ID helperů bojleru; oblast Sklep pro mrazák; druhý kanál (IB) Pro EM-50 volný.
 
+### 0q. 15. 10. odpoledne – auto nenabíjelo z přetoku (`ev_resume_after_min` = 28 min)
+- **Příčina:** `input_number.ev_resume_after_min` (start nabíjení po stabilním přebytku) bylo **28 min** (nejpozději
+  od 8. 10., uživatel nejspíš omylem posunul posuvník na mobilu; návrh 5 min). Každý pokles pod minimum (1270 W
+  pro 6 A 1f) odpočet nuluje → 15. 10. dopoledne 33 min nad minimem v kouscích, nenastartovalo (přebytek šel do
+  baterie 19 → 98 %, do sítě jen ~0,4 kWh); 15:09–15:34 plná baterie, ~2 kW do sítě, „čekám 28 min“. Stejně 13. 10.
+- **Uživatel 15:34 vrátil na 5 min** → 15:35 start 9 A 1f, síť ~0. Parametry regulátor čte každý krok (`ev_params`).
+- **Cíl 80 → 90 → 100 → 90 %** (15:17–15:25, účet uživatele) – jednorázový cíl nad standardem se po nabití/odjezdu
+  vrátí na 80 %. Kia mezitím jela (13:15–15:04, 74 → 71 %) → potřeba 16,3 kWh, slunce do 4 dnů 13,7 → NT 2,6 kWh
+  ve 22:00 (zmenší se o dnešní nabíjení ze slunce).
+- **Návrhy:** (1) parametry regulace na dashboardu chránit před posunutím při scrollování (helpery `mode: box`
+  nebo karta jen pro čtení); (2) odpočet startu nenulovat při krátkém poklesu (jako `down_hold` u snižování proudu).
+- SSH: `homeassistant.local` (mDNS) z Macu dočasně nešlo přeložit → přes IP s `HostKeyAlias=homeassistant.local`
+  (klíč ED25519 přidán do known_hosts pod jménem; starý záznam pro IP 192.168.68.115 v known_hosts:37 je zastaralý).
+
 ### 0p. Kontrola 15. 10. dopoledne
 - **Noc:** standby, baterie drží 29 % (prodej 14. 10. večer), 5:46 „auto“ (Solcast zítra 21,7 → baterie kryje dům
   15 min NT), 6:00 27 %, 9:41 24 % (ve VT na min. SOC – plán to hlásil, cena za prodej + NT nákup). NT nabíjení 0.
